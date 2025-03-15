@@ -137,38 +137,43 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     reader.onload = (e) => {
         const text = e.target.result;
         try {
-            // Skip the header line and filter out empty lines
-            const lines = text.split('\n').filter(line => line.trim());
+            // Remove any carriage returns and split by newline
+            const lines = text.replace(/\r/g, '').split('\n').filter(line => line.trim());
             console.log('Total lines:', lines.length);
             
-            const allNetworks = lines.slice(1).map(line => {
-                // Use regex to properly split CSV, handling commas within fields
-                const regex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
-                const parts = line.split(regex);
-                console.log('Parts found:', parts.length, 'Line:', line);
+            // Skip header line
+            const dataLines = lines.slice(1);
+            const allNetworks = [];
+
+            for (const line of dataLines) {
+                const parts = line.split(',');
                 
+                // Log the parsing attempt
+                console.log('Processing line:', line);
+                console.log('Found parts:', parts.length);
+
+                // Skip invalid lines
                 if (parts.length !== 11) {
-                    console.error('Invalid line format. Expected 11 parts, got', parts.length, ':', line);
-                    console.log('Parts:', parts);
-                    return null;
+                    console.error('Skipping invalid line:', line);
+                    continue;
                 }
 
                 const [mac, ssid, authMode, firstSeen, channel, rssi, lat, lon, altitude, accuracy, type] = parts;
+                
+                // Parse and validate coordinates
                 const parsedLat = parseFloat(lat);
                 const parsedLon = parseFloat(lon);
                 
                 if (isNaN(parsedLat) || isNaN(parsedLon)) {
                     console.error('Invalid coordinates:', lat, lon);
-                    return null;
+                    continue;
                 }
 
-                // Clean up AuthMode by removing brackets if present
-                const encryption = authMode.replace(/[\[\]]/g, '');
-
-                return {
+                // Create network object
+                allNetworks.push({
                     mac: mac.trim(),
                     ssid: ssid.trim() || '(Hidden Network)',
-                    encryption: encryption.trim(),
+                    encryption: authMode.replace(/[\[\]]/g, '').trim(),
                     channel: channel.trim(),
                     signal: parseFloat(rssi),
                     lat: parsedLat,
@@ -177,9 +182,8 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
                     altitude: parseFloat(altitude),
                     accuracy: parseFloat(accuracy),
                     type: type.trim()
-                };
-            })
-            .filter(network => network !== null);
+                });
+            }
 
             console.log('Valid networks found:', allNetworks.length);
 
