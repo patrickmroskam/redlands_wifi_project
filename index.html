@@ -132,18 +132,7 @@
 
     <div class="auth-section">
       <p class="auth-message">Sign in with Google to upload WiFi data</p>
-      <div id="g_id_onload"
-         data-client_id="923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse">
-      </div>
-      <div class="g_id_signin"
-         data-type="standard"
-         data-shape="rectangular"
-         data-theme="outline"
-         data-text="signin_with"
-         data-size="large"
-         data-logo_alignment="left">
-      </div>
+      <div id="buttonDiv"></div>
       <p class="auth-error" id="authError"></p>
       <button id="signOutButton" onclick="signOut()">Sign Out</button>
     </div>
@@ -201,12 +190,17 @@
       try {
         google.accounts.id.initialize({
           client_id: '923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com',
-          auto_select: false,
           callback: handleCredentialResponse
         });
         google.accounts.id.renderButton(
-          document.querySelector('.g_id_signin'),
-          { theme: "outline", size: "large" }
+          document.getElementById("buttonDiv"),
+          { 
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "signin_with",
+            shape: "rectangular",
+          }
         );
       } catch (error) {
         console.error('Failed to initialize Google Sign-In:', error);
