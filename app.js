@@ -127,14 +127,20 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     reader.onload = (e) => {
         const text = e.target.result;
         try {
-            // Skip the header line
+            // Skip the header line and filter out empty lines
             const lines = text.split('\n').filter(line => line.trim());
+            console.log('Total lines:', lines.length);
+            
             const allNetworks = lines.slice(1).map(line => {
-                const parts = line.split(',').map(s => s.trim());
+                const parts = line.split(',');
+                console.log('Parts found:', parts.length, 'Line:', line);
+                
                 if (parts.length !== 11) {
-                    console.error('Invalid line format:', line);
+                    console.error('Invalid line format. Expected 11 parts, got', parts.length, ':', line);
+                    console.log('Parts:', parts);
                     return null;
                 }
+
                 const [mac, ssid, authMode, firstSeen, channel, rssi, lat, lon, altitude, accuracy, type] = parts;
                 const parsedLat = parseFloat(lat);
                 const parsedLon = parseFloat(lon);
@@ -148,20 +154,22 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
                 const encryption = authMode.replace(/[\[\]]/g, '');
 
                 return {
-                    mac,
-                    ssid: ssid || '(Hidden Network)',
-                    encryption,
-                    channel,
+                    mac: mac.trim(),
+                    ssid: ssid.trim() || '(Hidden Network)',
+                    encryption: encryption.trim(),
+                    channel: channel.trim(),
                     signal: parseFloat(rssi),
                     lat: parsedLat,
                     lon: parsedLon,
-                    firstSeen,
+                    firstSeen: firstSeen.trim(),
                     altitude: parseFloat(altitude),
                     accuracy: parseFloat(accuracy),
-                    type
+                    type: type.trim()
                 };
             })
-            .filter(network => network !== null); // Remove invalid entries
+            .filter(network => network !== null);
+
+            console.log('Valid networks found:', allNetworks.length);
 
             // Filter networks to only those in Redlands zip codes
             const filteredNetworks = allNetworks.filter(network => {
