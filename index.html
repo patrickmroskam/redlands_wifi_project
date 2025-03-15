@@ -15,8 +15,7 @@
   <title>Redlands WiFi Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- Add Google Sign-In API -->
-  <script src="https://apis.google.com/js/platform.js" async defer></script>
-  <meta name="google-signin-client_id" content="980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     body {
       margin: 0;
@@ -133,7 +132,19 @@
 
     <div class="auth-section">
       <p class="auth-message">Sign in with Google to upload WiFi data</p>
-      <div class="g-signin2" data-onsuccess="onSignIn" data-onfailure="onSignInFailure"></div>
+      <div id="g_id_onload"
+         data-client_id="923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse"
+         data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="sign_in_with"
+         data-shape="rectangular"
+         data-logo_alignment="left">
+      </div>
       <p class="auth-error" id="authError"></p>
       <button id="signOutButton" onclick="signOut()">Sign Out</button>
     </div>
@@ -186,25 +197,13 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
   <script>
-    // Initialize Google Sign-In
-    function initGoogleSignIn() {
-      gapi.load('auth2', function() {
-        gapi.auth2.init({
-          client_id: '980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com'
-        }).then(function() {
-          console.log('Google Sign-In initialized');
-        }, function(error) {
-          console.error('Google Sign-In initialization failed:', error);
-          showAuthError('Failed to initialize Google Sign-In');
-        });
-      });
-    }
+    let tokenClient;
 
-    // Handle successful sign-in
-    function onSignIn(googleUser) {
+    function handleCredentialResponse(response) {
       try {
-        const profile = googleUser.getBasicProfile();
-        const email = profile.getEmail();
+        // Decode the JWT token to get user information
+        const responsePayload = parseJwt(response.credential);
+        const email = responsePayload.email;
         const allowedEmail = 'pat.roskam@gmail.com';
 
         if (email === allowedEmail) {
@@ -219,30 +218,23 @@
       } catch (error) {
         console.error('Sign-in error:', error);
         showAuthError('Failed to process sign-in');
-        signOut();
       }
     }
 
-    // Handle sign-in failure
-    function onSignInFailure(error) {
-      console.error('Sign-in failed:', error);
-      showAuthError('Sign-in failed. Please try again.');
+    function parseJwt(token) {
+      try {
+        return JSON.parse(atob(token.split('.')[1]));
+      } catch (e) {
+        return null;
+      }
     }
 
-    // Handle sign-out
     function signOut() {
-      const auth2 = gapi.auth2.getAuthInstance();
-      if (auth2) {
-        auth2.signOut().then(function () {
-          document.querySelector('.upload-section').style.display = 'none';
-          document.querySelector('.auth-message').textContent = 'Sign in with Google to upload WiFi data';
-          document.getElementById('signOutButton').style.display = 'none';
-          hideAuthError();
-        }).catch(function(error) {
-          console.error('Sign-out error:', error);
-          showAuthError('Failed to sign out');
-        });
-      }
+      google.accounts.id.disableAutoSelect();
+      document.querySelector('.upload-section').style.display = 'none';
+      document.querySelector('.auth-message').textContent = 'Sign in with Google to upload WiFi data';
+      document.getElementById('signOutButton').style.display = 'none';
+      hideAuthError();
     }
 
     // Show authentication error
@@ -257,9 +249,6 @@
       const errorElement = document.getElementById('authError');
       errorElement.style.display = 'none';
     }
-
-    // Initialize Google Sign-In when the page loads
-    window.onload = initGoogleSignIn;
   </script>
 </body>
 </html>
