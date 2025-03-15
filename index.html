@@ -197,14 +197,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
   <script>
-    let tokenClient;
-
     function handleCredentialResponse(response) {
       try {
         // Decode the JWT token to get user information
         const responsePayload = parseJwt(response.credential);
         const email = responsePayload.email;
-        const allowedEmail = 'pat.roskam@gmail.com';
+        const allowedEmail = 'patrick@calicoders.com';
 
         if (email === allowedEmail) {
           document.querySelector('.upload-section').style.display = 'block';
