@@ -55,10 +55,14 @@ function createPopupContent(network) {
     return `
         <strong>SSID:</strong> ${network.ssid}<br>
         <strong>MAC:</strong> ${network.mac}<br>
-        <strong>Encryption:</strong> ${network.encryption}<br>
+        <strong>Auth Mode:</strong> ${network.encryption}<br>
+        <strong>First Seen:</strong> ${network.firstSeen}<br>
         <strong>Channel:</strong> ${network.channel}<br>
         <strong>Signal:</strong> ${network.signal} dBm<br>
-        <strong>Location:</strong> ${network.lat.toFixed(6)}, ${network.lon.toFixed(6)}
+        <strong>Location:</strong> ${network.lat.toFixed(6)}, ${network.lon.toFixed(6)}<br>
+        <strong>Altitude:</strong> ${network.altitude.toFixed(2)}m<br>
+        <strong>Accuracy:</strong> ${network.accuracy.toFixed(2)}m<br>
+        <strong>Type:</strong> ${network.type}
     `;
 }
 
@@ -123,34 +127,41 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     reader.onload = (e) => {
         const text = e.target.result;
         try {
-            const allNetworks = text.split('\n')
-                .filter(line => line.trim())
-                .map(line => {
-                    const parts = line.split(',').map(s => s.trim());
-                    if (parts.length !== 7) {
-                        console.error('Invalid line format:', line);
-                        return null;
-                    }
-                    const [mac, ssid, encryption, channel, signal, lat, lon] = parts;
-                    const parsedLat = parseFloat(lat);
-                    const parsedLon = parseFloat(lon);
-                    
-                    if (isNaN(parsedLat) || isNaN(parsedLon)) {
-                        console.error('Invalid coordinates:', lat, lon);
-                        return null;
-                    }
+            // Skip the header line
+            const lines = text.split('\n').filter(line => line.trim());
+            const allNetworks = lines.slice(1).map(line => {
+                const parts = line.split(',').map(s => s.trim());
+                if (parts.length !== 11) {
+                    console.error('Invalid line format:', line);
+                    return null;
+                }
+                const [mac, ssid, authMode, firstSeen, channel, rssi, lat, lon, altitude, accuracy, type] = parts;
+                const parsedLat = parseFloat(lat);
+                const parsedLon = parseFloat(lon);
+                
+                if (isNaN(parsedLat) || isNaN(parsedLon)) {
+                    console.error('Invalid coordinates:', lat, lon);
+                    return null;
+                }
 
-                    return {
-                        mac,
-                        ssid,
-                        encryption,
-                        channel,
-                        signal: parseFloat(signal),
-                        lat: parsedLat,
-                        lon: parsedLon
-                    };
-                })
-                .filter(network => network !== null); // Remove invalid entries
+                // Clean up AuthMode by removing brackets if present
+                const encryption = authMode.replace(/[\[\]]/g, '');
+
+                return {
+                    mac,
+                    ssid: ssid || '(Hidden Network)',
+                    encryption,
+                    channel,
+                    signal: parseFloat(rssi),
+                    lat: parsedLat,
+                    lon: parsedLon,
+                    firstSeen,
+                    altitude: parseFloat(altitude),
+                    accuracy: parseFloat(accuracy),
+                    type
+                };
+            })
+            .filter(network => network !== null); // Remove invalid entries
 
             // Filter networks to only those in Redlands zip codes
             const filteredNetworks = allNetworks.filter(network => {
@@ -180,7 +191,7 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             }
         } catch (error) {
             console.error('Error processing file:', error);
-            alert('Error processing file. Please check the format: MAC,SSID,Encryption,Channel,Signal Strength,Latitude,Longitude');
+            alert('Error processing file. Please check the format and try again.');
         }
     };
 
