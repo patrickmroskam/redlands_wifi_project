@@ -142,7 +142,9 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             console.log('Total lines:', lines.length);
             
             const allNetworks = lines.slice(1).map(line => {
-                const parts = line.split(',');
+                // Use regex to properly split CSV, handling commas within fields
+                const regex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+                const parts = line.split(regex);
                 console.log('Parts found:', parts.length, 'Line:', line);
                 
                 if (parts.length !== 11) {
