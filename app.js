@@ -137,89 +137,42 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     reader.onload = (e) => {
         const text = e.target.result;
         try {
-            // Normalize line endings and split
-            const lines = text
-                .replace(/\r\n/g, '\n')
-                .replace(/\r/g, '\n')
-                .split('\n')
-                .filter(line => line.trim());
-
-            console.log('Total lines:', lines.length);
+            // Split into lines and remove empty lines
+            const lines = text.split('\n').filter(line => line.trim());
             
-            // Skip header line
-            const dataLines = lines.slice(1);
+            // Skip header line and process each line
             const allNetworks = [];
-
-            for (const line of dataLines) {
-                // Debug output for each line
-                console.log('-------------------');
-                console.log('Raw line:', line);
-                console.log('Line length:', line.length);
-                console.log('Line bytes:', Array.from(line).map(c => c.charCodeAt(0)));
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                const parts = line.split(',');
                 
-                // Split and trim each part
-                const parts = line.split(',').map(part => part.trim());
-                console.log('Parts:', parts);
-                console.log('Number of parts:', parts.length);
-
-                // Validate parts
-                if (parts.length !== 11) {
-                    console.error('Invalid number of fields:', parts.length);
-                    continue;
-                }
-
-                const [mac, ssid, authMode, firstSeen, channel, rssi, lat, lon, altitude, accuracy, type] = parts;
-
-                try {
-                    // Create network object with validation
+                // Basic validation
+                if (parts.length === 11) {
                     const network = {
-                        mac: mac,
-                        ssid: ssid || '(Hidden Network)',
-                        encryption: authMode.replace(/[\[\]]/g, ''),
-                        firstSeen,
-                        channel,
-                        signal: Number(rssi),
-                        lat: Number(lat),
-                        lon: Number(lon),
-                        altitude: Number(altitude),
-                        accuracy: Number(accuracy),
-                        type
+                        mac: parts[0].trim(),
+                        ssid: parts[1].trim() || '(Hidden Network)',
+                        encryption: parts[2].replace(/[\[\]]/g, '').trim(),
+                        firstSeen: parts[3].trim(),
+                        channel: parts[4].trim(),
+                        signal: Number(parts[5]),
+                        lat: Number(parts[6]),
+                        lon: Number(parts[7]),
+                        altitude: Number(parts[8]),
+                        accuracy: Number(parts[9]),
+                        type: parts[10].trim()
                     };
-
-                    // Validate all numeric fields
-                    if (Object.entries(network).some(([key, value]) => 
-                        ['signal', 'lat', 'lon', 'altitude', 'accuracy'].includes(key) && 
-                        (isNaN(value) || !isFinite(value)))) {
-                        console.error('Invalid numeric value in:', network);
-                        continue;
-                    }
-
                     allNetworks.push(network);
-                    console.log('Successfully parsed network:', network);
-                } catch (err) {
-                    console.error('Error parsing network:', err);
-                    continue;
                 }
             }
-
-            console.log('Valid networks found:', allNetworks.length);
 
             // Filter networks to only those in Redlands zip codes
-            const filteredNetworks = allNetworks.filter(network => {
-                const inZipCodes = isInRedlandsZipCodes(network.lat, network.lon);
-                if (!inZipCodes) {
-                    console.log(`Filtered out network ${network.ssid} at ${network.lat}, ${network.lon} - outside Redlands zip codes`);
-                }
-                return inZipCodes;
-            });
+            const filteredNetworks = allNetworks.filter(network => 
+                isInRedlandsZipCodes(network.lat, network.lon)
+            );
 
             if (filteredNetworks.length === 0) {
-                alert('No valid networks found within Redlands zip codes (92373 and 92374). Please check your data format and coordinates.');
+                alert('No valid networks found within Redlands zip codes (92373 and 92374).');
                 return;
-            }
-
-            if (filteredNetworks.length < allNetworks.length) {
-                alert(`Filtered out ${allNetworks.length - filteredNetworks.length} networks outside of Redlands zip codes (92373 and 92374)`);
             }
 
             wifiNetworks = filteredNetworks;
