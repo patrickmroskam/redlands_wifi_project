@@ -16,21 +16,31 @@ const zipCodes = {
     },
     '92374': {
         north: 34.0900,
-        south: 34.0400,
+        south: 34.0300,
         east: -117.1400,
-        west: -117.2200
+        west: -117.2300
     }
 };
 
 // Function to check if coordinates are within specified zip codes
 function isInRedlandsZipCodes(lat, lon) {
+    console.log('Checking coordinates:', lat, lon);
     // Check each zip code area
-    return Object.values(zipCodes).some(bounds => {
-        return lat >= bounds.south &&
-               lat <= bounds.north &&
-               lon >= bounds.west &&
-               lon <= bounds.east;
-    });
+    for (const [zipCode, bounds] of Object.entries(zipCodes)) {
+        const isInBounds = lat >= bounds.south &&
+                          lat <= bounds.north &&
+                          lon >= bounds.west &&
+                          lon <= bounds.east;
+        
+        console.log(`Checking ${zipCode}:`, {
+            latInRange: `${bounds.south} <= ${lat} <= ${bounds.north}`,
+            lonInRange: `${bounds.west} <= ${lon} <= ${bounds.east}`,
+            isInBounds
+        });
+        
+        if (isInBounds) return true;
+    }
+    return false;
 }
 
 // Set bounds to Redlands area (92373 and 92374)
