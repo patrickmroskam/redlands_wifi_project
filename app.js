@@ -137,8 +137,13 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     reader.onload = (e) => {
         const text = e.target.result;
         try {
-            // Remove any carriage returns and split by newline
-            const lines = text.replace(/\r/g, '').split('\n').filter(line => line.trim());
+            // Normalize line endings and split
+            const lines = text
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n')
+                .split('\n')
+                .filter(line => line.trim());
+
             console.log('Total lines:', lines.length);
             
             // Skip header line
@@ -146,43 +151,55 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             const allNetworks = [];
 
             for (const line of dataLines) {
-                const parts = line.split(',');
+                // Debug output for each line
+                console.log('-------------------');
+                console.log('Raw line:', line);
+                console.log('Line length:', line.length);
+                console.log('Line bytes:', Array.from(line).map(c => c.charCodeAt(0)));
                 
-                // Log the parsing attempt
-                console.log('Processing line:', line);
-                console.log('Found parts:', parts.length);
+                // Split and trim each part
+                const parts = line.split(',').map(part => part.trim());
+                console.log('Parts:', parts);
+                console.log('Number of parts:', parts.length);
 
-                // Skip invalid lines
+                // Validate parts
                 if (parts.length !== 11) {
-                    console.error('Skipping invalid line:', line);
+                    console.error('Invalid number of fields:', parts.length);
                     continue;
                 }
 
                 const [mac, ssid, authMode, firstSeen, channel, rssi, lat, lon, altitude, accuracy, type] = parts;
-                
-                // Parse and validate coordinates
-                const parsedLat = parseFloat(lat);
-                const parsedLon = parseFloat(lon);
-                
-                if (isNaN(parsedLat) || isNaN(parsedLon)) {
-                    console.error('Invalid coordinates:', lat, lon);
+
+                try {
+                    // Create network object with validation
+                    const network = {
+                        mac: mac,
+                        ssid: ssid || '(Hidden Network)',
+                        encryption: authMode.replace(/[\[\]]/g, ''),
+                        firstSeen,
+                        channel,
+                        signal: Number(rssi),
+                        lat: Number(lat),
+                        lon: Number(lon),
+                        altitude: Number(altitude),
+                        accuracy: Number(accuracy),
+                        type
+                    };
+
+                    // Validate all numeric fields
+                    if (Object.entries(network).some(([key, value]) => 
+                        ['signal', 'lat', 'lon', 'altitude', 'accuracy'].includes(key) && 
+                        (isNaN(value) || !isFinite(value)))) {
+                        console.error('Invalid numeric value in:', network);
+                        continue;
+                    }
+
+                    allNetworks.push(network);
+                    console.log('Successfully parsed network:', network);
+                } catch (err) {
+                    console.error('Error parsing network:', err);
                     continue;
                 }
-
-                // Create network object
-                allNetworks.push({
-                    mac: mac.trim(),
-                    ssid: ssid.trim() || '(Hidden Network)',
-                    encryption: authMode.replace(/[\[\]]/g, '').trim(),
-                    channel: channel.trim(),
-                    signal: parseFloat(rssi),
-                    lat: parsedLat,
-                    lon: parsedLon,
-                    firstSeen: firstSeen.trim(),
-                    altitude: parseFloat(altitude),
-                    accuracy: parseFloat(accuracy),
-                    type: type.trim()
-                });
             }
 
             console.log('Valid networks found:', allNetworks.length);
