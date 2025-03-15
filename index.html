@@ -202,7 +202,7 @@
     // Initialize Google Sign-In
     window.onload = function() {
       google.accounts.id.initialize({
-        client_id: '980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com',
+        client_id: '923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com',
         auto_select: false,
         callback: handleCredentialResponse
       });
@@ -213,7 +213,7 @@
         // Decode the JWT token to get user information
         const responsePayload = parseJwt(response.credential);
         const email = responsePayload.email;
-        const allowedEmail = 'pat.roskam@gmail.com';
+        const allowedEmail = 'patrick@calicoders.com';
 
         if (email === allowedEmail) {
           document.querySelector('.upload-section').style.display = 'block';
