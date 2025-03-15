@@ -12,108 +12,196 @@
 </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Redlands WiFi Project</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <title>Redlands WiFi Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Add Google Sign-In API -->
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <meta name="google-signin-client_id" content="980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com">
   <style>
     body {
+      margin: 0;
+      padding: 20px;
       font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #f9f9f9;
-      height: 100vh;
     }
-
-    header {
-      width: 100%;
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
       text-align: center;
-      padding: 20px 0;
-      background-color: #333;
-      color: #fff;
-      font-size: 18px;
-      line-height: 1.6;
+      margin-bottom: 20px;
     }
-
-    header pre {
-      margin: 0;
-      font-family: monospace;
-      font-size: 16px;
-      color: #00ff00;
-    }
-
     #map {
-      width: 90%;
-      height: 500px;
-      margin: 20px 0;
+      height: 600px;
+      width: 100%;
       border: 2px solid #ccc;
       border-radius: 8px;
+      margin-bottom: 20px;
     }
-
-    input[type="file"] {
-      margin: 20px 0;
-      padding: 10px;
+    .upload-section {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none; /* Hide by default */
+    }
+    .auth-section {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .auth-message {
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+    .stats-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .filters {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .filter-group {
+      flex: 1;
+      min-width: 200px;
+    }
+    select, input[type="file"] {
+      width: 100%;
+      padding: 8px;
       border: 1px solid #ddd;
-      border-radius: 5px;
-      cursor: pointer;
+      border-radius: 4px;
+    }
+    .legend {
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .open-networks-warning {
+      background: #fff3cd;
+      color: #856404;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: bold;
+      border: 1px solid #ffeeba;
+    }
+    #signOutButton {
       display: none;
+      margin: 10px auto;
+      padding: 8px 16px;
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
-
-    @media (max-width: 600px) {
-      #map {
-        width: 100%;
-      }
-    }
-
-    .g-signin2 {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
+    #signOutButton:hover {
+      background-color: #c82333;
     }
   </style>
-  <script src="https://apis.google.com/js/platform.js" async defer></script>
-  <meta name="google-signin-client_id" content="980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com.apps.googleusercontent.com">
 </head>
 <body>
-  <header>
-    <pre>
-        ____          _ _                 _      __        ___ _____ _   ____            _           _   
-        |  _ \ ___  __| | | __ _ _ __   __| |___  \ \      / (_)  ___(_) |  _ \ _ __ ___ (_) ___  ___| |_ 
-        | |_) / _ \/ _` | |/ _` | '_ \ / _` / __|  \ \ /\ / /| | |_  | | | |_) | '__/ _ \| |/ _ \/ __| __|
-        |  _ <  __/ (_| | | (_| | | | | (_| \__ \   \ V  V / | |  _| | | |  __/| | | (_) | |  __/ (__| |_ 
-        |_| \_\___|\__,_|_|\__,_|_| |_|\__,_|___/    \_/\_/  |_|_|   |_| |_|   |_|  \___// |\___|\___|\__|
-                                                                                       |__/                        
-    </pre>
-  </header>
-  <h1>Redlands WiFi Project</h1>
-  <input type="file" id="fileInput" />
-  <div id="map"></div>
-  <div class="g-signin2" data-onsuccess="onSignIn"></div>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <div class="container">
+    <div class="header">
+      <h1>Redlands WiFi Map</h1>
+      <p>Mapping WiFi networks in 92373 and 92374</p>
+    </div>
+
+    <div class="open-networks-warning">
+      <span id="openNetworksWarning">No open networks detected</span>
+    </div>
+
+    <div class="auth-section">
+      <p class="auth-message">Sign in with Google to upload WiFi data</p>
+      <div class="g-signin2" data-onsuccess="onSignIn"></div>
+      <button id="signOutButton" onclick="signOut()">Sign Out</button>
+    </div>
+
+    <div class="upload-section">
+      <h3>Upload WiFi Data</h3>
+      <input type="file" id="fileInput" accept=".txt,.csv" />
+      <p>File format: MAC,SSID,Encryption,Channel,Signal Strength,Latitude,Longitude</p>
+    </div>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label for="encryptionFilter">Encryption Type:</label>
+        <select id="encryptionFilter">
+          <option value="all">All</option>
+          <option value="WPA2">WPA2</option>
+          <option value="WPA3">WPA3</option>
+          <option value="Open">Open</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="signalFilter">Min Signal Strength:</label>
+        <select id="signalFilter">
+          <option value="all">All</option>
+          <option value="-70">-70 dBm or better</option>
+          <option value="-80">-80 dBm or better</option>
+          <option value="-90">-90 dBm or better</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="stats-section">
+      <div class="stat-card">
+        <h3>Total Networks</h3>
+        <p id="totalNetworks">0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Open Networks</h3>
+        <p id="openNetworks">0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Average Signal</h3>
+        <p id="avgSignal">N/A</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
   <script>
     function onSignIn(googleUser) {
-      var profile = googleUser.getBasicProfile();
-      var email = profile.getEmail();
-      var allowedEmail = 'pat.roskam@gmail.com'; // Replace with the allowed email address
+      const profile = googleUser.getBasicProfile();
+      const email = profile.getEmail();
+      const allowedEmail = 'pat.roskam@gmail.com';
 
       if (email === allowedEmail) {
-        console.log('ID: ' + profile.getId());
-        console.log('Name: ' + profile.getName());
-        console.log('Image URL: ' + profile.getImageUrl());
-        console.log('Email: ' + profile.getEmail());
-
-        document.getElementById('fileInput').style.display = 'block';
+        document.querySelector('.upload-section').style.display = 'block';
+        document.querySelector('.auth-message').textContent = 'Signed in as ' + email;
+        document.getElementById('signOutButton').style.display = 'block';
       } else {
-        alert('Access denied. This account is not authorized.');
-        var auth2 = gapi.auth2.getAuthInstance();
-        auth2.signOut().then(function () {
-          console.log('User signed out.');
-        });
+        alert('Access denied. Only authorized users can upload data.');
+        signOut();
       }
+    }
+
+    function signOut() {
+      const auth2 = gapi.auth2.getAuthInstance();
+      auth2.signOut().then(function () {
+        document.querySelector('.upload-section').style.display = 'none';
+        document.querySelector('.auth-message').textContent = 'Sign in with Google to upload WiFi data';
+        document.getElementById('signOutButton').style.display = 'none';
+      });
     }
   </script>
 </body>
