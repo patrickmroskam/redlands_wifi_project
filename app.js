@@ -122,37 +122,66 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target.result;
-        const allNetworks = text.split('\n')
-            .filter(line => line.trim())
-            .map(line => {
-                const [mac, ssid, encryption, channel, signal, lat, lon] = line.split(',').map(s => s.trim());
-                return {
-                    mac,
-                    ssid,
-                    encryption,
-                    channel,
-                    signal,
-                    lat: parseFloat(lat),
-                    lon: parseFloat(lon)
-                };
+        try {
+            const allNetworks = text.split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const parts = line.split(',').map(s => s.trim());
+                    if (parts.length !== 7) {
+                        console.error('Invalid line format:', line);
+                        return null;
+                    }
+                    const [mac, ssid, encryption, channel, signal, lat, lon] = parts;
+                    const parsedLat = parseFloat(lat);
+                    const parsedLon = parseFloat(lon);
+                    
+                    if (isNaN(parsedLat) || isNaN(parsedLon)) {
+                        console.error('Invalid coordinates:', lat, lon);
+                        return null;
+                    }
+
+                    return {
+                        mac,
+                        ssid,
+                        encryption,
+                        channel,
+                        signal: parseFloat(signal),
+                        lat: parsedLat,
+                        lon: parsedLon
+                    };
+                })
+                .filter(network => network !== null); // Remove invalid entries
+
+            // Filter networks to only those in Redlands zip codes
+            const filteredNetworks = allNetworks.filter(network => {
+                const inZipCodes = isInRedlandsZipCodes(network.lat, network.lon);
+                if (!inZipCodes) {
+                    console.log(`Filtered out network ${network.ssid} at ${network.lat}, ${network.lon} - outside Redlands zip codes`);
+                }
+                return inZipCodes;
             });
 
-        // Filter networks to only those in Redlands zip codes
-        const filteredNetworks = allNetworks.filter(network => {
-            const inZipCodes = isInRedlandsZipCodes(network.lat, network.lon);
-            if (!inZipCodes) {
-                console.log(`Filtered out network ${network.ssid} at ${network.lat}, ${network.lon} - outside Redlands zip codes`);
+            if (filteredNetworks.length === 0) {
+                alert('No valid networks found within Redlands zip codes (92373 and 92374). Please check your data format and coordinates.');
+                return;
             }
-            return inZipCodes;
-        });
 
-        if (filteredNetworks.length < allNetworks.length) {
-            alert(`Filtered out ${allNetworks.length - filteredNetworks.length} networks outside of Redlands zip codes (92373 and 92374)`);
+            if (filteredNetworks.length < allNetworks.length) {
+                alert(`Filtered out ${allNetworks.length - filteredNetworks.length} networks outside of Redlands zip codes (92373 and 92374)`);
+            }
+
+            wifiNetworks = filteredNetworks;
+            updateStats();
+            applyFilters();
+            
+            // Center map on the first valid network
+            if (filteredNetworks.length > 0) {
+                map.setView([filteredNetworks[0].lat, filteredNetworks[0].lon], 13);
+            }
+        } catch (error) {
+            console.error('Error processing file:', error);
+            alert('Error processing file. Please check the format: MAC,SSID,Encryption,Channel,Signal Strength,Latitude,Longitude');
         }
-
-        wifiNetworks = filteredNetworks;
-        updateStats();
-        applyFilters();
     };
 
     reader.readAsText(file);
