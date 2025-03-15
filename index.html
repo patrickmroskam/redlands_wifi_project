@@ -133,10 +133,8 @@
     <div class="auth-section">
       <p class="auth-message">Sign in with Google to upload WiFi data</p>
       <div id="g_id_onload"
-         data-client_id="980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com"
-         data-context="signin"
-         data-ux_mode="redirect"
-         data-login_uri="https://redlandswifiproject.com"
+         data-client_id="923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse"
          data-auto_prompt="false">
       </div>
       <div class="g_id_signin"
@@ -201,11 +199,20 @@
   <script>
     // Initialize Google Sign-In
     window.onload = function() {
-      google.accounts.id.initialize({
-        client_id: '923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com',
-        auto_select: false,
-        callback: handleCredentialResponse
-      });
+      try {
+        google.accounts.id.initialize({
+          client_id: '923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com',
+          callback: handleCredentialResponse,
+          auto_select: false
+        });
+        google.accounts.id.renderButton(
+          document.getElementById("g_id_signin"),
+          { theme: "outline", size: "large" }
+        );
+      } catch (error) {
+        console.error('Failed to initialize Google Sign-In:', error);
+        showAuthError('Failed to initialize Google Sign-In');
+      }
     };
 
     function handleCredentialResponse(response) {
@@ -259,13 +266,6 @@
       const errorElement = document.getElementById('authError');
       errorElement.style.display = 'none';
     }
-
-    // Handle initialization errors
-    window.onerror = function(msg, url, line) {
-      console.error('Error: ' + msg + '\nURL: ' + url + '\nLine: ' + line);
-      showAuthError('Failed to initialize Google Sign-In. Please try refreshing the page.');
-      return false;
-    };
   </script>
 </body>
 </html>
