@@ -135,10 +135,9 @@
       <div id="g_id_onload"
          data-client_id="980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com"
          data-context="signin"
-         data-ux_mode="popup"
+         data-ux_mode="redirect"
          data-login_uri="https://redlandswifiproject.com"
-         data-auto_prompt="false"
-         data-callback="handleCredentialResponse">
+         data-auto_prompt="false">
       </div>
       <div class="g_id_signin"
          data-type="standard"
@@ -203,10 +202,9 @@
     // Initialize Google Sign-In
     window.onload = function() {
       google.accounts.id.initialize({
-        client_id: '923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com',
-        callback: handleCredentialResponse,
-        auto_prompt: false,
-        ux_mode: 'popup'
+        client_id: '980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com',
+        auto_select: false,
+        callback: handleCredentialResponse
       });
     };
 
@@ -215,7 +213,7 @@
         // Decode the JWT token to get user information
         const responsePayload = parseJwt(response.credential);
         const email = responsePayload.email;
-        const allowedEmail = 'patrick@calicoders.com';
+        const allowedEmail = 'pat.roskam@gmail.com';
 
         if (email === allowedEmail) {
           document.querySelector('.upload-section').style.display = 'block';
