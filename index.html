@@ -15,7 +15,7 @@
   <title>Redlands WiFi Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- Add Google Sign-In API -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     body {
       margin: 0;
@@ -133,16 +133,19 @@
     <div class="auth-section">
       <p class="auth-message">Sign in with Google to upload WiFi data</p>
       <div id="g_id_onload"
-         data-client_id="923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com"
-         data-callback="handleCredentialResponse"
-         data-auto_prompt="false">
+         data-client_id="980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com"
+         data-context="signin"
+         data-ux_mode="popup"
+         data-login_uri="https://redlandswifiproject.com"
+         data-auto_prompt="false"
+         data-callback="handleCredentialResponse">
       </div>
       <div class="g_id_signin"
          data-type="standard"
-         data-size="large"
-         data-theme="outline"
-         data-text="sign_in_with"
          data-shape="rectangular"
+         data-theme="outline"
+         data-text="signin_with"
+         data-size="large"
          data-logo_alignment="left">
       </div>
       <p class="auth-error" id="authError"></p>
@@ -197,12 +200,22 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
   <script>
+    // Initialize Google Sign-In
+    window.onload = function() {
+      google.accounts.id.initialize({
+        client_id: '980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com',
+        callback: handleCredentialResponse,
+        auto_prompt: false,
+        ux_mode: 'popup'
+      });
+    };
+
     function handleCredentialResponse(response) {
       try {
         // Decode the JWT token to get user information
         const responsePayload = parseJwt(response.credential);
         const email = responsePayload.email;
-        const allowedEmail = 'patrick@calicoders.com';
+        const allowedEmail = 'pat.roskam@gmail.com';
 
         if (email === allowedEmail) {
           document.querySelector('.upload-section').style.display = 'block';
@@ -223,6 +236,7 @@
       try {
         return JSON.parse(atob(token.split('.')[1]));
       } catch (e) {
+        console.error('JWT parsing error:', e);
         return null;
       }
     }
@@ -247,6 +261,13 @@
       const errorElement = document.getElementById('authError');
       errorElement.style.display = 'none';
     }
+
+    // Handle initialization errors
+    window.onerror = function(msg, url, line) {
+      console.error('Error: ' + msg + '\nURL: ' + url + '\nLine: ' + line);
+      showAuthError('Failed to initialize Google Sign-In. Please try refreshing the page.');
+      return false;
+    };
   </script>
 </body>
 </html>
