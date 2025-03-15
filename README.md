@@ -27,4 +27,27 @@ MAC,SSID,Encryption,Channel,Signal Strength,Latitude,Longitude
 
 ## Deployment
 
-The application is deployed using GitHub Pages and can be accessed at: [YOUR-GITHUB-USERNAME].github.io/redlands-wifi-project
+The application is deployed and accessible at https://redlandswifiproject.com
+
+### Custom Domain Setup
+
+1. Configure your domain DNS settings to point to GitHub Pages:
+   - Type: A Record
+   - Name: @
+   - Value: GitHub Pages IP addresses
+     ```
+     185.199.108.153
+     185.199.109.153
+     185.199.110.153
+     185.199.111.153
+     ```
+   - Also add AAAA records for IPv6 support
+
+2. Configure Google OAuth:
+   - Add these URLs to Authorized JavaScript origins:
+     ```
+     https://redlandswifiproject.com
+     http://redlandswifiproject.com
+     ```
+
+3. Ensure HTTPS is enabled in GitHub Pages settings for secure authentication

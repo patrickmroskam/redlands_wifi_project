@@ -113,6 +113,11 @@
     #signOutButton:hover {
       background-color: #c82333;
     }
+    .auth-error {
+      color: #dc3545;
+      margin-top: 10px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -128,7 +133,8 @@
 
     <div class="auth-section">
       <p class="auth-message">Sign in with Google to upload WiFi data</p>
-      <div class="g-signin2" data-onsuccess="onSignIn"></div>
+      <div class="g-signin2" data-onsuccess="onSignIn" data-onfailure="onSignInFailure"></div>
+      <p class="auth-error" id="authError"></p>
       <button id="signOutButton" onclick="signOut()">Sign Out</button>
     </div>
 
@@ -180,29 +186,80 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
   <script>
-    function onSignIn(googleUser) {
-      const profile = googleUser.getBasicProfile();
-      const email = profile.getEmail();
-      const allowedEmail = 'pat.roskam@gmail.com';
+    // Initialize Google Sign-In
+    function initGoogleSignIn() {
+      gapi.load('auth2', function() {
+        gapi.auth2.init({
+          client_id: '980151228436-3283qklspr1j97fd8oj9sq2rioj0fqk9.apps.googleusercontent.com'
+        }).then(function() {
+          console.log('Google Sign-In initialized');
+        }, function(error) {
+          console.error('Google Sign-In initialization failed:', error);
+          showAuthError('Failed to initialize Google Sign-In');
+        });
+      });
+    }
 
-      if (email === allowedEmail) {
-        document.querySelector('.upload-section').style.display = 'block';
-        document.querySelector('.auth-message').textContent = 'Signed in as ' + email;
-        document.getElementById('signOutButton').style.display = 'block';
-      } else {
-        alert('Access denied. Only authorized users can upload data.');
+    // Handle successful sign-in
+    function onSignIn(googleUser) {
+      try {
+        const profile = googleUser.getBasicProfile();
+        const email = profile.getEmail();
+        const allowedEmail = 'pat.roskam@gmail.com';
+
+        if (email === allowedEmail) {
+          document.querySelector('.upload-section').style.display = 'block';
+          document.querySelector('.auth-message').textContent = 'Signed in as ' + email;
+          document.getElementById('signOutButton').style.display = 'block';
+          hideAuthError();
+        } else {
+          showAuthError('Access denied. Only authorized users can upload data.');
+          signOut();
+        }
+      } catch (error) {
+        console.error('Sign-in error:', error);
+        showAuthError('Failed to process sign-in');
         signOut();
       }
     }
 
+    // Handle sign-in failure
+    function onSignInFailure(error) {
+      console.error('Sign-in failed:', error);
+      showAuthError('Sign-in failed. Please try again.');
+    }
+
+    // Handle sign-out
     function signOut() {
       const auth2 = gapi.auth2.getAuthInstance();
-      auth2.signOut().then(function () {
-        document.querySelector('.upload-section').style.display = 'none';
-        document.querySelector('.auth-message').textContent = 'Sign in with Google to upload WiFi data';
-        document.getElementById('signOutButton').style.display = 'none';
-      });
+      if (auth2) {
+        auth2.signOut().then(function () {
+          document.querySelector('.upload-section').style.display = 'none';
+          document.querySelector('.auth-message').textContent = 'Sign in with Google to upload WiFi data';
+          document.getElementById('signOutButton').style.display = 'none';
+          hideAuthError();
+        }).catch(function(error) {
+          console.error('Sign-out error:', error);
+          showAuthError('Failed to sign out');
+        });
+      }
     }
+
+    // Show authentication error
+    function showAuthError(message) {
+      const errorElement = document.getElementById('authError');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+
+    // Hide authentication error
+    function hideAuthError() {
+      const errorElement = document.getElementById('authError');
+      errorElement.style.display = 'none';
+    }
+
+    // Initialize Google Sign-In when the page loads
+    window.onload = initGoogleSignIn;
   </script>
 </body>
 </html>
