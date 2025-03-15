@@ -14,8 +14,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Redlands WiFi Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Add Google Sign-In API -->
-  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     body {
       margin: 0;
@@ -42,7 +40,6 @@
       padding: 20px;
       border-radius: 8px;
       margin-bottom: 20px;
-      display: none; /* Hide by default */
     }
     .auth-section {
       background: #f5f5f5;
@@ -130,13 +127,6 @@
       <span id="openNetworksWarning">No open networks detected</span>
     </div>
 
-    <div class="auth-section">
-      <p class="auth-message">Sign in with Google to upload WiFi data</p>
-      <div id="buttonDiv"></div>
-      <p class="auth-error" id="authError"></p>
-      <button id="signOutButton" onclick="signOut()">Sign Out</button>
-    </div>
-
     <div class="upload-section">
       <h3>Upload WiFi Data</h3>
       <input type="file" id="fileInput" accept=".txt,.csv" />
@@ -184,81 +174,5 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
-  <script>
-    // Initialize Google Sign-In
-    window.onload = function() {
-      try {
-        google.accounts.id.initialize({
-          client_id: '923622971294-dtkdb554d72rc70mup0v84712th6uhvk.apps.googleusercontent.com',
-          callback: handleCredentialResponse
-        });
-        google.accounts.id.renderButton(
-          document.getElementById("buttonDiv"),
-          { 
-            type: "standard",
-            theme: "outline",
-            size: "large",
-            text: "signin_with",
-            shape: "rectangular",
-          }
-        );
-      } catch (error) {
-        console.error('Failed to initialize Google Sign-In:', error);
-        showAuthError('Failed to initialize Google Sign-In');
-      }
-    };
-
-    function handleCredentialResponse(response) {
-      try {
-        // Decode the JWT token to get user information
-        const responsePayload = parseJwt(response.credential);
-        const email = responsePayload.email;
-        const allowedEmail = 'patrick@calicoders.com';
-
-        if (email === allowedEmail) {
-          document.querySelector('.upload-section').style.display = 'block';
-          document.querySelector('.auth-message').textContent = 'Signed in as ' + email;
-          document.getElementById('signOutButton').style.display = 'block';
-          hideAuthError();
-        } else {
-          showAuthError('Access denied. Only authorized users can upload data.');
-          signOut();
-        }
-      } catch (error) {
-        console.error('Sign-in error:', error);
-        showAuthError('Failed to process sign-in');
-      }
-    }
-
-    function parseJwt(token) {
-      try {
-        return JSON.parse(atob(token.split('.')[1]));
-      } catch (e) {
-        console.error('JWT parsing error:', e);
-        return null;
-      }
-    }
-
-    function signOut() {
-      google.accounts.id.disableAutoSelect();
-      document.querySelector('.upload-section').style.display = 'none';
-      document.querySelector('.auth-message').textContent = 'Sign in with Google to upload WiFi data';
-      document.getElementById('signOutButton').style.display = 'none';
-      hideAuthError();
-    }
-
-    // Show authentication error
-    function showAuthError(message) {
-      const errorElement = document.getElementById('authError');
-      errorElement.textContent = message;
-      errorElement.style.display = 'block';
-    }
-
-    // Hide authentication error
-    function hideAuthError() {
-      const errorElement = document.getElementById('authError');
-      errorElement.style.display = 'none';
-    }
-  </script>
 </body>
 </html>
