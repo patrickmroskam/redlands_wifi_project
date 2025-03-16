@@ -9,33 +9,48 @@ const firebaseConfig = {
     appId: "1:654772244549:web:6a54aa3045a4aa8a8a3e7b"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Function to initialize Firebase
+function initializeFirebase() {
+    return new Promise((resolve, reject) => {
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
 
-// Initialize Firestore with settings
-const db = firebase.firestore();
-db.settings({
-    ignoreUndefinedProperties: true,
-    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-    merge: true,
-    experimentalForceLongPolling: true,
-    experimentalAutoDetectLongPolling: true
-});
+            const db = firebase.firestore();
+            db.settings({
+                ignoreUndefinedProperties: true,
+                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
+                merge: true,
+                experimentalForceLongPolling: true,
+                experimentalAutoDetectLongPolling: true
+            });
 
-// Enable offline persistence
-db.enablePersistence({
-    synchronizeTabs: true
-}).catch((err) => {
-    if (err.code == 'failed-precondition') {
-        console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code == 'unimplemented') {
-        console.warn('The current browser does not support persistence.');
-    }
-});
+            // Enable offline persistence
+            db.enablePersistence({
+                synchronizeTabs: true
+            }).catch((err) => {
+                if (err.code == 'failed-precondition') {
+                    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+                } else if (err.code == 'unimplemented') {
+                    console.warn('The current browser does not support persistence.');
+                }
+            });
 
-// Initialize Auth
-const auth = firebase.auth();
+            const auth = firebase.auth();
 
-// Export instances
-window.db = db;
-window.auth = auth; 
+            // Export instances
+            window.db = db;
+            window.auth = auth;
+            window.firebaseInitialized = true;
+
+            resolve({ db, auth });
+        } catch (error) {
+            console.error('Error initializing Firebase:', error);
+            reject(error);
+        }
+    });
+}
+
+// Initialize Firebase when the script loads
+window.initFirebase = initializeFirebase; 

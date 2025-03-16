@@ -19,7 +19,7 @@ async function loadNetworksFromFirebase() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         console.log('Fetching networks collection...');
-        const snapshot = await db.collection('networks').get();
+        const snapshot = await window.db.collection('networks').get();
         console.log('Got snapshot:', snapshot);
         
         const networks = [];
@@ -79,65 +79,70 @@ async function loadNetworksFromFirebase() {
     }
 }
 
-// Wait for Firebase to initialize before setting up auth listeners
-document.addEventListener('DOMContentLoaded', () => {
-    // Ensure Firebase is initialized
-    if (!firebase.apps.length) {
-        console.error('Firebase not initialized');
-        return;
+// Initialize Firebase and set up event listeners
+async function initializeApp() {
+    try {
+        console.log('Initializing Firebase...');
+        await window.initFirebase();
+        console.log('Firebase initialized successfully');
+
+        // Authentication state observer
+        window.auth.onAuthStateChanged((user) => {
+            const loginForm = document.getElementById('loginForm');
+            const logoutSection = document.getElementById('logoutSection');
+            const uploadSection = document.getElementById('uploadSection');
+            const adminEmailDisplay = document.getElementById('adminEmailDisplay');
+
+            if (user) {
+                // User is signed in
+                console.log('User signed in:', user.email);
+                loginForm.style.display = 'none';
+                logoutSection.style.display = 'block';
+                uploadSection.style.display = 'block';
+                adminEmailDisplay.textContent = user.email;
+            } else {
+                // User is signed out
+                console.log('User signed out');
+                loginForm.style.display = 'block';
+                logoutSection.style.display = 'none';
+                uploadSection.style.display = 'none';
+            }
+        });
+
+        // Handle login
+        document.getElementById('loginButton').addEventListener('click', async () => {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            const errorElement = document.getElementById('loginError');
+
+            try {
+                await window.auth.signInWithEmailAndPassword(email, password);
+                errorElement.style.display = 'none';
+            } catch (error) {
+                console.error('Login error:', error);
+                errorElement.textContent = 'Invalid email or password';
+                errorElement.style.display = 'block';
+            }
+        });
+
+        // Handle logout
+        document.getElementById('logoutButton').addEventListener('click', async () => {
+            try {
+                await window.auth.signOut();
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+
+        // Load networks after initialization
+        await loadNetworksFromFirebase();
+    } catch (error) {
+        console.error('Error during app initialization:', error);
     }
+}
 
-    // Authentication state observer
-    firebase.auth().onAuthStateChanged((user) => {
-        const loginForm = document.getElementById('loginForm');
-        const logoutSection = document.getElementById('logoutSection');
-        const uploadSection = document.getElementById('uploadSection');
-        const adminEmailDisplay = document.getElementById('adminEmailDisplay');
-
-        if (user) {
-            // User is signed in
-            console.log('User signed in:', user.email);
-            loginForm.style.display = 'none';
-            logoutSection.style.display = 'block';
-            uploadSection.style.display = 'block';
-            adminEmailDisplay.textContent = user.email;
-        } else {
-            // User is signed out
-            console.log('User signed out');
-            loginForm.style.display = 'block';
-            logoutSection.style.display = 'none';
-            uploadSection.style.display = 'none';
-        }
-    });
-
-    // Handle login
-    document.getElementById('loginButton').addEventListener('click', async () => {
-        const email = document.getElementById('adminEmail').value;
-        const password = document.getElementById('adminPassword').value;
-        const errorElement = document.getElementById('loginError');
-
-        try {
-            await firebase.auth().signInWithEmailAndPassword(email, password);
-            errorElement.style.display = 'none';
-        } catch (error) {
-            console.error('Login error:', error);
-            errorElement.textContent = 'Invalid email or password';
-            errorElement.style.display = 'block';
-        }
-    });
-
-    // Handle logout
-    document.getElementById('logoutButton').addEventListener('click', async () => {
-        try {
-            await firebase.auth().signOut();
-        } catch (error) {
-            console.error('Logout error:', error);
-        }
-    });
-
-    // Load networks after auth is initialized
-    loadNetworksFromFirebase();
-});
+// Wait for DOM to be ready before initializing
+document.addEventListener('DOMContentLoaded', initializeApp);
 
 // Define zip code boundaries (approximate)
 const zipCodes = {
@@ -259,7 +264,7 @@ function applyFilters() {
 
 // Modify the file upload handler to check authentication
 document.getElementById('fileInput').addEventListener('change', async (event) => {
-    if (!firebase.auth().currentUser) {
+    if (!window.auth.currentUser) {
         alert('You must be logged in to upload data.');
         return;
     }
@@ -294,7 +299,7 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
                         altitude: Number(parts[8]),
                         accuracy: Number(parts[9]),
                         type: parts[10].trim(),
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        timestamp: window.firebase.firestore.FieldValue.serverTimestamp()
                     };
                     allNetworks.push(network);
                 }
@@ -313,10 +318,10 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
             // Save networks to Firebase
             try {
                 console.log('Starting to save networks to Firebase...');
-                const batch = db.batch();
+                const batch = window.db.batch();
                 filteredNetworks.forEach((network, index) => {
                     console.log(`Processing network ${index + 1}/${filteredNetworks.length}:`, network);
-                    const networkRef = db.collection('networks').doc();
+                    const networkRef = window.db.collection('networks').doc();
                     batch.set(networkRef, network);
                 });
                 console.log('Committing batch to Firebase...');
