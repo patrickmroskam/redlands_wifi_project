@@ -127,13 +127,11 @@
       <span id="openNetworksWarning">No open networks detected</span>
     </div>
 
-    <!-- Upload section temporarily disabled
     <div class="upload-section">
       <h3>Upload WiFi Data</h3>
       <input type="file" id="fileInput" accept=".txt,.csv" />
       <p>File format: MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMetters,Type</p>
     </div>
-    -->
 
     <div class="filters">
       <div class="filter-group">
@@ -174,6 +172,11 @@
     </div>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>

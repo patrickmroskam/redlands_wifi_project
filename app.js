@@ -128,13 +128,38 @@ function applyFilters() {
     });
 }
 
+// Load networks from Firebase on page load
+async function loadNetworksFromFirebase() {
+    try {
+        const snapshot = await db.collection('networks').get();
+        const networks = [];
+        snapshot.forEach(doc => {
+            networks.push(doc.data());
+        });
+        
+        if (networks.length > 0) {
+            wifiNetworks = networks;
+            updateStats();
+            applyFilters();
+            
+            // Center map on the first network
+            map.setView([networks[0].lat, networks[0].lon], 13);
+        }
+    } catch (error) {
+        console.error('Error loading networks from Firebase:', error);
+    }
+}
+
+// Call the load function when the page loads
+loadNetworksFromFirebase();
+
 // Handle file upload
-document.getElementById('fileInput').addEventListener('change', (event) => {
+document.getElementById('fileInput').addEventListener('change', async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         const text = e.target.result;
         try {
             // Split into lines and remove empty lines
@@ -153,13 +178,14 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
                         ssid: parts[1].trim() || '(Hidden Network)',
                         encryption: parts[2].replace(/[\[\]]/g, '').trim(),
                         firstSeen: parts[3].trim(),
-                        channel: parts[4].trim(),
+                        channel: Number(parts[4]),
                         signal: Number(parts[5]),
                         lat: Number(parts[6]),
                         lon: Number(parts[7]),
                         altitude: Number(parts[8]),
                         accuracy: Number(parts[9]),
-                        type: parts[10].trim()
+                        type: parts[10].trim(),
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     allNetworks.push(network);
                 }
@@ -172,6 +198,21 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
 
             if (filteredNetworks.length === 0) {
                 alert('No valid networks found within Redlands zip codes (92373 and 92374).');
+                return;
+            }
+
+            // Save networks to Firebase
+            try {
+                const batch = db.batch();
+                filteredNetworks.forEach(network => {
+                    const networkRef = db.collection('networks').doc();
+                    batch.set(networkRef, network);
+                });
+                await batch.commit();
+                console.log('Successfully saved networks to Firebase');
+            } catch (error) {
+                console.error('Error saving to Firebase:', error);
+                alert('Error saving networks to database. Please try again.');
                 return;
             }
 
