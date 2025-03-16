@@ -6,6 +6,52 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+// Authentication state observer
+auth.onAuthStateChanged((user) => {
+    const loginForm = document.getElementById('loginForm');
+    const logoutSection = document.getElementById('logoutSection');
+    const uploadSection = document.getElementById('uploadSection');
+    const adminEmailDisplay = document.getElementById('adminEmailDisplay');
+
+    if (user) {
+        // User is signed in
+        loginForm.style.display = 'none';
+        logoutSection.style.display = 'block';
+        uploadSection.style.display = 'block';
+        adminEmailDisplay.textContent = user.email;
+    } else {
+        // User is signed out
+        loginForm.style.display = 'block';
+        logoutSection.style.display = 'none';
+        uploadSection.style.display = 'none';
+    }
+});
+
+// Handle login
+document.getElementById('loginButton').addEventListener('click', async () => {
+    const email = document.getElementById('adminEmail').value;
+    const password = document.getElementById('adminPassword').value;
+    const errorElement = document.getElementById('loginError');
+
+    try {
+        await auth.signInWithEmailAndPassword(email, password);
+        errorElement.style.display = 'none';
+    } catch (error) {
+        console.error('Login error:', error);
+        errorElement.textContent = 'Invalid email or password';
+        errorElement.style.display = 'block';
+    }
+});
+
+// Handle logout
+document.getElementById('logoutButton').addEventListener('click', async () => {
+    try {
+        await auth.signOut();
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+});
+
 // Define zip code boundaries (approximate)
 const zipCodes = {
     '92373': {
@@ -153,8 +199,13 @@ async function loadNetworksFromFirebase() {
 // Call the load function when the page loads
 loadNetworksFromFirebase();
 
-// Handle file upload
+// Modify the file upload handler to check authentication
 document.getElementById('fileInput').addEventListener('change', async (event) => {
+    if (!auth.currentUser) {
+        alert('You must be logged in to upload data.');
+        return;
+    }
+
     const file = event.target.files[0];
     if (!file) return;
 

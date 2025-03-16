@@ -114,6 +114,50 @@
       margin-top: 10px;
       display: none;
     }
+    .admin-section {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .input-group input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .input-group button {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .input-group button:hover {
+      background-color: #0056b3;
+    }
+    .error-message {
+      color: #dc3545;
+      margin-top: 10px;
+      display: none;
+    }
+    #logoutButton {
+      padding: 8px 16px;
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #logoutButton:hover {
+      background-color: #c82333;
+    }
   </style>
 </head>
 <body>
@@ -127,7 +171,23 @@
       <span id="openNetworksWarning">No open networks detected</span>
     </div>
 
-    <div class="upload-section">
+    <div class="admin-section">
+      <div id="loginForm" style="display: block;">
+        <h3>Admin Login</h3>
+        <div class="input-group">
+          <input type="email" id="adminEmail" placeholder="Admin Email" />
+          <input type="password" id="adminPassword" placeholder="Password" />
+          <button id="loginButton">Login</button>
+        </div>
+        <p id="loginError" class="error-message"></p>
+      </div>
+      <div id="logoutSection" style="display: none;">
+        <p>Logged in as: <span id="adminEmailDisplay"></span></p>
+        <button id="logoutButton">Logout</button>
+      </div>
+    </div>
+
+    <div id="uploadSection" class="upload-section" style="display: none;">
       <h3>Upload WiFi Data</h3>
       <input type="file" id="fileInput" accept=".txt,.csv" />
       <p>File format: MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMetters,Type</p>
@@ -175,6 +235,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
   <script src="firebase-config.js"></script>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
