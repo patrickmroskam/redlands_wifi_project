@@ -6,6 +6,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+// Initialize variables to store data
+let wifiNetworks = [];
+let markers = L.layerGroup().addTo(map);
+
 // Load networks from Firebase
 async function loadNetworksFromFirebase() {
     try {
@@ -46,50 +50,56 @@ async function loadNetworksFromFirebase() {
     }
 }
 
-// Authentication state observer
-auth.onAuthStateChanged((user) => {
-    const loginForm = document.getElementById('loginForm');
-    const logoutSection = document.getElementById('logoutSection');
-    const uploadSection = document.getElementById('uploadSection');
-    const adminEmailDisplay = document.getElementById('adminEmailDisplay');
+// Wait for Firebase to initialize before setting up auth listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Authentication state observer
+    firebase.auth().onAuthStateChanged((user) => {
+        const loginForm = document.getElementById('loginForm');
+        const logoutSection = document.getElementById('logoutSection');
+        const uploadSection = document.getElementById('uploadSection');
+        const adminEmailDisplay = document.getElementById('adminEmailDisplay');
 
-    if (user) {
-        // User is signed in
-        loginForm.style.display = 'none';
-        logoutSection.style.display = 'block';
-        uploadSection.style.display = 'block';
-        adminEmailDisplay.textContent = user.email;
-    } else {
-        // User is signed out
-        loginForm.style.display = 'block';
-        logoutSection.style.display = 'none';
-        uploadSection.style.display = 'none';
-    }
-});
+        if (user) {
+            // User is signed in
+            loginForm.style.display = 'none';
+            logoutSection.style.display = 'block';
+            uploadSection.style.display = 'block';
+            adminEmailDisplay.textContent = user.email;
+        } else {
+            // User is signed out
+            loginForm.style.display = 'block';
+            logoutSection.style.display = 'none';
+            uploadSection.style.display = 'none';
+        }
+    });
 
-// Handle login
-document.getElementById('loginButton').addEventListener('click', async () => {
-    const email = document.getElementById('adminEmail').value;
-    const password = document.getElementById('adminPassword').value;
-    const errorElement = document.getElementById('loginError');
+    // Handle login
+    document.getElementById('loginButton').addEventListener('click', async () => {
+        const email = document.getElementById('adminEmail').value;
+        const password = document.getElementById('adminPassword').value;
+        const errorElement = document.getElementById('loginError');
 
-    try {
-        await auth.signInWithEmailAndPassword(email, password);
-        errorElement.style.display = 'none';
-    } catch (error) {
-        console.error('Login error:', error);
-        errorElement.textContent = 'Invalid email or password';
-        errorElement.style.display = 'block';
-    }
-});
+        try {
+            await firebase.auth().signInWithEmailAndPassword(email, password);
+            errorElement.style.display = 'none';
+        } catch (error) {
+            console.error('Login error:', error);
+            errorElement.textContent = 'Invalid email or password';
+            errorElement.style.display = 'block';
+        }
+    });
 
-// Handle logout
-document.getElementById('logoutButton').addEventListener('click', async () => {
-    try {
-        await auth.signOut();
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
+    // Handle logout
+    document.getElementById('logoutButton').addEventListener('click', async () => {
+        try {
+            await firebase.auth().signOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+    });
+
+    // Load networks after auth is initialized
+    loadNetworksFromFirebase();
 });
 
 // Define zip code boundaries (approximate)
@@ -134,10 +144,6 @@ const southWest = L.latLng(34.0200, -117.2200);
 const northEast = L.latLng(34.0900, -117.1400);
 const bounds = L.latLngBounds(southWest, northEast);
 map.setMaxBounds(bounds);
-
-// Initialize variables to store data
-let wifiNetworks = [];
-let markers = L.layerGroup().addTo(map);
 
 // Function to determine marker color based on signal strength
 function getMarkerColor(signal) {
@@ -214,12 +220,9 @@ function applyFilters() {
     });
 }
 
-// Load networks immediately
-loadNetworksFromFirebase();
-
 // Modify the file upload handler to check authentication
 document.getElementById('fileInput').addEventListener('change', async (event) => {
-    if (!auth.currentUser) {
+    if (!firebase.auth().currentUser) {
         alert('You must be logged in to upload data.');
         return;
     }
