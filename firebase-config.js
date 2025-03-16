@@ -20,8 +20,7 @@ function initializeFirebase() {
             const db = firebase.firestore();
             db.settings({
                 ignoreUndefinedProperties: true,
-                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-                experimentalAutoDetectLongPolling: true
+                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
             });
 
             // Enable offline persistence
