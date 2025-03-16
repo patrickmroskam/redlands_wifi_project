@@ -18,34 +18,63 @@ async function loadNetworksFromFirebase() {
         // Wait for any pending Firestore operations
         await new Promise(resolve => setTimeout(resolve, 1000));
         
+        console.log('Fetching networks collection...');
         const snapshot = await db.collection('networks').get();
+        console.log('Got snapshot:', snapshot);
+        
         const networks = [];
+        console.log('Processing documents...');
+        
         snapshot.forEach(doc => {
+            console.log('Processing document:', doc.id);
             const data = doc.data();
-            // Ensure all numeric fields are properly converted
-            networks.push({
-                ...data,
-                channel: Number(data.channel),
-                signal: Number(data.signal),
-                lat: Number(data.lat),
-                lon: Number(data.lon),
-                altitude: Number(data.altitude),
-                accuracy: Number(data.accuracy)
-            });
+            console.log('Document data:', data);
+            
+            try {
+                // Ensure all numeric fields are properly converted
+                const network = {
+                    ...data,
+                    channel: Number(data.channel) || 0,
+                    signal: Number(data.signal) || 0,
+                    lat: Number(data.lat) || 0,
+                    lon: Number(data.lon) || 0,
+                    altitude: Number(data.altitude) || 0,
+                    accuracy: Number(data.accuracy) || 0
+                };
+                console.log('Processed network:', network);
+                networks.push(network);
+            } catch (conversionError) {
+                console.error('Error converting document:', doc.id, conversionError);
+                console.log('Raw data:', data);
+            }
         });
         
         console.log(`Loaded ${networks.length} networks from Firebase`);
+        console.log('Networks:', networks);
+        
         if (networks.length > 0) {
+            console.log('Updating application with loaded networks...');
             wifiNetworks = networks;
             updateStats();
             applyFilters();
             
             // Center map on the first network
-            map.setView([networks[0].lat, networks[0].lon], 13);
+            const firstNetwork = networks[0];
+            console.log('Centering map on:', firstNetwork.lat, firstNetwork.lon);
+            map.setView([firstNetwork.lat, firstNetwork.lon], 13);
+            console.log('Map centered');
+        } else {
+            console.log('No networks found in the database');
         }
     } catch (error) {
         console.error('Error loading networks from Firebase:', error);
+        console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
         // Retry after a delay if there was an error
+        console.log('Retrying in 2 seconds...');
         setTimeout(loadNetworksFromFirebase, 2000);
     }
 }
