@@ -6,6 +6,30 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+// Load networks from Firebase
+async function loadNetworksFromFirebase() {
+    try {
+        console.log('Loading networks from Firebase...');
+        const snapshot = await db.collection('networks').get();
+        const networks = [];
+        snapshot.forEach(doc => {
+            networks.push(doc.data());
+        });
+        
+        console.log(`Loaded ${networks.length} networks from Firebase`);
+        if (networks.length > 0) {
+            wifiNetworks = networks;
+            updateStats();
+            applyFilters();
+            
+            // Center map on the first network
+            map.setView([networks[0].lat, networks[0].lon], 13);
+        }
+    } catch (error) {
+        console.error('Error loading networks from Firebase:', error);
+    }
+}
+
 // Authentication state observer
 auth.onAuthStateChanged((user) => {
     const loginForm = document.getElementById('loginForm');
@@ -174,29 +198,7 @@ function applyFilters() {
     });
 }
 
-// Load networks from Firebase on page load
-async function loadNetworksFromFirebase() {
-    try {
-        const snapshot = await db.collection('networks').get();
-        const networks = [];
-        snapshot.forEach(doc => {
-            networks.push(doc.data());
-        });
-        
-        if (networks.length > 0) {
-            wifiNetworks = networks;
-            updateStats();
-            applyFilters();
-            
-            // Center map on the first network
-            map.setView([networks[0].lat, networks[0].lon], 13);
-        }
-    } catch (error) {
-        console.error('Error loading networks from Firebase:', error);
-    }
-}
-
-// Call the load function when the page loads
+// Load networks immediately
 loadNetworksFromFirebase();
 
 // Modify the file upload handler to check authentication

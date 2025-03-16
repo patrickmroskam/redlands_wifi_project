@@ -9,8 +9,16 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
-// Initialize Firestore
+// Initialize Firestore with settings
 const db = firebase.firestore();
+db.settings({
+    ignoreUndefinedProperties: true,
+    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+});
+db.enablePersistence()
+    .catch((err) => {
+        console.error('Error enabling persistence:', err);
+    });
 
 // Initialize Auth
 const auth = firebase.auth();
