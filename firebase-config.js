@@ -15,8 +15,8 @@ db.settings({
     ignoreUndefinedProperties: true,
     cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
     merge: true,
-    host: 'firestore.googleapis.com',
-    ssl: true
+    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true
 });
 
 // Enable offline persistence
