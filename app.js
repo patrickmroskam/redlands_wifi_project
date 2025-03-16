@@ -10,10 +10,24 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 async function loadNetworksFromFirebase() {
     try {
         console.log('Loading networks from Firebase...');
+        
+        // Wait for any pending Firestore operations
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const snapshot = await db.collection('networks').get();
         const networks = [];
         snapshot.forEach(doc => {
-            networks.push(doc.data());
+            const data = doc.data();
+            // Ensure all numeric fields are properly converted
+            networks.push({
+                ...data,
+                channel: Number(data.channel),
+                signal: Number(data.signal),
+                lat: Number(data.lat),
+                lon: Number(data.lon),
+                altitude: Number(data.altitude),
+                accuracy: Number(data.accuracy)
+            });
         });
         
         console.log(`Loaded ${networks.length} networks from Firebase`);
@@ -27,6 +41,8 @@ async function loadNetworksFromFirebase() {
         }
     } catch (error) {
         console.error('Error loading networks from Firebase:', error);
+        // Retry after a delay if there was an error
+        setTimeout(loadNetworksFromFirebase, 2000);
     }
 }
 
