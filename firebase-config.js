@@ -1,7 +1,9 @@
 // Firebase configuration
 const firebaseConfig = {
     projectId: "redlands-wifi",
-    authDomain: "redlands-wifi.firebaseapp.com"
+    authDomain: "redlands-wifi.firebaseapp.com",
+    databaseURL: "https://redlands-wifi.firebaseio.com",
+    storageBucket: "redlands-wifi.appspot.com"
 };
 
 // Initialize Firebase

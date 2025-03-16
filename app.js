@@ -203,16 +203,24 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
 
             // Save networks to Firebase
             try {
+                console.log('Starting to save networks to Firebase...');
                 const batch = db.batch();
-                filteredNetworks.forEach(network => {
+                filteredNetworks.forEach((network, index) => {
+                    console.log(`Processing network ${index + 1}/${filteredNetworks.length}:`, network);
                     const networkRef = db.collection('networks').doc();
                     batch.set(networkRef, network);
                 });
+                console.log('Committing batch to Firebase...');
                 await batch.commit();
                 console.log('Successfully saved networks to Firebase');
             } catch (error) {
                 console.error('Error saving to Firebase:', error);
-                alert('Error saving networks to database. Please try again.');
+                console.error('Error details:', {
+                    code: error.code,
+                    message: error.message,
+                    stack: error.stack
+                });
+                alert('Error saving networks to database. Please check the console for details.');
                 return;
             }
 
