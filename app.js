@@ -81,6 +81,12 @@ async function loadNetworksFromFirebase() {
 
 // Wait for Firebase to initialize before setting up auth listeners
 document.addEventListener('DOMContentLoaded', () => {
+    // Ensure Firebase is initialized
+    if (!firebase.apps.length) {
+        console.error('Firebase not initialized');
+        return;
+    }
+
     // Authentication state observer
     firebase.auth().onAuthStateChanged((user) => {
         const loginForm = document.getElementById('loginForm');
@@ -90,12 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (user) {
             // User is signed in
+            console.log('User signed in:', user.email);
             loginForm.style.display = 'none';
             logoutSection.style.display = 'block';
             uploadSection.style.display = 'block';
             adminEmailDisplay.textContent = user.email;
         } else {
             // User is signed out
+            console.log('User signed out');
             loginForm.style.display = 'block';
             logoutSection.style.display = 'none';
             uploadSection.style.display = 'none';
