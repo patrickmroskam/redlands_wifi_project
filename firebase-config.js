@@ -21,8 +21,6 @@ function initializeFirebase() {
             db.settings({
                 ignoreUndefinedProperties: true,
                 cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-                merge: true,
-                experimentalForceLongPolling: true,
                 experimentalAutoDetectLongPolling: true
             });
 
