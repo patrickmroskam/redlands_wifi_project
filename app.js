@@ -213,6 +213,16 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
                 console.log('Committing batch to Firebase...');
                 await batch.commit();
                 console.log('Successfully saved networks to Firebase');
+
+                // Add new networks to existing ones instead of replacing
+                wifiNetworks = [...wifiNetworks, ...filteredNetworks];
+                updateStats();
+                applyFilters();
+                
+                // Only center map on first network if this is the first upload
+                if (wifiNetworks.length === filteredNetworks.length) {
+                    map.setView([filteredNetworks[0].lat, filteredNetworks[0].lon], 13);
+                }
             } catch (error) {
                 console.error('Error saving to Firebase:', error);
                 console.error('Error details:', {
@@ -222,15 +232,6 @@ document.getElementById('fileInput').addEventListener('change', async (event) =>
                 });
                 alert('Error saving networks to database. Please check the console for details.');
                 return;
-            }
-
-            wifiNetworks = filteredNetworks;
-            updateStats();
-            applyFilters();
-            
-            // Center map on the first valid network
-            if (filteredNetworks.length > 0) {
-                map.setView([filteredNetworks[0].lat, filteredNetworks[0].lon], 13);
             }
         } catch (error) {
             console.error('Error processing file:', error);
