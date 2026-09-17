@@ -40,3 +40,7 @@ the files it processed and prints a summary with a count for each drop reason.
 python3 -m unittest discover -s tests -v   # pipeline unit tests (fixtures in tests/fixtures/)
 npx playwright test                        # browser smoke tests
 ```
+
+CI (`.github/workflows/ci.yml`) runs both suites on every pull request and on every
+push to `main`. The first-time setup for the browser tests is
+`npm ci && npx playwright install chromium`.
