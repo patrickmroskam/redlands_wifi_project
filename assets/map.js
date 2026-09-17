@@ -9,7 +9,8 @@
   var COLORS = { encrypted: '#33ff66', open: '#ffb000' };
   // Keep auto-panned popups clear of the zoom control (top left); Leaflet's default elsewhere.
   var POPUP_OPTIONS = { autoPanPaddingTopLeft: [50, 10], autoPanPaddingBottomRight: [5, 5] };
-  // Extra room around the popup (pan padding plus its tip) when the fence is loosened for it.
+  // Extra room on every side of the popup when the fence is loosened for it. Must cover the largest
+  // auto-pan padding above (50) plus the popup tip below the box (~20, outside offsetHeight).
   var POPUP_SLACK = 60;
 
   var statsEl = document.getElementById('stats');
@@ -136,7 +137,8 @@
   });
 
   // Switching markers closes one popup and opens the next in the same tick. Restore the fence only
-  // once no popup is open, or its snap-back would pan the new popup out of view again.
+  // once no popup is open, or its snap-back would pan the new popup out of view again. If a popup
+  // reopened before the check, the fence stays loose until that popup closes, which restores it.
   var openPopups = 0;
   map.on('popupopen', function () { openPopups += 1; });
   map.on('popupclose', function () {

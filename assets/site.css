@@ -64,7 +64,10 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   margin: 0 0 6px;
   color: var(--green-dim);
   font-size: 0.8rem;
-  /* Decorative (aria-hidden): one line, clipped rather than wrapped, typed in on load. */
+  /* Decorative (aria-hidden): one line, clipped rather than wrapped, typed in on load.
+     The box hugs the text so the clip reveals it at an even pace (about one step per character). */
+  width: fit-content;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   animation: type-in 1.4s steps(40, end) 0.2s both;
@@ -192,8 +195,10 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   border-radius: 0;
 }
 .leaflet-popup-content {
-  /* Right margin leaves room for the close button. The width cap keeps a popup, its margins,
-     and the auto-pan padding inside the map on a phone (map = viewport - 34 px). */
+  /* Right margin leaves room for the close button. The width cap keeps the whole popup inside
+     the map on a phone: map = viewport - 34 px (page padding + frame); the popup adds 42 px of
+     content margin + 2 px of wrapper padding/border; auto-pan keeps 50 px left (clear of the zoom
+     control, POPUP_OPTIONS in map.js) and 5 px right. 34 + 42 + 2 + 50 + 5 = 133, rounded to 140. */
   margin: 10px 30px 10px 12px;
   max-width: min(300px, calc(100vw - 140px));
   font-size: 13px;

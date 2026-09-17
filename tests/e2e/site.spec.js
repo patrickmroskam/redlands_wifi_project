@@ -7,6 +7,7 @@ const FIXTURE_3 = path.join(__dirname, '..', 'fixtures', 'networks-3.json');
 const FIXTURE_EDGE = path.join(__dirname, '..', 'fixtures', 'networks-edge.json');
 const FIXTURE_XSS = path.join(__dirname, '..', 'fixtures', 'networks-xss.json');
 const FIXTURE_DUP = path.join(__dirname, '..', 'fixtures', 'networks-dup.json');
+const FIXTURE_CORNERS = path.join(__dirname, '..', 'fixtures', 'networks-corners.json');
 
 test.beforeEach(async ({ page }) => {
   // Keep tests deterministic: never fetch map tiles (Leaflet is vendored under assets/).
@@ -410,6 +411,33 @@ test('popups open fully inside the fenced map on a phone; the fence returns on c
   await page.evaluate(() => window.__rwp.map.setZoom(3, { animate: false }));
   expect(await page.evaluate(() => window.__rwp.map.getZoom())).toBe(minZoom);
 });
+
+// Markers at the fence's corners and top edge are where clipping was worst. Portrait and landscape
+// phones, at the zoom-out limit and zoomed in on the marker.
+for (const [width, height] of [[360, 740], [740, 360]]) {
+  for (const zoomIn of [0, 2]) {
+    test(`corner popups stay inside the map at ${width}x${height}, min zoom +${zoomIn} (#7)`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await useFixture(page, FIXTURE_CORNERS);
+      await page.goto('/index.html');
+      await expect(page.locator('path.net-marker')).toHaveCount(5);
+      const fence = await page.evaluate(() => window.__rwp.fence().toBBoxString());
+      for (let i = 0; i < 5; i++) {
+        await page.evaluate(([n, dz]) => {
+          const { map, markers } = window.__rwp;
+          map.closePopup();
+          map.setView(markers[n].getLatLng(), map.getMinZoom() + dz, { animate: false });
+        }, [i, zoomIn]);
+        // Let the fence's own snap-back settle before opening, as a user's tap would.
+        await page.waitForTimeout(400);
+        await page.evaluate((n) => window.__rwp.markers[n].openPopup(), i);
+        await expect.poll(() => popupInsideMap(page), { message: `marker ${i}` }).toBe('inside');
+      }
+      await page.evaluate(() => window.__rwp.map.closePopup());
+      await expect.poll(() => page.evaluate(() => window.__rwp.map.options.maxBounds.toBBoxString())).toBe(fence);
+    });
+  }
+}
 
 test('Leaflet controls keep the terminal theme in every state (#7)', async ({ page }) => {
   await useFixture(page, FIXTURE_3);

@@ -1,0 +1,51 @@
+{
+  "updated_at": "2026-09-15T08:30:00Z",
+  "count": 5,
+  "networks": [
+    {
+      "bssid": "aa:bb:cc:00:00:31",
+      "ssid": "Corner-0-with-a-fairly-long-name",
+      "auth": "[WPA2_PSK]",
+      "channel": 6,
+      "first_seen": "2026-09-14 10:00:00",
+      "lat": 34.0985,
+      "lon": -117.2495
+    },
+    {
+      "bssid": "aa:bb:cc:00:00:32",
+      "ssid": "Corner-1-with-a-fairly-long-name",
+      "auth": "[ESS]",
+      "channel": 6,
+      "first_seen": "2026-09-14 10:00:00",
+      "lat": 34.0985,
+      "lon": -117.0345
+    },
+    {
+      "bssid": "aa:bb:cc:00:00:33",
+      "ssid": "Corner-2-with-a-fairly-long-name",
+      "auth": "[WEP]",
+      "channel": 6,
+      "first_seen": "2026-09-14 10:00:00",
+      "lat": 33.9348,
+      "lon": -117.2495
+    },
+    {
+      "bssid": "aa:bb:cc:00:00:34",
+      "ssid": "Corner-3-with-a-fairly-long-name",
+      "auth": "[WPA3_SAE]",
+      "channel": 6,
+      "first_seen": "2026-09-14 10:00:00",
+      "lat": 33.9348,
+      "lon": -117.0345
+    },
+    {
+      "bssid": "aa:bb:cc:00:00:35",
+      "ssid": "Corner-4-with-a-fairly-long-name",
+      "auth": "[ESS]",
+      "channel": 6,
+      "first_seen": "2026-09-14 10:00:00",
+      "lat": 34.0985,
+      "lon": -117.142
+    }
+  ]
+}
