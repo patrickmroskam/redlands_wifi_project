@@ -105,6 +105,13 @@ if ! git push --quiet origin "HEAD:$branch"; then
     echo "::error::main changed data/networks.json or a processed log during this run (rebase conflict); nothing was pushed — re-run the workflow"
     exit 2
   }
+  # A removal (data/removed.json) may have landed meanwhile without touching the
+  # database, so the rebase is clean but this commit could republish a removed
+  # network. Re-check on the rebased tree; the next run will drop it properly.
+  python3 scripts/ingest.py --check || {
+    echo "::error::a network removed on request during this run is in this commit; nothing was pushed — re-run the workflow"
+    exit 2
+  }
   git push --quiet origin "HEAD:$branch" || { echo "::error::push to $branch failed twice; nothing was pushed"; exit 2; }
 fi
 

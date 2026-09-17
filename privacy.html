@@ -133,7 +133,7 @@
       </p>
       <p>
         Renaming a network does not remove an entry that is already on the map. For that,
-        send a removal request. The opt-out is not remembered: if you later remove
+        send a removal request, which is remembered. The opt-out itself is not remembered: if you later remove
         <code>_nomap</code> from the name, the network can be added the next time it is heard.
       </p>
     </section>
@@ -149,8 +149,9 @@
         <li>Include the network's BSSID (MAC address) or its name, plus the nearest street or intersection.</li>
         <li><strong>Issues are public.</strong> Don't include your name, your home address, or anything else personal.</li>
         <li>A person reviews each request and removes the entry by hand.</li>
-        <li>Also add <code>_nomap</code> to the network's name. Otherwise, the next scan that hears
-          it could put it back on the map.</li>
+        <li>The removal is remembered. The network's BSSID goes on a list of removed networks
+          (with only the date and the issue number), and later scans never add it back, even
+          under a different name. You don't need to rename it or add <code>_nomap</code>.</li>
         <li>Older versions of the map data stay in the repository's history.</li>
       </ul>
     </section>

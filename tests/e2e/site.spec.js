@@ -782,7 +782,7 @@ test('privacy page covers every required section (R6)', async ({ page }) => {
     '#how': [/beacon/i, /never connects/i],
     '#where': [/92373/, /92374/, /thrown away/i, /opted out/i, /history/i],
     '#opt-out': [/_nomap/, /_optout/, /uppercase\s+or\s+lowercase/i, /not remembered/i],
-    '#removal': [/do not need to email/i, /Issues are public/i, /_nomap/],
+    '#removal': [/do not need to email/i, /Issues are public/i, /removal is remembered/i, /never add it back/i],
     '#visitors': [/No cookies/i, /No analytics/i, /No accounts/i],
   };
   for (const [id, patterns] of Object.entries(sections)) {

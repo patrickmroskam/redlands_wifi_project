@@ -37,7 +37,8 @@ class PublishCase(unittest.TestCase):
         git(self.tmp, "init", "--quiet", "--bare", "-b", "main", self.remote)
         git(self.tmp, "init", "--quiet", "-b", "main", self.work)
         for rel in ("scripts/ingest.py", "scripts/publish_ingest.sh",
-                    "data/redlands-boundary.geojson", "ingest/README.md"):
+                    "data/redlands-boundary.geojson", "data/removed.json",
+                    "ingest/README.md"):
             dest = os.path.join(self.work, rel)
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             shutil.copy2(os.path.join(REPO, rel), dest)
@@ -164,6 +165,25 @@ class Publishes(PublishCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("::error::", result.stdout)
         self.assertIn("rebase conflict", result.stdout)
+        self.assertEqual(self.remote_head(), head)
+        self.assertNotIn("pushed_sha", self.read(self.output))
+
+
+    def test_removal_landing_during_the_run_is_never_pushed(self):
+        # The removal only touches data/removed.json, so the rebase is clean (#27).
+        self.add_log("wardrive_1.log")
+        bssid = "aa:bb:cc:00:00:01"  # in town in sample.log, so this run adds it
+        other = os.path.join(self.tmp, "other")
+        git(self.tmp, "clone", "--quiet", self.remote, other)
+        with open(os.path.join(other, "data", "removed.json"), "w", encoding="utf-8") as fh:
+            json.dump({"removed": [{"bssid": bssid, "date": "2026-09-17", "issue": 27}]}, fh)
+        self.commit_all("remove a network", cwd=other)
+        git(other, "push", "--quiet", "origin", "main")
+        head = self.remote_head()
+        result = self.publish()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("retrying once", result.stdout)
+        self.assertIn("removed on request during this run", result.stdout)
         self.assertEqual(self.remote_head(), head)
         self.assertNotIn("pushed_sha", self.read(self.output))
 
