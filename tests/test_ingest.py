@@ -581,6 +581,19 @@ class Denylist(PipelineCase):
                 self.write_denylist(entries)
                 self.assert_fatal_and_untouched("needs a manual fix", text)
 
+    def test_check_mode_validates_without_touching_the_inbox(self):
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:68"))
+        code, out = self.run_pipeline("--check")
+        self.assertEqual(code, 0, out)
+        self.assertIn("consistent", out)
+        self.write_db([{"bssid": "aa:bb:cc:00:00:68", "ssid": "Gone", "auth": "",
+                        "channel": 1, "first_seen": "", "lat": 34.05, "lon": -117.18}])
+        self.write_denylist([self.entry("aa:bb:cc:00:00:68")])
+        code, out = self.run_pipeline("--check")
+        self.assertEqual(code, 2, out)
+        self.assertIn("still contains 1 removed network(s)", out)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+
     def test_removed_network_still_in_the_database_is_fatal(self):
         self.write_db([{"bssid": "AA-BB-CC-00-00-67", "ssid": "Gone", "auth": "",
                         "channel": 1, "first_seen": "", "lat": 34.05, "lon": -117.18}])
@@ -662,6 +675,42 @@ class RemoveNetwork(PipelineCase):
                 self.assertEqual(code, 2, out)
                 self.assertIn("nothing was written", out)
                 self.assertEqual(self.snapshot(), before)
+
+    def test_missing_database_path_is_refused(self):
+        os.remove(self.db)
+        with open(self.denylist, "rb") as fh:
+            before = fh.read()
+        code, out = self.remove("--issue", "45", "aa:bb:cc:00:00:76")
+        self.assertEqual(code, 2, out)
+        self.assertIn("does not exist", out)
+        with open(self.denylist, "rb") as fh:
+            self.assertEqual(fh.read(), before)
+
+    def test_failed_database_write_is_reported_and_a_re_run_finishes_the_job(self):
+        self.write_db([self.net("aa:bb:cc:00:00:77")])
+        real_save = remove_network.ingest.save_db
+
+        def boom(*_a, **_k):
+            raise OSError("disk full")
+
+        remove_network.ingest.save_db = boom
+        try:
+            code, out = self.remove("--issue", "46", "aa:bb:cc:00:00:77")
+        finally:
+            remove_network.ingest.save_db = real_save
+        self.assertEqual(code, 2, out)
+        self.assertIn("re-run this command", out)
+        self.assertNotIn("nothing was written", out)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertEqual([e["bssid"] for e in self.read_denylist()], ["aa:bb:cc:00:00:77"])
+        # Half-done: the ingest refuses to run.
+        self.assertEqual(self.run_pipeline()[0], 2)
+
+        code, out = self.remove("--issue", "46", "aa:bb:cc:00:00:77")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_db()["count"], 0)
+        self.assertEqual(len(self.read_denylist()), 1)
+        self.assertEqual(self.run_pipeline()[0], 0)
 
     def test_refuses_a_broken_denylist(self):
         self.write_db([self.net("aa:bb:cc:00:00:75")])

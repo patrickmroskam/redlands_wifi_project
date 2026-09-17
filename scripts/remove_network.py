@@ -71,6 +71,8 @@ def remove(bssids, issue, db_path, denylist_path, today=None):
         raise ingest.FatalError("give at least one BSSID")
 
     # Validate both files up front with the ingest's own rules.
+    if not os.path.isfile(db_path):
+        raise ingest.FatalError("database {} does not exist".format(db_path))
     db = ingest.load_db(db_path)
     ingest.stored_bssids(db, db_path)
     listed = ingest.load_denylist(denylist_path)

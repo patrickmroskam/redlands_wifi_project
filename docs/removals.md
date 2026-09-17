@@ -21,7 +21,11 @@ the network must not add it back. That is what `data/removed.json` is for.
    `data/removed.json`. It works even if the network isn't on the map yet.
 3. Commit **both** files in one commit and open a PR. CI checks that the denylist is
    valid and that no listed BSSID is still in the database.
-4. After the merge, comment on the issue ("removed; it won't be added again") and
+4. If an ingest run happens between your branch and the merge, the ingest refuses to
+   push a commit that would republish a listed network (it re-checks after its
+   rebase). If the ingest still stops with "still contains … removed network(s)",
+   re-run step 2 on `main` and merge that.
+5. After the merge, comment on the issue ("removed; it won't be added again") and
    close it. Don't repeat the BSSID or any location in the comment.
 
 ## What the denylist holds

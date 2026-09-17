@@ -420,6 +420,23 @@ def classify(row, fence, known, removed=frozenset()):
     }, bssid
 
 
+def check_data(db_path, denylist_path):
+    """Load and validate the database and the denylist. Returns (db, stored, removed).
+
+    A denylisted BSSID that is still in the database is fatal: a removal was half-done
+    (or raced an ingest), and the network is still published."""
+    db = load_db(db_path)
+    stored = stored_bssids(db, db_path)
+    removed = load_denylist(denylist_path)
+    still_published = sorted(stored & removed)
+    if still_published:
+        raise FatalError(
+            "database {} still contains {} removed network(s) listed in {}: {}; "
+            "delete them from the database (docs/removals.md)".format(
+                db_path, len(still_published), denylist_path, _preview(still_published)))
+    return db, stored, removed
+
+
 def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         dry_run=False, now=None):
     """Run the pipeline and return a summary dict. Raises FatalError before any change."""
@@ -430,15 +447,7 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         raise FatalError("cannot load boundary {}: {}".format(boundary_path, exc))
     if not os.path.isdir(ingest_dir):
         raise FatalError("ingest directory {} does not exist".format(ingest_dir))
-    db = load_db(db_path)
-    stored = stored_bssids(db, db_path)
-    removed = load_denylist(denylist_path)
-    still_published = sorted(stored & removed)
-    if still_published:
-        raise FatalError(
-            "database {} still contains {} removed network(s) listed in {}: {}; "
-            "delete them from the database (docs/removals.md)".format(
-                db_path, len(still_published), denylist_path, _preview(still_published)))
+    db, stored, removed = check_data(db_path, denylist_path)
     known = set(stored)
 
     summary = {
@@ -546,7 +555,17 @@ def main(argv=None):
                         help="removed BSSIDs that are never added (default: data/removed.json)")
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would happen without writing or deleting")
+    parser.add_argument("--check", action="store_true",
+                        help="only validate the database and the denylist, then exit")
     args = parser.parse_args(argv)
+    if args.check:
+        try:
+            check_data(args.db, args.denylist)
+        except FatalError as exc:
+            print("error: {}".format(exc))
+            return EXIT_FATAL
+        print("database and denylist are consistent.")
+        return EXIT_OK
     try:
         summary = run(args.ingest_dir, args.db, args.boundary,
                       denylist_path=args.denylist, dry_run=args.dry_run)
