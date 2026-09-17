@@ -1,7 +1,7 @@
 ---
 title: "feat: Ingest pipeline (parse → fence → filter → dedupe → append → delete)"
 type: feat
-status: active
+status: completed
 date: 2026-09-17
 origin: docs/spec/PRD.md
 issue: 3
