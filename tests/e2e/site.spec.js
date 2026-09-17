@@ -63,6 +63,28 @@ async function clickMarker(page, n, dx = 0, dy = 0) {
   await page.mouse.click(x, y);
 }
 
+// The colour actually drawn on the markers canvas at each marker's centre, as [r, g, b, a].
+function drawnColors(page) {
+  return page.evaluate(() => {
+    const { map, markers } = window.__rwp;
+    const canvas = map.getContainer().querySelector('.leaflet-overlay-pane canvas');
+    const box = canvas.getBoundingClientRect();
+    const mapBox = map.getContainer().getBoundingClientRect();
+    const ctx = canvas.getContext('2d');
+    return markers.map((m) => {
+      const p = map.latLngToContainerPoint(m.getLatLng());
+      const x = Math.round((mapBox.left + p.x - box.left) * canvas.width / box.width);
+      const y = Math.round((mapBox.top + p.y - box.top) * canvas.height / box.height);
+      return Array.from(ctx.getImageData(x, y, 1, 1).data);
+    });
+  });
+}
+
+function nearColor(actual, hex) {
+  const want = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return want.every((c, i) => Math.abs(actual[i] - c) <= 4) && actual[3] > 200;
+}
+
 async function clickFirstMarkerOfKind(page, kind) {
   await expect.poll(() => page.evaluate(() => window.__rwp.markers.length)).toBeGreaterThan(0);
   const n = (await markerKinds(page)).indexOf(kind);
@@ -120,8 +142,10 @@ test('fixture database: one colored marker per network', async ({ page }) => {
 
   await expectMarkers(page, 3);
   expect(await markerKinds(page)).toEqual(['encrypted', 'encrypted', 'open']);
-  const fills = await page.evaluate(() => window.__rwp.markers.map((m) => m.options.fillColor));
-  expect(fills).toEqual(['#33ff66', '#33ff66', '#ffb000']);
+  // What is painted, not just what was asked for.
+  const expected = ['#33ff66', '#33ff66', '#ffb000'];
+  await expect.poll(async () => (await drawnColors(page)).map((c, i) => nearColor(c, expected[i])))
+    .toEqual([true, true, true]);
   await expect(page.locator('#map .leaflet-overlay-pane canvas')).toHaveCount(1);
   await expect(page.locator('#stats')).toContainText('3 networks mapped');
   await expect(page.locator('#stats')).toContainText('2026-09-15 08:30 UTC');
@@ -139,9 +163,15 @@ test('duplicate BSSIDs in the database render one marker per network (#15)', asy
   await expectMarkers(page, 5);
   // The first record of each BSSID wins; the later (open) copies are never drawn.
   expect(await markerKinds(page)).not.toContain('open');
-  // Popup content is built on demand from a function.
-  const bssids = await page.evaluate(() => window.__rwp.markers.map((m) =>
-    m.getPopup().getContent()(m).querySelectorAll('dd')[1].textContent));
+  const bssids = [];
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate((n) => window.__rwp.markers[n].openPopup(), i);
+    bssids.push(await page.locator('.leaflet-popup:last-child .leaflet-popup-content dd').nth(1).textContent());
+  }
+  // Popups are built when they open, never all up front (18k of them would cost memory).
+  await page.evaluate(() => window.__rwp.map.closePopup());
+  expect(await page.evaluate(() => window.__rwp.markers.filter((m) =>
+    m.getPopup().getContent() instanceof Node).length)).toBe(0);
   expect(bssids).toEqual(['aa:bb:cc:00:00:21', 'aa:bb:cc:00:00:22', 'aa:bb:cc:00:00:23', '—', '—']);
   expect(warnings).toContain('Skipped 2 duplicate network record(s) (same BSSID).');
 });
@@ -556,17 +586,31 @@ test('18,000 networks load quickly, stay off the DOM, and pan, zoom and open pop
   // One canvas, not one element per network (SVG markers made this about 18,080).
   expect(await page.evaluate(() => document.getElementsByTagName('*').length)).toBeLessThan(500);
 
-  // Pan, zoom in, and zoom out all finish.
+  // Pan, zoom in, and zoom out all finish, and no frame stalls for long while they animate.
+  // With SVG markers the worst frame was about 700 ms under 6x CPU throttling (#11 plan).
   const moved = await page.evaluate(async () => {
     const { map } = window.__rwp;
     const t = performance.now();
+    let last = t;
+    let worst = 0;
+    let running = true;
+    const tick = (now) => {
+      worst = Math.max(worst, now - last);
+      last = now;
+      if (running) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
     const settle = (event, action) => new Promise((resolve) => { map.once(event, resolve); action(); });
     await settle('moveend', () => map.panBy([120, 90], { animate: true, duration: 0.3 }));
+    await settle('moveend', () => map.panBy([-120, -90], { animate: true, duration: 0.3 }));
     await settle('zoomend', () => map.zoomIn(1));
     await settle('zoomend', () => map.zoomOut(1));
-    return performance.now() - t;
+    running = false;
+    return { total: performance.now() - t, worst };
   });
-  expect(moved).toBeLessThan(10_000);
+  console.log(`18k networks: pan/zoom ${Math.round(moved.total)} ms, worst frame ${Math.round(moved.worst)} ms`);
+  expect(moved.total).toBeLessThan(10_000);
+  expect(moved.worst).toBeLessThan(400);
 
   // A real click on a network in view opens its popup.
   const n = await page.evaluate(() => {
