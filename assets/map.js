@@ -102,8 +102,13 @@
   }).addTo(map);
 
   // ~18k networks: one canvas for every marker instead of one SVG element each (#11). The boundary
-  // stays SVG. Tolerance widens the tap target on phones; padding redraws less while panning.
-  var markerRenderer = L.canvas({ padding: 0.5, tolerance: 4 });
+  // stays SVG. Padding keeps nearby markers drawn while dragging; more would risk mobile canvas limits.
+  var markerRenderer = L.canvas({ padding: 0.3 });
+  var MARKER_RADIUS = 5;
+  // How far from a marker's centre a click still picks it, in CSS pixels: the drawn circle, plus
+  // some slop for fingers.
+  var COARSE_POINTER = !!(window.matchMedia && window.matchMedia('(any-pointer: coarse)').matches);
+  var HIT_RADIUS = MARKER_RADIUS + 1 + (COARSE_POINTER ? 6 : 0);
 
   var fenceBounds = null;
 
@@ -155,6 +160,55 @@
   // Expose read-only hooks for the smoke test.
   window.__rwp = { map: map, markers: [], fence: function () { return fenceBounds; } };
 
+  // Canvas hit-testing gives a click to the last-drawn marker in range, not the one aimed at, and
+  // opens the popup at the click point. So markers are not interactive themselves: a click on the
+  // map opens the marker whose centre is nearest, anchored on that centre.
+  var projected = { zoom: null, points: [] };
+  function nearestMarker(latlng) {
+    var markers = window.__rwp.markers;
+    var zoom = map.getZoom();
+    if (projected.zoom !== zoom || projected.points.length !== markers.length) {
+      projected = { zoom: zoom, points: markers.map(function (m) { return map.project(m.getLatLng(), zoom); }) };
+    }
+    var at = map.project(latlng, zoom);
+    var best = -1;
+    var bestDistance = HIT_RADIUS * HIT_RADIUS;
+    for (var i = 0; i < projected.points.length; i++) {
+      var dx = projected.points[i].x - at.x;
+      var dy = projected.points[i].y - at.y;
+      var distance = dx * dx + dy * dy;
+      // On a tie the later marker wins: it is drawn on top.
+      if (distance <= bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return best < 0 ? null : markers[best];
+  }
+
+  map.on('click', function (e) {
+    var marker = nearestMarker(e.latlng);
+    if (marker) marker.openPopup();
+  });
+
+  // A pointer cursor over markers, checked at most once per frame. This listens to the DOM, because
+  // the canvas renderer drops map mousemove events that come within 32 ms of the last one.
+  var hoverFrame = 0;
+  var hoverAt = null;
+  L.DomEvent.on(map.getContainer(), 'mousemove', function (e) {
+    hoverAt = map.mouseEventToLatLng(e);
+    if (hoverFrame) return;
+    hoverFrame = window.requestAnimationFrame(function () {
+      hoverFrame = 0;
+      L.DomUtil[nearestMarker(hoverAt) ? 'addClass' : 'removeClass'](map.getContainer(), 'over-marker');
+    });
+  });
+  map.on('mouseout', function () {
+    window.cancelAnimationFrame(hoverFrame);
+    hoverFrame = 0;
+    L.DomUtil.removeClass(map.getContainer(), 'over-marker');
+  });
+
   var boundaryReady = fetchJson(BOUNDARY_URL).then(function (geo) {
     var layer = L.geoJSON(geo, {
       interactive: false,
@@ -195,8 +249,9 @@
       // The popup is built only when it opens; 18k detached popup trees would cost memory at load.
       var marker = L.circleMarker([lat, lon], {
         renderer: markerRenderer,
+        interactive: false,
         kind: kind,
-        radius: 5,
+        radius: MARKER_RADIUS,
         weight: 1,
         color: '#000',
         fillColor: COLORS[kind],
