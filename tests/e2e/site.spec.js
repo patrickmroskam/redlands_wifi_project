@@ -8,6 +8,8 @@ const FIXTURE_EDGE = path.join(__dirname, '..', 'fixtures', 'networks-edge.json'
 const FIXTURE_XSS = path.join(__dirname, '..', 'fixtures', 'networks-xss.json');
 const FIXTURE_DUP = path.join(__dirname, '..', 'fixtures', 'networks-dup.json');
 const FIXTURE_CORNERS = path.join(__dirname, '..', 'fixtures', 'networks-corners.json');
+const FIXTURE_EMPTY = path.join(__dirname, '..', 'fixtures', 'networks-empty.json');
+const FIXTURE_CATEGORIES = path.join(__dirname, '..', 'fixtures', 'networks-categories.json');
 
 test.beforeEach(async ({ page }) => {
   // Keep tests deterministic: never fetch map tiles (Leaflet is vendored under assets/).
@@ -92,7 +94,9 @@ async function clickFirstMarkerOfKind(page, kind) {
   await clickMarker(page, n);
 }
 
-test('empty seed database: banner, bounded map, legend, zero stats, privacy link', async ({ page }) => {
+test('empty database: banner, bounded map, legend, zero stats, privacy link', async ({ page }) => {
+  // The committed database is real data since the backfill (#8), so the empty case uses a fixture.
+  await useFixture(page, FIXTURE_EMPTY);
   await page.goto('/index.html');
 
   const title = page.getByRole('heading', { level: 1 });
@@ -101,6 +105,11 @@ test('empty seed database: banner, bounded map, legend, zero stats, privacy link
   await expect(page.locator('header.banner img, header.banner svg')).toHaveCount(0);
 
   await expect(page.locator('#stats')).toContainText('0 networks mapped');
+  // #12: the breakdown shows an empty state, not an empty circle.
+  await expect(page.locator('#security-status')).toHaveText('> no networks mapped yet');
+  await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+  await expect(page.locator('#security-status')).not.toHaveClass(/visually-hidden/);
+  await expect(page.locator('svg.pie')).toHaveCount(0);
   await expect(page.locator('.legend')).toContainText('encrypted');
   await expect(page.locator('.legend')).toContainText('open');
   await expect(page.locator('path.boundary')).toHaveCount(2);
@@ -212,6 +221,8 @@ test('every popup field and the stats line render HTML payloads as text', async 
   await expect(page.locator('#stats')).toHaveText(
     '> 1 network mapped · last updated <img src=x onerror="window.__xss=\'updated_at\'">');
   await expect(page.locator('#stats *')).toHaveCount(0);
+  // The breakdown classifies the payload network without rendering any of it (#12).
+  await expect(page.locator('#security-legend li')).toHaveText(['Other100.0% (1)']);
 
   await clickMarker(page, 0);
   const popup = page.locator('.leaflet-popup-content');
@@ -240,6 +251,218 @@ test('a database parse error quoting HTML is shown as text', async ({ page }) =>
   await expect(alert).toContainText('<img');
   await expect(alert.locator('*:not(p)')).toHaveCount(0);
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+});
+
+// Security breakdown under the map (#12).
+const CATEGORY_COUNTS = {
+  default: 3, open: 3, wep: 1, wpa: 1, 'wpa-wpa2': 1, wpa2: 3,
+  'wpa2-enterprise': 2, 'wpa2-wpa3': 1, wpa3: 2, other: 1,
+};
+// 18 networks, rounded by largest remainder so the column adds up to exactly 100.0.
+const CATEGORY_LEGEND = [
+  ['Default-looking', '16.7% (3)'],
+  ['Open', '16.7% (3)'],
+  ['WEP', '5.6% (1)'],
+  ['WPA', '5.6% (1)'],
+  ['WPA/WPA2', '5.5% (1)'],
+  ['WPA2', '16.7% (3)'],
+  ['WPA2 Enterprise', '11.1% (2)'],
+  ['WPA2/WPA3', '5.5% (1)'],
+  ['WPA3', '11.1% (2)'],
+  ['Other', '5.5% (1)'],
+];
+
+test('the classifier puts every network in exactly one category (#12)', async ({ page }) => {
+  await page.goto('/index.html');
+  const fixture = require(FIXTURE_CATEGORIES);
+  // The first 18 records are the ones the map plots (the last two are a duplicate BSSID and bad coordinates).
+  const result = await page.evaluate((nets) => {
+    const S = window.RWPStats;
+    const counts = S.countCategories(nets);
+    const pct = S.percentages(counts);
+    return {
+      counts,
+      byName: Object.fromEntries(nets.map((n) => [n.bssid, S.classify(n)])),
+      tenths: Object.values(pct).reduce((sum, p) => sum + Math.round(p * 10), 0),
+      categories: S.CATEGORIES.map((c) => c.id),
+    };
+  }, fixture.networks.slice(0, 18));
+  expect(result.counts).toEqual(CATEGORY_COUNTS);
+  expect(Object.keys(result.counts)).toEqual(result.categories);
+  expect(result.tenths).toBe(1000);
+  expect(result.byName['aa:bb:cc:00:01:01']).toBe('default'); // factory name on WPA2 wins over WPA2
+  expect(result.byName['aa:bb:cc:00:01:02']).toBe('default'); // factory name on an open network
+  expect(result.byName['aa:bb:cc:00:01:04']).toBe('wpa2'); // hidden SSID falls through to its auth
+  expect(result.byName['aa:bb:cc:00:01:05']).toBe('wpa2'); // renamed "Frontier Speedy" is not default
+  expect(result.byName['aa:bb:cc:00:01:08']).toBe('open'); // hidden and no auth
+  expect(result.byName['aa:bb:cc:00:01:09']).toBe('open'); // [ESS] is amber on the map, so Open here
+  expect(result.byName['aa:bb:cc:00:01:0e']).toBe('wpa2-enterprise'); // EAP
+  expect(result.byName['aa:bb:cc:00:01:12']).toBe('other'); // encrypted, but not a Marauder string
+
+  // Rounding always sums to 100.0, even for awkward splits; no networks gives no percentages.
+  const sums = await page.evaluate(() => {
+    const S = window.RWPStats;
+    const splits = [{ open: 1, wpa2: 1, wpa3: 1 }, { default: 1, open: 2, wep: 3, wpa: 4, wpa2: 97 }, { wpa2: 7 }];
+    return {
+      sums: splits.map((c) => Object.values(S.percentages(c)).reduce((sum, p) => sum + Math.round(p * 10), 0)),
+      thirds: S.percentages({ open: 1, wpa2: 1, wpa3: 1 }),
+      empty: S.percentages({}),
+    };
+  });
+  expect(sums.sums).toEqual([1000, 1000, 1000]);
+  expect([sums.thirds.open, sums.thirds.wpa2, sums.thirds.wpa3]).toEqual([33.4, 33.3, 33.3]);
+  expect(sums.empty).toEqual({});
+});
+
+test('factory SSID patterns match defaults and skip renamed look-alikes (#12)', async ({ page }) => {
+  await page.goto('/index.html');
+  const defaults = [
+    'SpectrumSetup-A1', 'MySpectrumWiFi5c-2G', 'Spectrum1261', 'Frontier0000', 'ATT-WIFI-2437', 'ATT6C8NwJ4',
+    'ATT7YYC53e_EXT', 'ORBI12-IoT', 'ASUS-2.4G-ext', 'ASUS_C0_2G_Guest', 'ASUS_Guest1',
+    'CenturyLink1234', 'TMOBILE-082B_EXT', 'Verizon-1E06', 'Verizon_7XSJ9T', 'Verizon-MiFi8800L-93D0',
+    'NETGEAR', 'NETGEAR06', 'NETGEAR06-5G', 'netgear42_EXT', 'NETGEAR-Guest', 'ORBI', 'ORBI12-Guest',
+    'TP-Link_1A2B', 'TP-LINK_1B8B_5G', 'TP-LINK_785058', 'Linksys04357-guest', 'DIRECT-01-HP M203 LaserJet',
+    'dlink', 'dlink-610E', 'ASUS', 'ASUS_5G', 'ASUS_9C28', 'ASUS22', 'Tenda_22F7F0', 'xfinitywifi', 'XFSETUP-1A2B',
+  ];
+  const renamed = [
+    '', '   ', 'Spectrum sucks', 'SpectrumShade', 'Frontier Speedy', 'Frontier', 'ATTIC', 'Attorneys',
+    'ATT4WIFI', 'Verizon-My hotspot', 'NETGEAR-Rivera 2G', 'ORBITAL', 'TP-LINK_IoT', 'TP-LINK_Power Strip_2601',
+    'Linksys Extender Setup', 'ASUSTek Lab',
+    'ORBI88benandnatalia', 'ORBI88smith-IoT', 'Asus Wifi', 'ASUS_MD', 'ASUS_50 NEW', 'ATT6C8NwJ4_home', 'Tenda', 'xfinitywifi2', 'Redlands Internet', 'MyDIRECT-TV',
+  ];
+  const results = await page.evaluate(([yes, no]) => {
+    const is = (ssid) => window.RWPStats.classify({ ssid, auth: '[WPA2_PSK]' }) === 'default';
+    return { missed: yes.filter((s) => !is(s)), wrong: no.filter(is) };
+  }, [defaults, renamed]);
+  expect(results).toEqual({ missed: [], wrong: [] });
+});
+
+test('the security pie sits under the map and matches the plotted networks (#12)', async ({ page }) => {
+  await useFixture(page, FIXTURE_CATEGORIES);
+  await page.goto('/index.html');
+  await expectMarkers(page, 18);
+
+  const section = page.locator('section.breakdown');
+  await expect(section.getByRole('heading', { level: 2 })).toHaveText('Network breakdown');
+  const [mapBox, sectionBox] = [await page.locator('.map-frame').boundingBox(), await section.boundingBox()];
+  expect(sectionBox.y).toBeGreaterThanOrEqual(mapBox.y + mapBox.height);
+
+  const pie = page.getByRole('img', { name: /how the 18 mapped networks are secured/ });
+  await expect(pie).toBeVisible();
+  // Still announced to screen readers, but not shown.
+  await expect(page.locator('#security-status')).toHaveText('> security breakdown loaded: 18 networks classified');
+  await expect(page.locator('#security-status')).toHaveClass(/visually-hidden/);
+  await expect(page.locator('#security-status')).toHaveAttribute('aria-live', 'polite');
+  await expect(pie.locator('.slice')).toHaveCount(10);
+  // A duplicate BSSID and a record with bad coordinates are not on the map, so they are not counted.
+  await expect(page.locator('.pie-total')).toHaveText('> 18 networks classified');
+
+  const legend = page.locator('#security-legend li');
+  await expect(legend).toHaveCount(CATEGORY_LEGEND.length);
+  await expect(legend.locator('.pie-label')).toHaveText(CATEGORY_LEGEND.map(([label]) => label));
+  await expect(legend.locator('.pie-value')).toHaveText(CATEGORY_LEGEND.map(([, value]) => value));
+  const total = (await legend.locator('.pie-value').allTextContents())
+    .reduce((sum, text) => sum + Math.round(parseFloat(text) * 10), 0);
+  expect(total).toBe(1000);
+  // The text summary names every slice.
+  await expect(page.locator('#security-summary')).toHaveText(
+    '18 networks: ' + CATEGORY_LEGEND.map(([label, value]) => `${label} ${value.split(' ')[0]}`).join(', ') + '.');
+
+  // Slice sizes follow the counts: each slice's arc spans its share of the circle.
+  const arcs = await pie.locator('path.slice').evaluateAll((paths) => paths.map((p) => {
+    // d = "M0 0L<x1> <y1>A1 1 0 <large> 1 <x2> <y2>Z"; only the endpoints have decimals.
+    const [x1, y1, x2, y2] = p.getAttribute('d').match(/-?\d+\.\d+/g).map(Number);
+    let turn = (Math.atan2(y2, x2) - Math.atan2(y1, x1)) / (2 * Math.PI);
+    if (turn <= 0) turn += 1;
+    return { category: p.dataset.category, turn };
+  }));
+  for (const { category, turn } of arcs) expect(turn, category).toBeCloseTo(CATEGORY_COUNTS[category] / 18, 3);
+
+  // Colours: Open is amber like the map legend; every slice has a colour and matches its swatch.
+  const colors = await page.evaluate(() => Array.from(document.querySelectorAll('#security-legend li')).map((li) => ({
+    category: li.dataset.category,
+    swatch: getComputedStyle(li.querySelector('.pie-swatch')).backgroundColor,
+    slice: getComputedStyle(document.querySelector(`.slice[data-category="${li.dataset.category}"]`)).fill,
+  })));
+  expect(colors.find((c) => c.category === 'open').slice).toBe('rgb(255, 176, 0)');
+  for (const c of colors) expect(c.slice, c.category).toBe(c.swatch);
+  expect(new Set(colors.map((c) => c.slice)).size).toBe(colors.length);
+});
+
+test('a slice over half the pie takes the long way round (#12)', async ({ page }) => {
+  const nets = [['[OPEN]', 34.0556, -117.1825], ['[OPEN]', 34.0600, -117.1700], ['[OPEN]', 34.0500, -117.1900],
+    ['[WPA2_PSK]', 34.0620, -117.1650]].map(([auth, lat, lon], i) =>
+    ({ bssid: `aa:bb:cc:00:03:0${i}`, ssid: `Net${i}`, auth, lat, lon }));
+  await page.route('**/data/networks.json', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ updated_at: null, networks: nets }) }));
+  await page.goto('/index.html');
+  await expectMarkers(page, 4);
+  // Open is 75%: its arc needs the large-arc flag, or it is drawn over the WPA2 slice.
+  await expect(page.locator('path.slice.cat-open')).toHaveAttribute('d', /A1 1 0 1 1 /);
+  await expect(page.locator('path.slice.cat-wpa2')).toHaveAttribute('d', /A1 1 0 0 1 /);
+  await expect(page.locator('#security-legend .pie-value')).toHaveText(['75.0% (3)', '25.0% (1)']);
+});
+
+test('a single-category database draws a full circle at 100% (#12)', async ({ page }) => {
+  await page.route('**/data/networks.json', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ updated_at: null, networks: [
+      { bssid: 'aa:bb:cc:00:02:01', ssid: 'Open1', auth: '[OPEN]', lat: 34.0556, lon: -117.1825 },
+      { bssid: 'aa:bb:cc:00:02:02', ssid: 'Open2', auth: '[OPEN]', lat: 34.0600, lon: -117.1700 },
+    ] }),
+  }));
+  await page.goto('/index.html');
+  await expectMarkers(page, 2);
+  await expect(page.locator('svg.pie circle.slice.cat-open')).toHaveCount(1);
+  await expect(page.locator('svg.pie path')).toHaveCount(0);
+  await expect(page.locator('#security-legend li')).toHaveText(['Open100.0% (2)']);
+});
+
+for (const [name, setup, errorText] of [
+  ['the database fails to load', (page) => page.route('**/data/networks.json',
+    (route) => route.fulfill({ status: 500, body: 'nope' })), 'Could not load the network database'],
+  ['the database is malformed', (page) => page.route('**/data/networks.json',
+    (route) => route.fulfill({ contentType: 'application/json', body: '{"networks": "oops"}' })), 'not in the expected format'],
+  ['the map library fails to load', (page) => page.route(/leaflet\.js$/, (route) => route.abort()), 'map library failed to load'],
+]) {
+  test(`the breakdown says unavailable, with no chart, when ${name} (#12, R2.7)`, async ({ page }) => {
+    await setup(page);
+    await page.goto('/index.html');
+    await expect(page.getByRole('alert')).toContainText(errorText);
+    await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
+    await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+    await expect(page.locator('#security-status')).toBeVisible();
+    await expect(page.locator('svg.pie')).toHaveCount(0);
+  });
+}
+
+test('the breakdown says unavailable when stats.js fails to load (#12)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  await page.route(/stats\.js$/, (route) => route.abort());
+  await page.goto('/index.html');
+  await expectMarkers(page, 3);
+  await expect(page.locator('#stats')).toContainText('3 networks mapped');
+  await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
+  await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+});
+
+test('a breakdown failure leaves the map and its stats line working (#12)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  // Break the renderer before map.js calls it.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'RWPStats', {
+      configurable: true,
+      set(value) {
+        value.render = () => { throw new Error('boom'); };
+        Object.defineProperty(window, 'RWPStats', { value, writable: true, configurable: true });
+      },
+    });
+  });
+  await page.goto('/index.html');
+  await expectMarkers(page, 3);
+  await expect(page.locator('#stats')).toContainText('3 networks mapped');
+  await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
+  await expect(page.locator('#error')).toBeHidden();
 });
 
 // The exact policy each page must carry; any added or loosened directive fails.
@@ -421,9 +644,17 @@ for (const pagePath of ['/index.html', '/privacy.html']) {
   for (const width of [360, 768, 1280]) {
     test(`no horizontal overflow at ${width} px on ${pagePath} (R1.4)`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 740 });
-      await useFixture(page, FIXTURE_3);
+      await useFixture(page, FIXTURE_CATEGORIES);
       await page.goto(pagePath);
-      if (pagePath === '/index.html') await expectMarkers(page, 3);
+      if (pagePath === '/index.html') {
+        await expectMarkers(page, 18);
+        await expect(page.locator('svg.pie')).toBeVisible();
+        // #12: two columns side by side on wide screens, stacked below 720 px.
+        const [left, right] = await Promise.all(['#security-col', '#list-col']
+          .map((sel) => page.locator(sel).boundingBox()));
+        if (width >= 720) expect(right.y).toBe(left.y);
+        else expect(right.y).toBeGreaterThanOrEqual(left.y + left.height);
+      }
       const overflow = await page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);

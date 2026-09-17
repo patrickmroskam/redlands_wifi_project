@@ -1,0 +1,26 @@
+{
+  "updated_at": "2026-09-17T10:00:00Z",
+  "count": 20,
+  "networks": [
+    {"bssid": "aa:bb:cc:00:01:01", "ssid": "SpectrumSetup-A1", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-17 10:00:00", "lat": 34.0556, "lon": -117.1825},
+    {"bssid": "aa:bb:cc:00:01:02", "ssid": "NETGEAR42-5G", "auth": "[OPEN]", "channel": 36, "first_seen": "2026-09-17 10:00:00", "lat": 34.0560, "lon": -117.1800},
+    {"bssid": "aa:bb:cc:00:01:03", "ssid": "DIRECT-7F-HP OfficeJet Pro", "auth": "[WPA2_PSK]", "channel": 1, "first_seen": "2026-09-17 10:00:00", "lat": 34.0570, "lon": -117.1780},
+    {"bssid": "aa:bb:cc:00:01:04", "ssid": "", "auth": "[WPA2_PSK]", "channel": 11, "first_seen": "2026-09-17 10:00:00", "lat": 34.0580, "lon": -117.1760},
+    {"bssid": "aa:bb:cc:00:01:05", "ssid": "Frontier Speedy", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-17 10:00:00", "lat": 34.0590, "lon": -117.1740},
+    {"bssid": "aa:bb:cc:00:01:06", "ssid": "CitrusCafe", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-17 10:00:00", "lat": 34.0600, "lon": -117.1720},
+    {"bssid": "aa:bb:cc:00:01:07", "ssid": "LibraryFree", "auth": "[OPEN]", "channel": 1, "first_seen": "2026-09-17 10:00:00", "lat": 34.0610, "lon": -117.1700},
+    {"bssid": "aa:bb:cc:00:01:08", "ssid": "", "auth": "", "channel": 1, "first_seen": "2026-09-17 10:00:00", "lat": 34.0620, "lon": -117.1680},
+    {"bssid": "aa:bb:cc:00:01:09", "ssid": "Kiosk", "auth": "[ESS]", "channel": 1, "first_seen": "2026-09-17 10:00:00", "lat": 34.0630, "lon": -117.1660},
+    {"bssid": "aa:bb:cc:00:01:0a", "ssid": "OldRouter", "auth": "[WEP]", "channel": 3, "first_seen": "2026-09-17 10:00:00", "lat": 34.0540, "lon": -117.1840},
+    {"bssid": "aa:bb:cc:00:01:0b", "ssid": "Legacy", "auth": "[WPA_PSK]", "channel": 3, "first_seen": "2026-09-17 10:00:00", "lat": 34.0530, "lon": -117.1860},
+    {"bssid": "aa:bb:cc:00:01:0c", "ssid": "Mixed", "auth": "[WPA_WPA2_PSK]", "channel": 9, "first_seen": "2026-09-17 10:00:00", "lat": 34.0520, "lon": -117.1880},
+    {"bssid": "aa:bb:cc:00:01:0d", "ssid": "UoR", "auth": "[WPA2]", "channel": 44, "first_seen": "2026-09-17 10:00:00", "lat": 34.0510, "lon": -117.1900},
+    {"bssid": "aa:bb:cc:00:01:0e", "ssid": "Corp", "auth": "[WPA2_EAP]", "channel": 44, "first_seen": "2026-09-17 10:00:00", "lat": 34.0500, "lon": -117.1920},
+    {"bssid": "aa:bb:cc:00:01:0f", "ssid": "Transition", "auth": "[WPA2_WPA3_PSK]", "channel": 149, "first_seen": "2026-09-17 10:00:00", "lat": 34.0490, "lon": -117.1940},
+    {"bssid": "aa:bb:cc:00:01:10", "ssid": "Modern", "auth": "[WPA3_PSK]", "channel": 149, "first_seen": "2026-09-17 10:00:00", "lat": 34.0480, "lon": -117.1960},
+    {"bssid": "aa:bb:cc:00:01:11", "ssid": "Modern2", "auth": "[WPA3]", "channel": 149, "first_seen": "2026-09-17 10:00:00", "lat": 34.0470, "lon": -117.1980},
+    {"bssid": "aa:bb:cc:00:01:12", "ssid": "Weird", "auth": "[WPA2-PSK-CCMP][ESS]", "channel": 6, "first_seen": "2026-09-17 10:00:00", "lat": 34.0460, "lon": -117.2000},
+    {"bssid": "AA-BB-CC-00-01-06", "ssid": "SpectrumSetup-ZZ", "auth": "[OPEN]", "channel": 6, "first_seen": "2026-09-17 10:00:00", "lat": 34.0450, "lon": -117.2020},
+    {"bssid": "aa:bb:cc:00:01:13", "ssid": "Frontier1234", "auth": "[OPEN]", "channel": 6, "first_seen": "2026-09-17 10:00:00", "lat": null, "lon": -117.2040}
+  ]
+}

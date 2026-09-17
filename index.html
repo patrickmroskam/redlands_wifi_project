@@ -36,6 +36,21 @@
     <section class="map-frame" aria-label="Map of observed networks">
       <div id="map"></div>
     </section>
+
+    <section class="breakdown" aria-labelledby="breakdown-heading">
+      <h2 id="breakdown-heading" class="section-title">Network breakdown</h2>
+      <div class="breakdown-grid">
+        <div class="breakdown-col" id="security-col">
+          <h3 class="col-title">Security</h3>
+          <p id="security-status" class="col-note" aria-live="polite">&gt; loading…</p>
+          <div id="security-chart" class="pie-wrap" hidden></div>
+        </div>
+        <div class="breakdown-col" id="list-col">
+          <h3 class="col-title">By category</h3>
+          <p class="col-note">&gt; category list coming soon</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
@@ -49,6 +64,7 @@
 
   <script src="assets/vendor/leaflet-1.9.4/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
+  <script src="assets/stats.js"></script>
   <script src="assets/map.js"></script>
 </body>
 </html>

@@ -158,6 +158,47 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   background: #000;
 }
 
+/* Network breakdown under the map (#12): two columns on wide screens, stacked below 720 px. */
+.breakdown { margin: 16px 0; }
+.section-title {
+  margin: 0 0 8px;
+  color: var(--green);
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.section-title::before { content: "## " / ""; color: var(--green-dim); }
+.breakdown-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 720px) {
+  .breakdown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.breakdown-col { min-width: 0; padding: 10px 14px; border: 1px solid var(--line); background: var(--panel); }
+.col-title { margin: 0 0 8px; color: var(--amber); font-size: 1rem; }
+.col-note { margin: 0; color: var(--green-dim); }
+
+.pie-wrap[hidden] { display: none; }
+.pie-wrap { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.pie { flex: 0 0 auto; width: min(200px, 100%); height: auto; filter: drop-shadow(0 0 6px rgba(51, 255, 102, 0.25)); }
+.slice { fill: var(--cat); stroke: var(--panel); stroke-width: 0.012; stroke-linejoin: round; }
+.pie-legend { flex: 1 1 200px; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 0.9rem; }
+.pie-legend li { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 2px 0; }
+.pie-swatch { flex: 0 0 auto; width: 12px; height: 12px; border: 1px solid #000; background: var(--cat); }
+.pie-label { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.pie-value { color: var(--green); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pie-total { flex: 1 1 100%; margin: 0; color: var(--green-dim); font-size: 0.85rem; }
+
+/* Category colours, shared by the pie, its legend, and the #13 list. Open matches the map legend. */
+.cat-default { --cat: #ff5f56; }
+.cat-open { --cat: #ffb000; }
+.cat-wep { --cat: #ff8a3d; }
+.cat-wpa { --cat: #e0d24a; }
+.cat-wpa-wpa2 { --cat: #a6e35a; }
+.cat-wpa2 { --cat: #33ff66; }
+.cat-wpa2-enterprise { --cat: #178a3a; }
+.cat-wpa2-wpa3 { --cat: #2de2e6; }
+.cat-wpa3 { --cat: #4f9dff; }
+.cat-other { --cat: #8a9a8e; }
+
 /* Markers are drawn on a canvas; map.js sets this class while the pointer is over one. */
 body:not(.leaflet-dragging) #map.over-marker { cursor: pointer; }
 

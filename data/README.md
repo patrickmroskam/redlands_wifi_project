@@ -38,6 +38,45 @@ It is valid JSON with one network per line, so diffs stay readable. Shape:
   `WEP`, `WPA`, or `RSN` as encrypted and everything else as open.
 - No RSSI, altitude, accuracy, or raw log content is ever stored here.
 
+## How the site groups networks (`assets/stats.js`)
+
+The "Network breakdown" section under the map puts every network the map plots
+into exactly one category, so the pie adds up to 100%:
+
+1. **Default-looking** comes first. The SSID still carries an ISP or router
+   factory name. Matching is case-insensitive and anchored at the start of the
+   SSID. The factory id part is required, so a renamed network such as
+   "Frontier Speedy" does not count. For ORBI and ASUS only the factory
+   suffixes (`-Guest`, `-IoT`, `_EXT`, `-2G`, `-5G`, `-2.4G`) may follow, so
+   `ORBI88smith` or `Asus Wifi` do not count. Hidden (blank) SSIDs never match.
+
+   | Family | Matches (examples) |
+   |---|---|
+   | Spectrum | `SpectrumSetup-XX`, `MySpectrumWiFiXX-2G`, `Spectrum1234` |
+   | Frontier | `Frontier1234` (3+ digits) |
+   | AT&T | `ATT-WIFI-1234`, `ATTa1b2c3d` (ATT + 7 letters/digits, at least one digit; and `_EXT`) |
+   | CenturyLink | `CenturyLink1234` |
+   | T-Mobile | `TMOBILE-1A2B` (and `_EXT`) |
+   | Verizon | `Verizon-1E06`, `Verizon_AB12CD`, `Verizon-MiFi…`, `Verizon-M2100-…`, `Verizon-SM-…` |
+   | NETGEAR / Orbi | `NETGEAR`, `NETGEAR42` (and `-5G`, `-Guest`, `_EXT`), `NETGEAR-Guest`, `ORBI`, `ORBI12` (and `-Guest`, `-IoT`) |
+   | TP-Link | `TP-Link_1A2B`, `TP-Link_1A2B3C` (and `_5G`) |
+   | Linksys | `Linksys01234` (and `-guest`) |
+   | Wi-Fi Direct | `DIRECT-…` (printers, TVs, cars) |
+   | D-Link | `dlink`, `dlink-1A2B` |
+   | ASUS | `ASUS`, `ASUS_5G`, `ASUS_9C28`, `ASUS22`, `ASUS_C0_2G_Guest` |
+   | Tenda | `Tenda_22F7F0` |
+   | Xfinity | `xfinitywifi`, `XFSETUP-1A2B` |
+
+2. Otherwise the `auth` string decides. Anything the map colours as open (no
+   `WEP`, `WPA`, or `RSN` in it, e.g. `[OPEN]`, `[ESS]`, or empty) is **Open**.
+   Encrypted strings map exactly: `[WEP]` → WEP, `[WPA_PSK]` → WPA,
+   `[WPA_WPA2_PSK]` → WPA/WPA2, `[WPA2_PSK]` → WPA2, `[WPA2]` or anything with
+   `EAP` / `ENTERPRISE` → WPA2 Enterprise, `[WPA2_WPA3_PSK]` → WPA2/WPA3,
+   `[WPA3_PSK]` / `[WPA3]` → WPA3. Any other encrypted string is **Other**.
+
+The patterns live only in `DEFAULT_SSID_PATTERNS` in `assets/stats.js`; update
+this table when you change them.
+
 ## `redlands-boundary.geojson` — the fence
 
 ZIP Code Tabulation Area polygons for **92373** and **92374** (Redlands, CA),

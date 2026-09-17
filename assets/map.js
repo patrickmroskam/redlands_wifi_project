@@ -14,6 +14,11 @@
   var POPUP_SLACK = 60;
 
   var statsEl = document.getElementById('stats');
+  // stats.js may have failed to load; the breakdown must not say "loading" forever.
+  if (!window.RWPStats) {
+    var breakdownStatus = document.getElementById('security-status');
+    if (breakdownStatus) breakdownStatus.textContent = '> security breakdown unavailable';
+  }
   var errorEl = document.getElementById('error');
 
   function showError(message) {
@@ -84,6 +89,7 @@
 
   if (typeof window.L === 'undefined') {
     statsEl.textContent = '> map unavailable';
+    if (window.RWPStats) window.RWPStats.fail();
     showError('The map library failed to load. Check your connection and reload.');
     return;
   }
@@ -229,6 +235,7 @@
     var duplicates = 0;
     var seen = Object.create(null);
     var markers = L.layerGroup();
+    var plottedNets = [];
     db.networks.forEach(function (net) {
       var lat = toCoord(net && net.lat);
       var lon = toCoord(net && net.lon);
@@ -258,11 +265,19 @@
         fillOpacity: 0.9
       }).bindPopup(function () { return popupFor(net); }, POPUP_OPTIONS).addTo(markers);
       window.__rwp.markers.push(marker);
+      plottedNets.push(net);
       plotted += 1;
     });
     markers.addTo(map);
     statsEl.textContent = '> ' + plotted.toLocaleString('en-US') + ' network' + (plotted === 1 ? '' : 's') +
       ' mapped · last updated ' + formatUpdated(db.updated_at);
+    // The breakdown counts exactly the networks on the map (#12). A bug there must not blank the map.
+    try {
+      if (window.RWPStats) window.RWPStats.render(plottedNets);
+    } catch (statsErr) {
+      console.error(statsErr);
+      window.RWPStats.fail();
+    }
     if (skipped > 0) {
       console.warn('Skipped ' + skipped + ' network record(s) with invalid coordinates.');
     }
@@ -271,6 +286,7 @@
     }
   }).catch(function (err) {
     statsEl.textContent = '> database unavailable';
+    if (window.RWPStats) window.RWPStats.fail();
     showError('Could not load the network database (' + err.message + '). Please try again later.');
   });
 })();
