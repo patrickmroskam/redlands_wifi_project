@@ -343,14 +343,105 @@ test('site sets no cookies or storage (R1.6)', async ({ page, context }) => {
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
 });
 
-for (const [pagePath, width] of [['/index.html', 360], ['/privacy.html', 360], ['/privacy.html', 1280]]) {
-  test(`no horizontal overflow at ${width} px on ${pagePath} (R1.4)`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 740 });
-    await useFixture(page, FIXTURE_3);
-    await page.goto(pagePath);
-    if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);
-    const overflow = await page.evaluate(() =>
-      document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
+// Responsive QA (R1.4, #7): both pages at phone, tablet, and desktop widths.
+for (const pagePath of ['/index.html', '/privacy.html']) {
+  for (const width of [360, 768, 1280]) {
+    test(`no horizontal overflow at ${width} px on ${pagePath} (R1.4)`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 740 });
+      await useFixture(page, FIXTURE_3);
+      await page.goto(pagePath);
+      if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);
+      const overflow = await page.evaluate(() =>
+        document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await testInfo.attach(`${pagePath.slice(1, -5)}-${width}px`, {
+        body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    });
+  }
+}
+
+// The popup's box relative to the map's box, in CSS pixels.
+function popupInsideMap(page) {
+  return page.evaluate(() => {
+    // A closed popup lingers for its 200 ms fade; the open one is always the last child.
+    const popup = document.querySelector('.leaflet-popup-pane > .leaflet-popup:last-child');
+    if (!popup) return 'no popup';
+    const p = popup.getBoundingClientRect();
+    const m = document.getElementById('map').getBoundingClientRect();
+    return p.top >= m.top && p.left >= m.left && p.right <= m.right && p.bottom <= m.bottom
+      ? 'inside' : `outside: popup ${[p.left, p.top, p.right, p.bottom]} map ${[m.left, m.top, m.right, m.bottom]}`;
   });
 }
+
+test('popups open fully inside the fenced map on a phone; the fence returns on close (#7)', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await useFixture(page, FIXTURE_3);
+  await page.goto('/index.html');
+  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  const fence = await page.evaluate(() => window.__rwp.fence().toBBoxString());
+  const zoom = await page.locator('.leaflet-control-zoom').boundingBox();
+  const mapBox = await page.locator('#map').boundingBox();
+
+  // A real tap on the first marker, then each popup in turn (switching closes the previous one).
+  await page.locator('path.net-marker').first().click();
+  for (let i = 0; i < 3; i++) {
+    if (i > 0) await page.evaluate((n) => window.__rwp.markers[n].openPopup(), i);
+    await expect.poll(() => popupInsideMap(page)).toBe('inside');
+    const box = await page.locator('.leaflet-popup-pane > .leaflet-popup:last-child').boundingBox();
+    // Clear of the zoom buttons, and never wider than the map (the XSS fixture's SSID is long).
+    expect(box.x).toBeGreaterThanOrEqual(zoom.x + zoom.width);
+    expect(box.width).toBeLessThanOrEqual(mapBox.width);
+    // The fence is only loosened, never dropped, while a popup is open.
+    expect(await page.evaluate((f) => {
+      const b = window.__rwp.map.options.maxBounds;
+      const [w, s, e, n] = f.split(',').map(Number);
+      return !!b && b.contains(L.latLngBounds([s, w], [n, e]));
+    }, fence)).toBe(true);
+  }
+  await expect(page.locator('.leaflet-popup:last-child .ssid')).toHaveText('hidden');
+
+  await page.locator('.leaflet-popup:last-child .leaflet-popup-close-button').click();
+  await expect(page.locator('.leaflet-popup')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__rwp.map.options.maxBounds.toBBoxString())).toBe(fence);
+  await expect.poll(() => page.evaluate(() => window.__rwp.fence().contains(window.__rwp.map.getCenter())))
+    .toBe(true);
+  // Zooming out past the fence is still impossible after a popup has been open.
+  const minZoom = await page.evaluate(() => window.__rwp.map.getMinZoom());
+  await page.evaluate(() => window.__rwp.map.setZoom(3, { animate: false }));
+  expect(await page.evaluate(() => window.__rwp.map.getZoom())).toBe(minZoom);
+});
+
+test('Leaflet controls keep the terminal theme in every state (#7)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  await page.goto('/index.html');
+  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  const panel = 'rgb(10, 18, 10)';
+
+  // At the zoom-out limit Leaflet marks the button disabled; its default style is light grey.
+  await page.evaluate(() => window.__rwp.map.setZoom(window.__rwp.map.getMinZoom(), { animate: false }));
+  const zoomOut = page.locator('.leaflet-control-zoom-out');
+  await expect(zoomOut).toHaveClass(/leaflet-disabled/);
+  await expect(zoomOut).toHaveCSS('background-color', panel);
+  await expect(page.locator('.leaflet-control-zoom-in')).toHaveCSS('background-color', panel);
+
+  // The popup close button stays amber-bright when focused (Leaflet's default is grey).
+  await page.evaluate(() => window.__rwp.markers[0].openPopup());
+  const close = page.locator('.leaflet-popup-close-button');
+  await close.focus();
+  await expect(close).toHaveCSS('color', 'rgb(255, 209, 102)');
+  await expect(page.locator('.leaflet-popup-content-wrapper')).toHaveCSS('background-color', panel);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.leaflet-popup')).toHaveCount(0);
+});
+
+test('banner prompt types in, and holds still for reduced motion (#7)', async ({ page }) => {
+  await page.goto('/index.html');
+  await expect(page.locator('.prompt')).toHaveCSS('animation-name', 'type-in');
+  await expect(page.locator('.cursor')).toHaveCSS('animation-name', 'blink');
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/privacy.html');
+  await expect(page.locator('.prompt')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.cursor')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('header.banner img, header.banner svg')).toHaveCount(0);
+});
