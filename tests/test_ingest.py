@@ -228,6 +228,65 @@ class DropReasons(PipelineCase):
         self.assertIn("malformed:       1", out)
         self.assertEqual(self.inbox_files(), [])
 
+    def test_blank_mac_is_malformed(self):
+        self.put("a.log", HEADER + row("") + row("08:00:00:00:00:03"))
+        code, out = self.run_pipeline()
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertIn("malformed:       1", out)
+
+    def test_leading_quote_ssid_cannot_swallow_later_rows(self):
+        # An unquoted SSID starting with '"' must not open a CSV quote that runs into
+        # the following rows (which would smuggle opt-out / out-of-area rows in).
+        text = (row("11:00:00:00:00:01", ssid='"quoted start')
+                + row("11:00:00:00:00:02", ssid="Hide_nomap")
+                + row("11:00:00:00:00:03", lat=OUT_OF_TOWN[0], lon=OUT_OF_TOWN[1])
+                + row("11:00:00:00:00:04", ssid='end quote"'))
+        self.put("a.log", HEADER + text)
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        nets = self.read_db()["networks"]
+        self.assertEqual([n["ssid"] for n in nets], ['"quoted start', 'end quote"'])
+        self.assertIn("opt-out:         1", out)
+        self.assertIn("outside area:    1", out)
+
+    def test_quoted_ssid_with_commas_is_unquoted(self):
+        self.put("a.log", HEADER + row("12:00:00:00:00:01", ssid='"a, b ""c"", d"')
+                 + row("12:00:00:00:00:02", ssid="x,y,z"))
+        self.run_pipeline()
+        self.assertEqual([n["ssid"] for n in self.read_db()["networks"]],
+                         ['a, b "c", d', "x,y,z"])
+
+    def test_nul_bytes_and_huge_fields_do_not_crash_the_run(self):
+        text = (row("13:00:00:00:00:01", ssid="bad\x00ssid")
+                + row("13:00:00:00:00:02", ssid='"' + "A" * 200_000)
+                + row("13:00:00:00:00:03"))
+        self.put("a.log", HEADER + text)
+        self.put("b.log", HEADER + row("13:00:00:00:00:04"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["13:00:00:00:00:02", "13:00:00:00:00:03", "13:00:00:00:00:04"])
+        self.assertIn("malformed:       1", out)
+
+    def test_line_separator_characters_inside_ssid_do_not_split_the_row(self):
+        self.put("a.log", HEADER + row("14:00:00:00:00:01", ssid="a\u2028b\x0cc\x1ed")
+                 + row("14:00:00:00:00:02").replace("\n", "\r\n"))
+        code, out = self.run_pipeline()
+        nets = self.read_db()["networks"]
+        self.assertEqual([n["ssid"] for n in nets], ["a\u2028b\x0cc\x1ed", "Net"])
+        self.assertIn("malformed:       0", out)
+
+    def test_opt_out_of_already_published_network_is_flagged_for_manual_removal(self):
+        existing = {"bssid": "15:00:00:00:00:01", "ssid": "Home", "auth": "[OPEN]",
+                    "channel": 1, "first_seen": "2024-01-01 00:00:00",
+                    "lat": 34.05, "lon": -117.18}
+        self.write_db([existing])
+        self.put("a.log", HEADER + row("15:00:00:00:00:01", ssid="Home_nomap"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertIn("already published but now opted out", out)
+        self.assertIn("15:00:00:00:00:01", out)
+
     def test_blank_lines_are_ignored(self):
         self.put("a.log", HEADER + "\n" + row("09:00:00:00:00:01") + "\n\n")
         code, out = self.run_pipeline()
@@ -269,6 +328,14 @@ class FilesAndExitCodes(PipelineCase):
         code, _ = self.run_pipeline()
         self.assertEqual(code, 1)
         self.assertEqual(self.inbox_files(), ["a.log"])
+
+    def test_wigle_header_without_column_line_is_unparseable(self):
+        self.put("a.log", "WigleWifi-1.4,appRelease=v1.2.0\n")
+        self.put("b.log", "WigleWifi-1.4,appRelease=v1.2.0")
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.inbox_files(), ["a.log", "b.log"])
+        self.assertIn("missing column header line", out)
 
     def test_header_only_file_is_processed_and_deleted(self):
         self.put("a.log", HEADER)
@@ -327,6 +394,33 @@ class FilesAndExitCodes(PipelineCase):
         self.assertEqual(self.inbox_files(), ["a.log"])
         self.assertEqual(self.read_db()["count"], 0)
 
+    def test_boundary_without_polygons_is_fatal_exit_2(self):
+        bad = os.path.join(self.tmp, "bad.geojson")
+        with open(bad, "w") as fh:
+            json.dump({"type": "FeatureCollection", "features": []}, fh)
+        self.put("a.log", HEADER + row("0e:00:00:00:00:02"))
+        code, out = self.run_pipeline(boundary=bad)
+        self.assertEqual(code, 2)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+
+    def test_missing_ingest_dir_is_fatal_exit_2(self):
+        shutil.rmtree(self.inbox)
+        with open(self.db, "rb") as fh:
+            before = fh.read()
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 2)
+        self.assertIn("does not exist", out)
+        with open(self.db, "rb") as fh:
+            self.assertEqual(fh.read(), before)
+
+    def test_database_with_non_object_entry_is_fatal_exit_2(self):
+        with open(self.db, "w") as fh:
+            json.dump({"updated_at": None, "count": 1, "networks": ["oops"]}, fh)
+        self.put("a.log", HEADER + row("0f:00:00:00:00:02"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 2)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+
     def test_corrupt_database_is_fatal_exit_2_and_nothing_deleted(self):
         with open(self.db, "w") as fh:
             fh.write("{not json")
@@ -352,6 +446,35 @@ class FilesAndExitCodes(PipelineCase):
         self.assertEqual(code, 2)
         self.assertEqual(self.inbox_files(), ["a.log"])
         self.assertIn("disk full", out)
+
+    def test_delete_failure_is_reported_with_exit_1_after_saving(self):
+        self.put("a.log", HEADER + row("16:00:00:00:00:01"))
+        original = ingest.os.remove
+
+        def refuse(path):
+            raise PermissionError("read-only")
+
+        ingest.os.remove = refuse
+        try:
+            code, out = self.run_pipeline()
+        finally:
+            ingest.os.remove = original
+        self.assertEqual(code, 1)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertIn("could not delete 1 file(s)", out)
+        self.assertIn("a.log: read-only", out)
+
+    def test_dry_run_counts_match_a_real_run(self):
+        text = HEADER + row("17:00:00:00:00:01") + row("17:00:00:00:00:02", typ="BLE") + row("")
+        self.put("a.log", text)
+        _, dry = self.run_pipeline("--dry-run")
+        _, real = self.run_pipeline()
+        strip = lambda out: [ln for ln in out.splitlines() if not ln.startswith("DRY RUN")]  # noqa: E731
+        self.assertEqual(strip(dry), strip(real))
+
+    def test_natural_sort_handles_non_ascii_digits(self):
+        self.assertEqual(sorted(["w10", "w2", "w²", "W1"], key=ingest.natural_key),
+                         ["W1", "w2", "w10", "w²"])
 
     def test_summary_lists_every_reason(self):
         code, out = self.run_pipeline()

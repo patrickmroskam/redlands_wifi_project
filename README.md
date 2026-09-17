@@ -24,7 +24,13 @@ the files it processed and prints a summary with a count for each drop reason.
 
 - `data/networks.json` is rewritten only when at least one network was added.
 - A file that is not a WiGLE CSV log is left in place and named in the output, and
-  the script exits `1` after processing the others.
+  the script exits `1` after processing the others. It also exits `1` if a processed
+  file could not be deleted.
+- Rows are split one line at a time on commas, since Marauder logs are not CSV-quoted.
+  A malformed row is dropped without affecting the rest of the file.
+- The script never removes a network that is already published. If a stored network
+  now broadcasts a `_nomap` / `_optout` SSID, the summary lists its BSSID so it can
+  be removed by hand.
 - Exit `2` means a fatal problem (missing boundary, unreadable database, write
   failure). Nothing is written or deleted in that case.
 

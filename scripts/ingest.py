@@ -12,10 +12,10 @@ Python 3 standard library only.
 Usage:
   python3 scripts/ingest.py [--dry-run] [--ingest-dir DIR] [--db FILE] [--boundary FILE]
 
-Exit codes: 0 ok, 1 some files could not be parsed, 2 fatal (nothing changed).
+Exit codes: 0 ok; 1 some files could not be parsed (left in place) or could not
+be deleted; 2 fatal (nothing written or deleted).
 """
 import argparse
-import csv
 import datetime
 import json
 import math
@@ -45,7 +45,7 @@ REASONS = (
     ("duplicate", "duplicate"),
 )
 
-EXIT_OK, EXIT_UNPARSEABLE, EXIT_FATAL = 0, 1, 2
+EXIT_OK, EXIT_PROBLEMS, EXIT_FATAL = 0, 1, 2
 
 _FIRST_SEEN = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})$")
 
@@ -136,7 +136,8 @@ def parse_coord(value):
 
 
 def natural_key(name):
-    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", name)]
+    parts = re.split(r"([0-9]+)", name)
+    return [int(part) if i % 2 else part.lower() for i, part in enumerate(parts)]
 
 
 # --- files ---------------------------------------------------------------------
@@ -151,6 +152,28 @@ def candidate_files(ingest_dir):
     return sorted(names, key=natural_key)
 
 
+def split_row(line, width, ssid_at):
+    """Split one physical line into `width` fields, or return None if it is malformed.
+
+    Marauder logs are not CSV-quoted, so each line is split on commas by itself.
+    An open quote can never swallow the rows after it. Extra commas are assumed
+    to belong to the SSID, and an SSID wrapped in double quotes (as other WiGLE
+    loggers write it) is unquoted.
+    """
+    if "\x00" in line:
+        return None
+    fields = line.split(",")
+    extra = len(fields) - width
+    if extra > 0:
+        fields[ssid_at:ssid_at + extra + 1] = [",".join(fields[ssid_at:ssid_at + extra + 1])]
+    if len(fields) != width:
+        return None
+    ssid = fields[ssid_at]
+    if len(ssid) >= 2 and ssid.startswith('"') and ssid.endswith('"'):
+        fields[ssid_at] = ssid[1:-1].replace('""', '"')
+    return fields
+
+
 def read_log(path):
     """Return a list of dicts (one per non-blank data row; None for a malformed row)."""
     with open(path, "rb") as fh:
@@ -159,24 +182,25 @@ def read_log(path):
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
         raise UnparseableFile("not UTF-8 text")
-    lines = text.splitlines()
-    if not lines or not lines[0].startswith("WigleWifi-"):
+    # Split on newlines only: str.splitlines() would also break rows on
+    # form feeds or U+2028 inside an SSID.
+    lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+    if not lines[0].startswith("WigleWifi-"):
         raise UnparseableFile("first line is not a WigleWifi header")
-    if len(lines) < 2:
+    if len(lines) < 2 or not lines[1].strip():
         raise UnparseableFile("missing column header line")
-    columns = [c.strip() for c in next(csv.reader([lines[1]]))]
+    columns = [c.strip() for c in lines[1].split(",")]
     missing = [c for c in REQUIRED_COLUMNS if c not in columns]
     if missing:
         raise UnparseableFile("missing columns: " + ", ".join(missing))
 
     ssid_at = columns.index("SSID")
     rows = []
-    for fields in csv.reader(line for line in lines[2:] if line.strip()):
-        extra = len(fields) - len(columns)
-        if extra > 0:
-            # An unquoted comma inside the SSID splits it; glue it back together.
-            fields[ssid_at:ssid_at + extra + 1] = [",".join(fields[ssid_at:ssid_at + extra + 1])]
-        rows.append(dict(zip(columns, fields)) if len(fields) == len(columns) else None)
+    for line in lines[2:]:
+        if not line.strip():
+            continue
+        fields = split_row(line, len(columns), ssid_at)
+        rows.append(dict(zip(columns, fields)) if fields is not None else None)
     return rows
 
 
@@ -192,6 +216,8 @@ def load_db(path):
         raise FatalError("cannot read database {}: {}".format(path, exc))
     if not isinstance(db, dict) or not isinstance(db.get("networks"), list):
         raise FatalError("database {} has no 'networks' list".format(path))
+    if not all(isinstance(n, dict) for n in db["networks"]):
+        raise FatalError("database {} has a network entry that is not an object".format(path))
     return db
 
 
@@ -270,7 +296,8 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
     if not os.path.isdir(ingest_dir):
         raise FatalError("ingest directory {} does not exist".format(ingest_dir))
     db = load_db(db_path)
-    known = {str(n.get("bssid", "")).lower() for n in db["networks"]}
+    stored = {str(n.get("bssid", "")).lower() for n in db["networks"]}
+    known = set(stored)
 
     summary = {
         "files_processed": [],
@@ -278,6 +305,8 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         "rows_read": 0,
         "dropped": {reason: 0 for reason, _ in REASONS},
         "added": 0,
+        "opted_out_but_published": [],
+        "not_deleted": [],
         "dry_run": dry_run,
     }
     added = []
@@ -293,6 +322,10 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
             reason, record = classify(row, fence, known)
             if reason:
                 summary["dropped"][reason] += 1
+                if reason == "opt_out":
+                    bssid = row["MAC"].strip().lower()
+                    if bssid in stored and bssid not in summary["opted_out_but_published"]:
+                        summary["opted_out_but_published"].append(bssid)
             else:
                 known.add(record["bssid"])
                 added.append(record)
@@ -312,7 +345,10 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
             raise FatalError("cannot write database {}: {}".format(db_path, exc))
 
     for name in summary["files_processed"]:
-        os.remove(os.path.join(ingest_dir, name))
+        try:
+            os.remove(os.path.join(ingest_dir, name))
+        except OSError as exc:
+            summary["not_deleted"].append((name, str(exc)))
     return summary
 
 
@@ -328,6 +364,15 @@ def format_summary(summary):
     for reason, label in REASONS:
         out.append(reason_line(label + ":", summary["dropped"][reason]))
     out.append(line("rows added:", summary["added"]))
+    if summary["opted_out_but_published"]:
+        out.append("")
+        out.append("already published but now opted out (remove by hand, see privacy policy):")
+        out.extend("  " + bssid for bssid in summary["opted_out_but_published"])
+    if summary["not_deleted"]:
+        out.append("")
+        out.append("processed but could not delete {} file(s):".format(len(summary["not_deleted"])))
+        for name, why in summary["not_deleted"]:
+            out.append("  {}: {}".format(name, why))
     if summary["unparseable"]:
         out.append("")
         out.append("could not parse {} file(s) (left in place):".format(len(summary["unparseable"])))
@@ -351,7 +396,9 @@ def main(argv=None):
         print("nothing was written or deleted.")
         return EXIT_FATAL
     print(format_summary(summary))
-    return EXIT_UNPARSEABLE if summary["unparseable"] else EXIT_OK
+    if summary["unparseable"] or summary["not_deleted"]:
+        return EXIT_PROBLEMS
+    return EXIT_OK
 
 
 if __name__ == "__main__":
