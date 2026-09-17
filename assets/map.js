@@ -18,6 +18,8 @@
   if (!window.RWPStats) {
     var breakdownStatus = document.getElementById('security-status');
     if (breakdownStatus) breakdownStatus.textContent = '> security breakdown unavailable';
+    var listStatus = document.getElementById('list-status');
+    if (listStatus) listStatus.textContent = '> category list unavailable';
   }
   var errorEl = document.getElementById('error');
 

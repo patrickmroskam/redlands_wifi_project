@@ -1,5 +1,6 @@
-/* Redlands Wifi Project — security breakdown under the map (#12). Plain script, no build step.
-   map.js calls RWPStats.render() with the networks it plotted, or RWPStats.fail() when it can't. */
+/* Redlands Wifi Project — network breakdown under the map: security pie (#12) and category list (#13).
+   Plain script, no build step. map.js calls RWPStats.render() with the networks it plotted, or
+   RWPStats.fail() when it can't; both columns always show the same data and the same state. */
 (function () {
   'use strict';
 
@@ -72,13 +73,23 @@
     return /WEP|WPA|RSN/i.test(String(auth || ''));
   }
 
-  function classify(net) {
+  // The category a network's auth string alone puts it in (never 'default').
+  function securityCategory(net) {
     net = net || {};
-    if (isDefaultLooking(net.ssid)) return 'default';
     var auth = String(net.auth == null ? '' : net.auth).toUpperCase();
     if (!isEncrypted(auth)) return 'open';
     if (/EAP|ENTERPRISE/.test(auth)) return 'wpa2-enterprise';
     return AUTH_CATEGORY[auth.replace(/[\[\]\s]/g, '')] || 'other';
+  }
+
+  function classify(net) {
+    net = net || {};
+    return isDefaultLooking(net.ssid) ? 'default' : securityCategory(net);
+  }
+
+  function isHidden(net) {
+    var ssid = (net || {}).ssid;
+    return typeof ssid !== 'string' || ssid.trim() === '';
   }
 
   function countCategories(nets) {
@@ -122,10 +133,18 @@
 
   var status = document.getElementById('security-status');
   var chart = document.getElementById('security-chart');
+  var listStatus = document.getElementById('list-status');
+  var list = document.getElementById('category-list');
+
+  function empty(el) {
+    if (!el) return;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    el.hidden = true;
+  }
 
   function clear() {
-    while (chart.firstChild) chart.removeChild(chart.firstChild);
-    chart.hidden = true;
+    empty(chart);
+    empty(list);
   }
 
   function setStatus(text, screenReaderOnly) {
@@ -133,13 +152,96 @@
     status.classList.toggle('visually-hidden', !!screenReaderOnly);
   }
 
+  // The list's status is not a live region: the pie's status already announces every change.
+  function setListStatus(text) {
+    if (!listStatus) return;
+    listStatus.textContent = text || '';
+    listStatus.hidden = !text;
+  }
+
+  function cell(tag, text, className) {
+    var el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+
+  function row(className, category, label, count, share, swatch) {
+    var tr = document.createElement('tr');
+    tr.className = className;
+    tr.setAttribute('data-category', category);
+    var th = cell('th', null, 'cat-name');
+    th.setAttribute('scope', 'row');
+    if (swatch) {
+      var sw = cell('span', null, 'pie-swatch cat-' + category);
+      sw.setAttribute('aria-hidden', 'true');
+      th.appendChild(sw);
+    }
+    th.appendChild(cell('span', label, 'cat-label'));
+    tr.appendChild(th);
+    tr.appendChild(cell('td', count, 'cat-count'));
+    tr.appendChild(cell('td', share, 'cat-share'));
+    return tr;
+  }
+
+  // Right column (#13): the same numbers as the pie, as a table, plus the default-looking split.
+  function renderList(nets, counts, pct, total) {
+    if (!list) return;
+    var labels = {};
+    var split = {};
+    CATEGORIES.forEach(function (c) { labels[c.id] = c.label; split[c.id] = 0; });
+    var hidden = 0;
+    nets.forEach(function (net) {
+      if (classify(net) === 'default') split[securityCategory(net)] += 1;
+      if (isHidden(net)) hidden += 1;
+    });
+
+    var table = cell('table', null, 'cat-table');
+    table.id = 'category-table';
+    table.appendChild(cell('caption', 'Networks by category', 'visually-hidden'));
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['Category', 'Networks', 'Share'].forEach(function (text) {
+      var th = cell('th', text);
+      th.setAttribute('scope', 'col');
+      headRow.appendChild(th);
+    });
+    head.appendChild(headRow);
+    table.appendChild(head);
+
+    var body = document.createElement('tbody');
+    CATEGORIES.forEach(function (c) {
+      body.appendChild(row('cat-row', c.id, c.label, formatCount(counts[c.id]),
+        pct[c.id].toFixed(1) + '%', true));
+      if (c.id !== 'default') return;
+      CATEGORIES.forEach(function (s) {
+        if (s.id === 'default' || split[s.id] === 0) return;
+        // The share cell stays blank so the Share column still adds up to 100%.
+        body.appendChild(row('sub-row', s.id, 'on ' + s.label, formatCount(split[s.id]), '', false));
+      });
+    });
+    table.appendChild(body);
+
+    var foot = document.createElement('tfoot');
+    foot.appendChild(row('total-row', 'total', 'Total', formatCount(total), '100.0%', false));
+    table.appendChild(foot);
+
+    list.appendChild(table);
+    list.appendChild(cell('p', '> ' + formatCount(hidden) + ' hidden network' + (hidden === 1 ? '' : 's') +
+      ' (blank name), counted under their security type', 'col-note hidden-note'));
+    list.hidden = false;
+    setListStatus('');
+  }
+
   function render(nets) {
     if (!status || !chart) return;
     clear();
+    nets = nets || [];
     var counts = countCategories(nets);
-    var total = (nets || []).length;
+    var total = nets.length;
     if (total === 0) {
       setStatus('> no networks mapped yet');
+      setListStatus('> no networks mapped yet');
       return;
     }
     var pct = percentages(counts);
@@ -212,6 +314,7 @@
     chart.appendChild(legend);
     chart.appendChild(totalEl);
     chart.hidden = false;
+    renderList(nets, counts, pct, total);
     // The status line is the live region: keep it for screen readers so they hear the chart arrive.
     setStatus('> security breakdown loaded: ' + formatCount(total) + ' networks classified', true);
   }
@@ -220,12 +323,14 @@
     if (!status || !chart) return;
     clear();
     setStatus('> security breakdown unavailable');
+    setListStatus('> category list unavailable');
   }
 
   window.RWPStats = {
     CATEGORIES: CATEGORIES,
     DEFAULT_SSID_PATTERNS: DEFAULT_SSID_PATTERNS,
     classify: classify,
+    securityCategory: securityCategory,
     countCategories: countCategories,
     percentages: percentages,
     render: render,

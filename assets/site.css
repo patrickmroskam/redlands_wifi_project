@@ -187,6 +187,22 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 .pie-value { color: var(--green); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pie-total { flex: 1 1 100%; margin: 0; color: var(--green-dim); font-size: 0.85rem; }
 
+/* Category list (#13): the pie's numbers as a table. */
+.category-list[hidden] { display: none; }
+.cat-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.cat-table th, .cat-table td { padding: 2px 0; text-align: left; vertical-align: baseline; }
+.cat-table thead th { color: var(--green-dim); font-weight: normal; border-bottom: 1px dashed var(--line); }
+.cat-table .cat-name { font-weight: normal; overflow-wrap: anywhere; }
+.cat-table .cat-name .pie-swatch { display: inline-block; margin-right: 8px; vertical-align: -1px; }
+.cat-table .cat-count, .cat-table .cat-share,
+.cat-table thead th + th { padding-left: 12px; text-align: right; white-space: nowrap; }
+.cat-table .cat-count, .cat-table .cat-share { color: var(--green); }
+.cat-table .sub-row .cat-name { padding-left: 22px; color: var(--green-dim); }
+.cat-table .sub-row .cat-name::before { content: "└ " / ""; }
+.cat-table .sub-row .cat-count { color: var(--green-dim); }
+.cat-table tfoot th, .cat-table tfoot td { border-top: 1px dashed var(--line); color: var(--amber); font-weight: bold; }
+.hidden-note { margin-top: 8px; font-size: 0.85rem; }
+
 /* Category colours, shared by the pie, its legend, and the #13 list. Open matches the map legend. */
 .cat-default { --cat: #ff5f56; }
 .cat-open { --cat: #ffb000; }
