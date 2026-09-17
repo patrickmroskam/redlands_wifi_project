@@ -1,8 +1,8 @@
 ---
 title: Redlands Wifi Project — Product Spec
-status: draft               # draft | ratified (PO acts only against ratified) — human flips to ratified
-ratified_by:
-ratified_at:
+status: ratified            # draft | ratified (PO acts only against ratified) — human flips to ratified
+ratified_by: Patrick Roskam (OH HAI ask msg_23db0887-cc11-4cc9-a7b6-a51677dc6467)
+ratified_at: 2026-09-17T19:19:36Z
 ---
 
 # Redlands Wifi Project — Product Spec
