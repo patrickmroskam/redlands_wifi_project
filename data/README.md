@@ -4,7 +4,8 @@ Files the site reads. Both are committed; neither is ever placed in `ingest/`.
 
 ## `networks.json` — the database
 
-Written only by the daily ingest job. Shape:
+Written only by the ingest pipeline (`scripts/ingest.py`, run by the daily job).
+It is valid JSON with one network per line, so diffs stay readable. Shape:
 
 ```json
 {
@@ -27,7 +28,11 @@ Written only by the daily ingest job. Shape:
 - `updated_at` is UTC in ISO-8601 with a trailing `Z`.
 - `lat` / `lon` are decimal degrees (WGS 84). Records with missing or 0,0
   coordinates are skipped by the map.
-- `bssid` is the dedupe key. An existing record is never overwritten.
+- `bssid` is the dedupe key, stored in lowercase. An existing record is never
+  overwritten; new networks are only appended.
+- `first_seen` is the logger's local time, normalized to `YYYY-MM-DD HH:MM:SS`
+  (kept as logged if it can't be parsed). `channel` is an integer or `null`.
+- `updated_at` changes only when a run adds at least one network.
 - `ssid` may be an empty string (hidden network); the map shows it as "hidden".
 - `auth` is the WiGLE `AuthMode` string. The map treats anything containing
   `WEP`, `WPA`, or `RSN` as encrypted and everything else as open.

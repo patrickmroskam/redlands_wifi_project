@@ -1,0 +1,5 @@
+WigleWifi-1.4,appRelease=v1.2.0,model=ESP32 Marauder,release=v1.2.0,device=ESP32 Marauder,display=SPI TFT,board=ESP32 Marauder,brand=JustCallMeKoko
+MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type
+AA:BB:CC:00:00:01,Downtown Cafe,[WPA2_PSK],2025-3-21 23:8:20,9,-83,34.0556,-117.1825,368.00,3.25,WIFI
+AA:BB:CC:00:00:02,Library Free WiFi,[OPEN],2025-3-21 23:8:22,11,-59,34.0560,-117.1830,367.30,3.25,WIFI
+AA:BB:CC:00:00:03,Los Angeles Net,[WPA2_PSK],2025-3-21 23:8:23,6,-70,34.0522,-118.2437,90.00,3.25,WIFI
