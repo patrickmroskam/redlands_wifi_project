@@ -1,6 +1,6 @@
 # data/
 
-Files the site reads. Both are committed; neither is ever placed in `ingest/`.
+Files the site and the ingest read. All are committed; none is ever placed in `ingest/`.
 
 ## `networks.json` — the database
 
@@ -83,6 +83,15 @@ Under **Default-looking**, indented rows show how those networks are secured
 (using the step 2 rules alone). A note below the table counts hidden (blank)
 SSIDs; those networks are already counted under their security type. The total
 equals the number of networks on the map.
+
+## `removed.json` — networks removed on request
+
+A list of BSSIDs that were taken off the map after a removal request. The ingest
+never adds them again, under any name. Each entry has exactly `bssid` (canonical
+lower-case form), `date` (`YYYY-MM-DD`), and `issue` (the request's issue number).
+Nothing else is stored. Change it only with `scripts/remove_network.py`, in the same
+commit that deletes the record. A missing or malformed file stops the ingest. The
+procedure is in [docs/removals.md](../docs/removals.md).
 
 ## `redlands-boundary.geojson` — the fence
 

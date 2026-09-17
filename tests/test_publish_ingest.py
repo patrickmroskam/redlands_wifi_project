@@ -37,7 +37,8 @@ class PublishCase(unittest.TestCase):
         git(self.tmp, "init", "--quiet", "--bare", "-b", "main", self.remote)
         git(self.tmp, "init", "--quiet", "-b", "main", self.work)
         for rel in ("scripts/ingest.py", "scripts/publish_ingest.sh",
-                    "data/redlands-boundary.geojson", "ingest/README.md"):
+                    "data/redlands-boundary.geojson", "data/removed.json",
+                    "ingest/README.md"):
             dest = os.path.join(self.work, rel)
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             shutil.copy2(os.path.join(REPO, rel), dest)

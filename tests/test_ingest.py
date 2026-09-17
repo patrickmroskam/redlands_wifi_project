@@ -48,6 +48,8 @@ class PipelineCase(unittest.TestCase):
         os.mkdir(self.inbox)
         self.db = os.path.join(self.tmp, "networks.json")
         self.write_db([])
+        self.denylist = os.path.join(self.tmp, "removed.json")
+        self.write_denylist([])
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -58,6 +60,10 @@ class PipelineCase(unittest.TestCase):
             json.dump({"updated_at": updated_at, "count": len(networks),
                        "networks": networks}, fh, indent=2)
             fh.write("\n")
+
+    def write_denylist(self, entries=None, raw=None):
+        with open(self.denylist, "w", encoding="utf-8") as fh:
+            fh.write(raw if raw is not None else json.dumps({"removed": entries}, indent=2))
 
     def read_db(self):
         with open(self.db, encoding="utf-8") as fh:
@@ -72,7 +78,7 @@ class PipelineCase(unittest.TestCase):
     def run_pipeline(self, *extra, boundary=BOUNDARY):
         out = io.StringIO()
         argv = ["--ingest-dir", self.inbox, "--db", self.db, "--boundary", boundary,
-                *extra]
+                "--denylist", self.denylist, *extra]
         with redirect_stdout(out):
             code = ingest.main(argv)
         return code, out.getvalue()
@@ -478,6 +484,194 @@ class BssidDedupe(PipelineCase):
         self.assertIn("  aa:bb:cc:00:00:49", out)
 
 
+class Denylist(PipelineCase):
+    """Removed networks (data/removed.json, issue #27) are never added again."""
+
+    def entry(self, bssid, date="2026-09-17", issue=27):
+        return {"bssid": bssid, "date": date, "issue": issue}
+
+    def test_denylisted_bssid_is_never_added_even_with_a_normal_ssid(self):
+        self.write_denylist([self.entry("aa:bb:cc:00:00:60")])
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:60", ssid="Totally Normal")
+                 + row("aa-bb-cc-00-00-60", ssid="Other spelling")
+                 + row("AA:BB:CC:00:00:61", ssid="Kept"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["aa:bb:cc:00:00:61"])
+        self.assertIn("  removed:         2", out)
+        self.assertIn("rows added:        1", out)
+        self.assertEqual(self.inbox_files(), [])
+
+    def test_removed_takes_precedence_over_other_drop_reasons(self):
+        self.write_denylist([self.entry("aa:bb:cc:00:00:62")])
+        self.put("a.log", HEADER
+                 + row("AA:BB:CC:00:00:62", lat=OUT_OF_TOWN[0], lon=OUT_OF_TOWN[1])
+                 + row("AA:BB:CC:00:00:62", ssid="x_nomap")
+                 + row("AA:BB:CC:00:00:62", lat="0", lon="0"))
+        _, out = self.run_pipeline()
+        self.assertIn("  removed:         3", out)
+        self.assertIn("  outside area:    0", out)
+        self.assertIn("  opt-out:         0", out)
+        self.assertNotIn("already published but now opted out", out)
+
+    def test_dry_run_reports_removed_rows(self):
+        self.write_denylist([self.entry("aa:bb:cc:00:00:63")])
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:63"))
+        code, out = self.run_pipeline("--dry-run")
+        self.assertEqual(code, 0, out)
+        self.assertIn("  removed:         1", out)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+
+    def test_empty_denylist_changes_nothing(self):
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:64"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("  removed:         0", out)
+        self.assertEqual(self.read_db()["count"], 1)
+
+    def assert_fatal_and_untouched(self, *expected):
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:65"))
+        with open(self.db, "rb") as fh:
+            before = fh.read()
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 2, out)
+        self.assertIn("nothing was written or deleted", out)
+        for text in expected:
+            self.assertIn(text, out)
+        with open(self.db, "rb") as fh:
+            self.assertEqual(fh.read(), before)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+
+    def test_missing_denylist_is_fatal(self):
+        os.remove(self.denylist)
+        self.assert_fatal_and_untouched("cannot read denylist")
+
+    def test_unparseable_denylist_is_fatal(self):
+        self.write_denylist(raw="{not json")
+        self.assert_fatal_and_untouched("cannot read denylist")
+
+    def test_denylist_without_removed_list_is_fatal(self):
+        for raw in ("[]", "{}", '{"removed": {}}'):
+            with self.subTest(raw=raw):
+                self.write_denylist(raw=raw)
+                self.assert_fatal_and_untouched("has no 'removed' list")
+
+    def test_malformed_entries_are_fatal(self):
+        good = "aa:bb:cc:00:00:66"
+        cases = [
+            ("not an object", [good], "#0 is not an object"),
+            ("missing key", [{"bssid": good, "date": "2026-09-17"}], "#0 missing issue"),
+            ("extra identifying key", [dict(self.entry(good), ssid="Home")],
+             'unexpected "ssid"'),
+            ("malformed bssid", [self.entry("aa:bb:cc:00:00")], "is not a canonical"),
+            ("non-canonical bssid", [self.entry("AA-BB-CC-00-00-66")], "is not a canonical"),
+            ("non-string bssid", [self.entry(None)], "is not a canonical"),
+            ("impossible date", [self.entry(good, date="2026-02-30")], "is not YYYY-MM-DD"),
+            ("date with time", [self.entry(good, date="2026-09-17T00:00")],
+             "is not YYYY-MM-DD"),
+            ("zero issue", [self.entry(good, issue=0)], "positive issue"),
+            ("string issue", [self.entry(good, issue="27")], "positive issue"),
+            ("bool issue", [self.entry(good, issue=True)], "positive issue"),
+            ("repeated bssid", [self.entry(good), self.entry(good, issue=28)],
+             "#1 repeats aa:bb:cc:00:00:66 from #0"),
+        ]
+        for name, entries, text in cases:
+            with self.subTest(name):
+                self.write_denylist(entries)
+                self.assert_fatal_and_untouched("needs a manual fix", text)
+
+    def test_removed_network_still_in_the_database_is_fatal(self):
+        self.write_db([{"bssid": "AA-BB-CC-00-00-67", "ssid": "Gone", "auth": "",
+                        "channel": 1, "first_seen": "", "lat": 34.05, "lon": -117.18}])
+        self.write_denylist([self.entry("aa:bb:cc:00:00:67")])
+        self.assert_fatal_and_untouched("still contains 1 removed network(s)",
+                                        "aa:bb:cc:00:00:67", "docs/removals.md")
+
+
+_rm_spec = importlib.util.spec_from_file_location(
+    "remove_network", os.path.join(REPO, "scripts", "remove_network.py"))
+remove_network = importlib.util.module_from_spec(_rm_spec)
+_rm_spec.loader.exec_module(remove_network)
+
+
+class RemoveNetwork(PipelineCase):
+    """scripts/remove_network.py deletes the record and denylists it in one step."""
+
+    def net(self, bssid, ssid="Stored"):
+        return {"bssid": bssid, "ssid": ssid, "auth": "[WPA2_PSK]", "channel": 6,
+                "first_seen": "2025-03-21 23:08:20", "lat": 34.0556, "lon": -117.1825}
+
+    def remove(self, *args):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = remove_network.main([*args, "--db", self.db, "--denylist", self.denylist])
+        return code, out.getvalue()
+
+    def read_denylist(self):
+        with open(self.denylist, encoding="utf-8") as fh:
+            return json.load(fh)["removed"]
+
+    def snapshot(self):
+        result = []
+        for path in (self.db, self.denylist):
+            with open(path, "rb") as fh:
+                result.append(fh.read())
+        return result
+
+    def test_removes_record_and_denylists_it_so_ingest_never_re_adds_it(self):
+        self.write_db([self.net("aa:bb:cc:00:00:70"), self.net("aa:bb:cc:00:00:71")],
+                      updated_at="2026-09-17T10:00:00Z")
+        code, out = self.remove("--issue", "40", "AA-BB-CC-00-00-70")
+        self.assertEqual(code, 0, out)
+        db = self.read_db()
+        self.assertEqual([n["bssid"] for n in db["networks"]], ["aa:bb:cc:00:00:71"])
+        self.assertEqual(db["count"], 1)
+        self.assertEqual(db["updated_at"], "2026-09-17T10:00:00Z")
+        [entry] = self.read_denylist()
+        self.assertEqual(sorted(entry), ["bssid", "date", "issue"])
+        self.assertEqual((entry["bssid"], entry["issue"]), ("aa:bb:cc:00:00:70", 40))
+        ingest.load_denylist(self.denylist)  # valid by the ingest's own rules
+
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:70", ssid="Back again"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("  removed:         1", out)
+        self.assertEqual(self.read_db()["count"], 1)
+
+    def test_network_not_on_the_map_is_still_denylisted(self):
+        code, out = self.remove("--issue", "41", "aabbcc000072")
+        self.assertEqual(code, 0, out)
+        self.assertIn("no matching record", out)
+        self.assertEqual([e["bssid"] for e in self.read_denylist()], ["aa:bb:cc:00:00:72"])
+
+    def test_already_denylisted_bssid_is_not_listed_twice(self):
+        old = {"bssid": "aa:bb:cc:00:00:73", "date": "2026-09-01", "issue": 5}
+        self.write_denylist([old])
+        code, out = self.remove("--issue", "42", "aa:bb:cc:00:00:73", "AA:BB:CC:00:00:73")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_denylist(), [old])
+
+    def test_invalid_input_writes_nothing(self):
+        self.write_db([self.net("aa:bb:cc:00:00:74")])
+        before = self.snapshot()
+        for args in (["--issue", "0", "aa:bb:cc:00:00:74"],
+                     ["--issue", "43", "aa:bb:cc:00:00:74", "not-a-mac"]):
+            with self.subTest(args=args):
+                code, out = self.remove(*args)
+                self.assertEqual(code, 2, out)
+                self.assertIn("nothing was written", out)
+                self.assertEqual(self.snapshot(), before)
+
+    def test_refuses_a_broken_denylist(self):
+        self.write_db([self.net("aa:bb:cc:00:00:75")])
+        self.write_denylist(raw="{}")
+        before = self.snapshot()
+        code, out = self.remove("--issue", "44", "aa:bb:cc:00:00:75")
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.snapshot(), before)
+
+
 class CommittedDatabase(unittest.TestCase):
     """The published database must pass the pipeline's own checks (catches hand edits in PRs)."""
 
@@ -488,6 +682,12 @@ class CommittedDatabase(unittest.TestCase):
         for net in db["networks"]:
             self.assertEqual(net["bssid"], ingest.normalize_bssid(net["bssid"]))
         self.assertEqual(db["count"], len(db["networks"]))
+
+    def test_committed_denylist_is_valid_and_no_removed_network_is_published(self):
+        db_path = os.path.join(REPO, "data", "networks.json")
+        stored = ingest.stored_bssids(ingest.load_db(db_path), db_path)
+        removed = ingest.load_denylist(os.path.join(REPO, "data", "removed.json"))
+        self.assertEqual(sorted(stored & removed), [])
 
 
 class FieldNormalisation(unittest.TestCase):

@@ -2,8 +2,9 @@
 """Ingest raw WiGLE CSV wardrive logs into data/networks.json.
 
 Reads every candidate file in ingest/, keeps WiFi rows that fall inside the
-Redlands ZIP polygons (92373 / 92374), are not opted out (`_nomap` / `_optout`)
-and are not already known (by BSSID), appends them to the database, then
+Redlands ZIP polygons (92373 / 92374), are not opted out (`_nomap` / `_optout`),
+are not on the removal denylist (data/removed.json) and are not already known
+(by BSSID), appends them to the database, then
 deletes the files it processed. Files it cannot parse are left in place,
 reported by name, and make the script exit 1. See docs/spec/PRD.md (R3, R4).
 
@@ -11,6 +12,7 @@ Python 3 standard library only.
 
 Usage:
   python3 scripts/ingest.py [--dry-run] [--ingest-dir DIR] [--db FILE] [--boundary FILE]
+                            [--denylist FILE]
 
 Exit codes: 0 ok; 1 some files could not be parsed (left in place) or could not
 be deleted; 2 fatal (nothing written or deleted).
@@ -28,6 +30,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_INGEST_DIR = os.path.join(REPO_ROOT, "ingest")
 DEFAULT_DB = os.path.join(REPO_ROOT, "data", "networks.json")
 DEFAULT_BOUNDARY = os.path.join(REPO_ROOT, "data", "redlands-boundary.geojson")
+DEFAULT_DENYLIST = os.path.join(REPO_ROOT, "data", "removed.json")
 
 # Files in the inbox that are never logs.
 NON_CANDIDATES = {"README.md", ".gitkeep"}
@@ -39,6 +42,7 @@ OPT_OUT_SUFFIXES = ("_nomap", "_optout")
 REASONS = (
     ("malformed", "malformed"),
     ("not_wifi", "not wifi"),
+    ("removed", "removed"),
     ("bad_coords", "bad coords"),
     ("outside_area", "outside area"),
     ("opt_out", "opt-out"),
@@ -58,6 +62,10 @@ _BSSID_FORMS = (
 
 # Byte-order marks and zero-width characters that some tools prepend to a field.
 _INVISIBLE = "\ufeff\u200b\u200c\u200d\u2060"
+
+# Exactly these keys per denylist entry: nothing that could identify a person.
+DENYLIST_KEYS = ("bssid", "date", "issue")
+_DENY_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _FIRST_SEEN = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})$")
 
@@ -275,6 +283,65 @@ def stored_bssids(db, path):
     return set(seen)
 
 
+def load_denylist(path):
+    """Canonical BSSIDs that were removed on request (docs/removals.md) and must never be
+    added again. A missing or malformed denylist is fatal: half-applying it, or silently
+    treating it as empty, would republish networks whose owners asked to be removed."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:
+        raise FatalError("cannot read denylist {}: {}".format(path, exc))
+    if not isinstance(data, dict) or not isinstance(data.get("removed"), list):
+        raise FatalError("denylist {} has no 'removed' list".format(path))
+    seen = {}
+    problems = []
+    for index, entry in enumerate(data["removed"]):
+        where = "#{}".format(index)
+        if not isinstance(entry, dict):
+            problems.append("{} is not an object".format(where))
+            continue
+        keys = set(entry)
+        if keys != set(DENYLIST_KEYS):
+            extra = sorted(keys - set(DENYLIST_KEYS))
+            missing = [k for k in DENYLIST_KEYS if k not in keys]
+            detail = []
+            if missing:
+                detail.append("missing " + ", ".join(missing))
+            if extra:
+                detail.append("unexpected " + ", ".join(json.dumps(k, ensure_ascii=False)
+                                                        for k in extra))
+            problems.append("{} {}".format(where, "; ".join(detail)))
+            continue
+        raw = entry["bssid"]
+        bssid = normalize_bssid(raw)
+        if bssid is None or raw != bssid:
+            problems.append("{} bssid {} is not a canonical xx:xx:xx:xx:xx:xx address".format(
+                where, json.dumps(raw, ensure_ascii=False)))
+        elif bssid in seen:
+            problems.append("{} repeats {} from #{}".format(where, bssid, seen[bssid]))
+        else:
+            seen[bssid] = index
+        date = entry["date"]
+        valid_date = isinstance(date, str) and _DENY_DATE.match(date)
+        if valid_date:
+            try:
+                datetime.date.fromisoformat(date)
+            except ValueError:
+                valid_date = False
+        if not valid_date:
+            problems.append("{} date {} is not YYYY-MM-DD".format(
+                where, json.dumps(date, ensure_ascii=False)))
+        issue = entry["issue"]
+        if isinstance(issue, bool) or not isinstance(issue, int) or issue < 1:
+            problems.append("{} issue {} is not a positive issue number".format(
+                where, json.dumps(issue, ensure_ascii=False)))
+    if problems:
+        raise FatalError("denylist {} needs a manual fix; {} problem(s): {}".format(
+            path, len(problems), _preview(problems)))
+    return set(seen)
+
+
 def _preview(items, limit=10):
     shown = ", ".join(items[:limit])
     return shown if len(items) <= limit else "{}, ... (+{} more)".format(shown, len(items) - limit)
@@ -316,7 +383,7 @@ def save_db(path, db):
 
 # --- pipeline ------------------------------------------------------------------
 
-def classify(row, fence, known):
+def classify(row, fence, known, removed=frozenset()):
     """Return (reason, None, bssid) for a dropped row or (None, record, bssid) for a kept one.
 
     bssid is the canonical address, or None when the row has none.
@@ -329,6 +396,8 @@ def classify(row, fence, known):
     bssid = normalize_bssid(row["MAC"])
     if bssid is None:
         return "malformed", None, None
+    if bssid in removed:
+        return "removed", None, bssid
     lat = parse_coord(row["CurrentLatitude"])
     lon = parse_coord(row["CurrentLongitude"])
     if lat is None or lon is None or (lat == 0 and lon == 0):
@@ -351,7 +420,8 @@ def classify(row, fence, known):
     }, bssid
 
 
-def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
+def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
+        dry_run=False, now=None):
     """Run the pipeline and return a summary dict. Raises FatalError before any change."""
     try:
         with open(boundary_path, encoding="utf-8") as fh:
@@ -362,6 +432,13 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         raise FatalError("ingest directory {} does not exist".format(ingest_dir))
     db = load_db(db_path)
     stored = stored_bssids(db, db_path)
+    removed = load_denylist(denylist_path)
+    still_published = sorted(stored & removed)
+    if still_published:
+        raise FatalError(
+            "database {} still contains {} removed network(s) listed in {}: {}; "
+            "delete them from the database (docs/removals.md)".format(
+                db_path, len(still_published), denylist_path, _preview(still_published)))
     known = set(stored)
 
     summary = {
@@ -386,7 +463,7 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         summary["files_processed"].append(name)
         for row in rows:
             summary["rows_read"] += 1
-            reason, record, bssid = classify(row, fence, known)
+            reason, record, bssid = classify(row, fence, known, removed)
             if reason:
                 summary["dropped"][reason] += 1
                 if reason == "duplicate" and bssid in stored:
@@ -465,11 +542,14 @@ def main(argv=None):
     parser.add_argument("--ingest-dir", default=DEFAULT_INGEST_DIR)
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--boundary", default=DEFAULT_BOUNDARY)
+    parser.add_argument("--denylist", default=DEFAULT_DENYLIST,
+                        help="removed BSSIDs that are never added (default: data/removed.json)")
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would happen without writing or deleting")
     args = parser.parse_args(argv)
     try:
-        summary = run(args.ingest_dir, args.db, args.boundary, dry_run=args.dry_run)
+        summary = run(args.ingest_dir, args.db, args.boundary,
+                      denylist_path=args.denylist, dry_run=args.dry_run)
     except FatalError as exc:
         print("error: {}".format(exc))
         print("nothing was written or deleted.")
