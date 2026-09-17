@@ -46,22 +46,24 @@ into exactly one category, so the pie adds up to 100%:
 1. **Default-looking** comes first. The SSID still carries an ISP or router
    factory name. Matching is case-insensitive and anchored at the start of the
    SSID. The factory id part is required, so a renamed network such as
-   "Frontier Speedy" does not count. Hidden (blank) SSIDs never match.
+   "Frontier Speedy" does not count. For ORBI and ASUS only the factory
+   suffixes (`-Guest`, `-IoT`, `_EXT`, `-2G`, `-5G`, `-2.4G`) may follow, so
+   `ORBI88smith` or `Asus Wifi` do not count. Hidden (blank) SSIDs never match.
 
    | Family | Matches (examples) |
    |---|---|
    | Spectrum | `SpectrumSetup-XX`, `MySpectrumWiFiXX-2G`, `Spectrum1234` |
    | Frontier | `Frontier1234` (3+ digits) |
-   | AT&T | `ATT-WIFI-1234`, `ATTa1b2c3d` (ATT + 7 letters/digits, at least one digit) |
+   | AT&T | `ATT-WIFI-1234`, `ATTa1b2c3d` (ATT + 7 letters/digits, at least one digit; and `_EXT`) |
    | CenturyLink | `CenturyLink1234` |
    | T-Mobile | `TMOBILE-1A2B` (and `_EXT`) |
    | Verizon | `Verizon-1E06`, `Verizon_AB12CD`, `Verizon-MiFi…`, `Verizon-M2100-…`, `Verizon-SM-…` |
-   | NETGEAR / Orbi | `NETGEAR`, `NETGEAR42` (and `-5G`, `-Guest`, `_EXT`), `NETGEAR-Guest`, `ORBI`, `ORBI12` |
+   | NETGEAR / Orbi | `NETGEAR`, `NETGEAR42` (and `-5G`, `-Guest`, `_EXT`), `NETGEAR-Guest`, `ORBI`, `ORBI12` (and `-Guest`, `-IoT`) |
    | TP-Link | `TP-Link_1A2B`, `TP-Link_1A2B3C` (and `_5G`) |
    | Linksys | `Linksys01234` (and `-guest`) |
    | Wi-Fi Direct | `DIRECT-…` (printers, TVs, cars) |
    | D-Link | `dlink`, `dlink-1A2B` |
-   | ASUS | `ASUS`, `ASUS_5G`, `ASUS_9C28`, `ASUS22` |
+   | ASUS | `ASUS`, `ASUS_5G`, `ASUS_9C28`, `ASUS22`, `ASUS_C0_2G_Guest` |
    | Tenda | `Tenda_22F7F0` |
    | Xfinity | `xfinitywifi`, `XFSETUP-1A2B` |
 

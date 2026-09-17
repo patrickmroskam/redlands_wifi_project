@@ -14,6 +14,11 @@
   var POPUP_SLACK = 60;
 
   var statsEl = document.getElementById('stats');
+  // stats.js may have failed to load; the breakdown must not say "loading" forever.
+  if (!window.RWPStats) {
+    var breakdownStatus = document.getElementById('security-status');
+    if (breakdownStatus) breakdownStatus.textContent = '> security breakdown unavailable';
+  }
   var errorEl = document.getElementById('error');
 
   function showError(message) {

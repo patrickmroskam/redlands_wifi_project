@@ -107,7 +107,8 @@ test('empty database: banner, bounded map, legend, zero stats, privacy link', as
   await expect(page.locator('#stats')).toContainText('0 networks mapped');
   // #12: the breakdown shows an empty state, not an empty circle.
   await expect(page.locator('#security-status')).toHaveText('> no networks mapped yet');
-  await expect(page.locator('#security-chart')).toBeHidden();
+  await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+  await expect(page.locator('#security-status')).not.toHaveClass(/visually-hidden/);
   await expect(page.locator('svg.pie')).toHaveCount(0);
   await expect(page.locator('.legend')).toContainText('encrypted');
   await expect(page.locator('.legend')).toContainText('open');
@@ -317,6 +318,7 @@ test('factory SSID patterns match defaults and skip renamed look-alikes (#12)', 
   await page.goto('/index.html');
   const defaults = [
     'SpectrumSetup-A1', 'MySpectrumWiFi5c-2G', 'Spectrum1261', 'Frontier0000', 'ATT-WIFI-2437', 'ATT6C8NwJ4',
+    'ATT7YYC53e_EXT', 'ORBI12-IoT', 'ASUS-2.4G-ext', 'ASUS_C0_2G_Guest', 'ASUS_Guest1',
     'CenturyLink1234', 'TMOBILE-082B_EXT', 'Verizon-1E06', 'Verizon_7XSJ9T', 'Verizon-MiFi8800L-93D0',
     'NETGEAR', 'NETGEAR06', 'NETGEAR06-5G', 'netgear42_EXT', 'NETGEAR-Guest', 'ORBI', 'ORBI12-Guest',
     'TP-Link_1A2B', 'TP-LINK_1B8B_5G', 'TP-LINK_785058', 'Linksys04357-guest', 'DIRECT-01-HP M203 LaserJet',
@@ -325,7 +327,8 @@ test('factory SSID patterns match defaults and skip renamed look-alikes (#12)', 
   const renamed = [
     '', '   ', 'Spectrum sucks', 'SpectrumShade', 'Frontier Speedy', 'Frontier', 'ATTIC', 'Attorneys',
     'ATT4WIFI', 'Verizon-My hotspot', 'NETGEAR-Rivera 2G', 'ORBITAL', 'TP-LINK_IoT', 'TP-LINK_Power Strip_2601',
-    'Linksys Extender Setup', 'ASUSTek Lab', 'Tenda', 'xfinitywifi2', 'Redlands Internet', 'MyDIRECT-TV',
+    'Linksys Extender Setup', 'ASUSTek Lab',
+    'ORBI88benandnatalia', 'ORBI88smith-IoT', 'Asus Wifi', 'ASUS_MD', 'ASUS_50 NEW', 'ATT6C8NwJ4_home', 'Tenda', 'xfinitywifi2', 'Redlands Internet', 'MyDIRECT-TV',
   ];
   const results = await page.evaluate(([yes, no]) => {
     const is = (ssid) => window.RWPStats.classify({ ssid, auth: '[WPA2_PSK]' }) === 'default';
@@ -346,7 +349,10 @@ test('the security pie sits under the map and matches the plotted networks (#12)
 
   const pie = page.getByRole('img', { name: /how the 18 mapped networks are secured/ });
   await expect(pie).toBeVisible();
-  await expect(page.locator('#security-status')).toBeHidden();
+  // Still announced to screen readers, but not shown.
+  await expect(page.locator('#security-status')).toHaveText('> security breakdown loaded: 18 networks classified');
+  await expect(page.locator('#security-status')).toHaveClass(/visually-hidden/);
+  await expect(page.locator('#security-status')).toHaveAttribute('aria-live', 'polite');
   await expect(pie.locator('.slice')).toHaveCount(10);
   // A duplicate BSSID and a record with bad coordinates are not on the map, so they are not counted.
   await expect(page.locator('.pie-total')).toHaveText('> 18 networks classified');
@@ -383,6 +389,20 @@ test('the security pie sits under the map and matches the plotted networks (#12)
   expect(new Set(colors.map((c) => c.slice)).size).toBe(colors.length);
 });
 
+test('a slice over half the pie takes the long way round (#12)', async ({ page }) => {
+  const nets = [['[OPEN]', 34.0556, -117.1825], ['[OPEN]', 34.0600, -117.1700], ['[OPEN]', 34.0500, -117.1900],
+    ['[WPA2_PSK]', 34.0620, -117.1650]].map(([auth, lat, lon], i) =>
+    ({ bssid: `aa:bb:cc:00:03:0${i}`, ssid: `Net${i}`, auth, lat, lon }));
+  await page.route('**/data/networks.json', (route) => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify({ updated_at: null, networks: nets }) }));
+  await page.goto('/index.html');
+  await expectMarkers(page, 4);
+  // Open is 75%: its arc needs the large-arc flag, or it is drawn over the WPA2 slice.
+  await expect(page.locator('path.slice.cat-open')).toHaveAttribute('d', /A1 1 0 1 1 /);
+  await expect(page.locator('path.slice.cat-wpa2')).toHaveAttribute('d', /A1 1 0 0 1 /);
+  await expect(page.locator('#security-legend .pie-value')).toHaveText(['75.0% (3)', '25.0% (1)']);
+});
+
 test('a single-category database draws a full circle at 100% (#12)', async ({ page }) => {
   await page.route('**/data/networks.json', (route) => route.fulfill({
     contentType: 'application/json',
@@ -410,10 +430,21 @@ for (const [name, setup, errorText] of [
     await page.goto('/index.html');
     await expect(page.getByRole('alert')).toContainText(errorText);
     await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
-    await expect(page.locator('#security-chart')).toBeHidden();
+    await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+    await expect(page.locator('#security-status')).toBeVisible();
     await expect(page.locator('svg.pie')).toHaveCount(0);
   });
 }
+
+test('the breakdown says unavailable when stats.js fails to load (#12)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  await page.route(/stats\.js$/, (route) => route.abort());
+  await page.goto('/index.html');
+  await expectMarkers(page, 3);
+  await expect(page.locator('#stats')).toContainText('3 networks mapped');
+  await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
+  await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+});
 
 test('a breakdown failure leaves the map and its stats line working (#12)', async ({ page }) => {
   await useFixture(page, FIXTURE_3);

@@ -19,24 +19,26 @@
 
   // SSIDs that still carry an ISP or router factory name. Each pattern needs the factory id part,
   // so a renamed network ("Frontier Speedy") does not count. Documented in data/README.md.
+  // Factory suffixes routers add after the name: -Guest, -IoT, _EXT, -5G, -2.4G, _2G_Guest …
+  var SUFFIX = '([-_ ]?(guest\\d*|iot|ext|2g|5g|2\\.4g|2\\.4ghz|5ghz))*';
   var DEFAULT_SSID_PATTERNS = [
     /^spectrum ?setup/i,                          // SpectrumSetup-XX
     /^myspectrumwifi/i,                           // MySpectrumWiFiXX-2G
     /^spectrum[-_ ]?\d+$/i,                       // Spectrum1234
     /^frontier\d{3,}/i,                           // Frontier1234
     /^att-wifi-\d{4}/i,                           // ATT-WIFI-1234
-    /^att(?=[a-z]*\d)[0-9a-z]{7}$/i,              // ATTa1b2c3d (must hold a digit)
+    /^att(?=[a-z]*\d)[0-9a-z]{7}(_ext)?$/i,       // ATTa1b2c3d, ATTa1b2c3d_EXT (must hold a digit)
     /^centurylink\d{4}/i,                         // CenturyLink1234
     /^tmobile-[0-9a-f]{4}/i,                      // TMOBILE-1A2B, TMOBILE-1A2B_EXT
     /^verizon[-_][0-9a-z]{4,6}(?![0-9a-z])/i,     // Verizon-1E06, Verizon_AB12CD
     /^verizon-(mifi|m\d{4}-|sm-)/i,               // Verizon hotspots: MiFi8800L, M2100, SM-G781V
     /^netgear(\d{2}|-?guest$|_?ext$|$)/i,         // NETGEAR42, NETGEAR42-5G, NETGEAR-Guest
-    /^orbi(\d{2}|$)/i,                            // ORBI12, ORBI12-Guest
+    new RegExp('^orbi(\\d{2})?' + SUFFIX + '$', 'i'), // ORBI, ORBI12, ORBI12-Guest
     /^tp-link_([0-9a-f]{6}|[0-9a-f]{4})(?![0-9a-z])/i, // TP-Link_1A2B, TP-LINK_1B8B_5G
     /^linksys\d{5}/i,                             // Linksys01234, Linksys01234-guest
     /^direct-/i,                                  // DIRECT-xx-HP … (printers, Wi-Fi Direct)
     /^dlink(-[0-9a-f]{4}|$)/i,                    // dlink-1A2B
-    /^asus(_[0-9a-f]{2,4}|_?[25]g|\d{2})?([-_ ].*)?$/i, // ASUS, ASUS_5G, ASUS_9C28, ASUS22
+    new RegExp('^asus(_[0-9a-f]{2,4}|\\d{2})?' + SUFFIX + '$', 'i'), // ASUS, ASUS_5G, ASUS_9C28, ASUS22
     /^tenda_[0-9a-f]{4,6}/i,                      // Tenda_22F7F0
     /^xfinitywifi$/i,                             // xfinitywifi
     /^xfsetup-[0-9a-f]{4}/i                       // XFSETUP-1A2B
@@ -64,7 +66,8 @@
     return false;
   }
 
-  // Must agree with isEncrypted() in map.js, so the Open slice matches the amber markers.
+  // Must agree with isEncrypted() in map.js: every Open network is an amber marker. (Amber markers with a
+  // default-looking name count in that slice instead, so the Open slice can be smaller than the amber count.)
   function isEncrypted(auth) {
     return /WEP|WPA|RSN/i.test(String(auth || ''));
   }
@@ -125,9 +128,9 @@
     chart.hidden = true;
   }
 
-  function setStatus(text) {
+  function setStatus(text, screenReaderOnly) {
     status.textContent = text;
-    status.hidden = false;
+    status.classList.toggle('visually-hidden', !!screenReaderOnly);
   }
 
   function render(nets) {
@@ -208,8 +211,9 @@
     chart.appendChild(summaryEl);
     chart.appendChild(legend);
     chart.appendChild(totalEl);
-    status.hidden = true;
     chart.hidden = false;
+    // The status line is the live region: keep it for screen readers so they hear the chart arrive.
+    setStatus('> security breakdown loaded: ' + formatCount(total) + ' networks classified', true);
   }
 
   function fail() {

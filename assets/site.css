@@ -176,6 +176,7 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 .col-title { margin: 0 0 8px; color: var(--amber); font-size: 1rem; }
 .col-note { margin: 0; color: var(--green-dim); }
 
+.pie-wrap[hidden] { display: none; }
 .pie-wrap { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
 .pie { flex: 0 0 auto; width: min(200px, 100%); height: auto; filter: drop-shadow(0 0 6px rgba(51, 255, 102, 0.25)); }
 .slice { fill: var(--cat); stroke: var(--panel); stroke-width: 0.012; stroke-linejoin: round; }
