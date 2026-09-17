@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Redlands Wifi Project</title>
   <meta name="description" content="A map of WiFi networks observed by wardriving in Redlands, California (ZIP 92373 / 92374).">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+  <!-- Leaflet is vendored so the CSP can stay 'self'-only; integrity pins the bytes (docs/security.md). -->
+  <link rel="stylesheet" href="assets/vendor/leaflet-1.9.4/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=">
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -40,13 +41,13 @@
     <p>
       <a href="privacy.html">Privacy policy &amp; opt-out</a>
       <span aria-hidden="true">·</span>
-      <a href="https://github.com/patrickmroskam/redlands_wifi_project">Source</a>
+      <a href="https://github.com/patrickmroskam/redlands_wifi_project" rel="noopener noreferrer">Source</a>
     </p>
     <p class="fine">No accounts. No cookies. No analytics.</p>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+  <script src="assets/vendor/leaflet-1.9.4/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
   <script src="assets/map.js"></script>
 </body>
 </html>
