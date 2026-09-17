@@ -20,5 +20,6 @@ the Actions tab) the pipeline reads every file here, keeps only networks inside 
 codes 92373 / 92374 that aren't already in the database, adds them to
 `data/networks.json`, and **deletes the processed files from this folder**.
 
-Files that can't be parsed are left here and reported in the workflow log.
+Files that can't be parsed are left here, named in the run's summary, and the run
+is marked failed (red) in the Actions tab so you notice.
 Do not put anything else in this folder.

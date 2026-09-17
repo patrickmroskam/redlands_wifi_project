@@ -1,0 +1,99 @@
+# Daily ingest: ingest/ logs -> data/networks.json, committed to main (PRD R5).
+# The logic lives in scripts/publish_ingest.sh (unit-tested); this file only wires it up.
+name: Ingest wardrive logs
+
+on:
+  schedule:
+    # 10:00 UTC = 03:00 PDT / 02:00 PST. Scheduled runs are skipped until the
+    # repo variable INGEST_SCHEDULE is 'on' (set by the backfill, #8). GitHub pauses
+    # schedules after 60 days without repo activity; re-enable from the Actions tab.
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: report only, commit and delete nothing'
+        type: boolean
+        default: false
+
+permissions: {}
+
+# Never let two runs append to the database at the same time; queue, don't cancel.
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: ingest
+    if: ${{ github.event_name != 'schedule' || vars.INGEST_SCHEDULE == 'on' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # commit the database + deleted logs to main
+      pages: write      # only to request a Pages build if the push didn't start one
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - name: Refuse to publish from a branch other than main
+        if: ${{ github.ref != 'refs/heads/main' && env.DRY_RUN != 'true' }}
+        run: |
+          echo "::error::Real ingest runs only on main (got ${GITHUB_REF}). Use dry_run for other branches."
+          exit 1
+
+      # Check out the branch tip, not the event SHA: a run queued behind another
+      # must see the previous run's commit. No persisted token while tests run.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # A GITHUB_TOKEN push does not trigger CI, so gate the data change here.
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Ingest and publish
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            scripts/publish_ingest.sh --dry-run
+          else
+            # Push credentials exist only for this step, and only for a real run.
+            auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+            echo "::add-mask::$auth"
+            git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $auth"
+            scripts/publish_ingest.sh
+          fi
+
+      # Runs even when the publish step failed with exit 1 (bad file) after pushing.
+      - name: Make sure GitHub Pages rebuilds
+        if: ${{ always() && steps.publish.outputs.pushed_sha != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.publish.outputs.pushed_sha }}
+        run: |
+          # Wait for a build of the pushed commit; request one if the push didn't start it.
+          requested=""
+          for i in $(seq 1 30); do
+            build=$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest" \
+                      --jq '"\(.commit) \(.status)"' 2>/dev/null || true)
+            commit=${build% *}; status=${build#* }
+            if [ "$commit" = "$SHA" ]; then
+              case "$status" in
+                built) echo "Pages built $SHA${requested:+ (after an explicit request)}."; exit 0 ;;
+                errored) echo "::error::GitHub Pages build of $SHA failed"; exit 1 ;;
+              esac
+            elif [ -z "$requested" ] && [ "$i" -ge 12 ]; then
+              echo "No Pages build for $SHA after 2 minutes; requesting one."
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" --jq .status
+              requested=1
+            fi
+            sleep 10
+          done
+          echo "::error::No finished Pages build for $SHA after 5 minutes (latest: $build)"
+          exit 1

@@ -6,6 +6,7 @@ Map WiFi networks in Redlands, CA — https://patrickmroskam.github.io/redlands_
 - `data/networks.json` — the database the map reads. See [`data/README.md`](data/README.md).
 - `ingest/` — inbox for raw wardrive logs. See [`ingest/README.md`](ingest/README.md).
 - `scripts/ingest.py` — the ingest pipeline (Python 3, standard library only).
+- `scripts/publish_ingest.sh` — runs the pipeline and commits + pushes its result (used by the daily job).
 - `docs/spec/` — product spec (`PRD.md`) and project rules (`constitution.md`).
 
 ## The ingest pipeline
@@ -33,6 +34,24 @@ the files it processed and prints a summary with a count for each drop reason.
   be removed by hand.
 - Exit `2` means a fatal problem (missing boundary, unreadable database, write
   failure). Nothing is written or deleted in that case.
+
+## The daily job
+
+`.github/workflows/ingest.yml` ("Ingest wardrive logs") runs every day at 10:00 UTC
+(03:00 Pacific in summer) and can be started by hand from the Actions tab
+(**Run workflow**; tick *Dry run* to only see the report). It:
+
+1. runs the unit tests (a push made by the job does not trigger CI);
+2. runs `scripts/publish_ingest.sh`, which runs the pipeline and, only if
+   `data/networks.json` or `ingest/` changed, commits exactly those paths as
+   `ingest: +N networks, M files processed` and pushes to `main`;
+3. checks that GitHub Pages started a build for that commit, and requests one if not.
+
+The report appears in the run's summary panel. A red run means a file could not be
+parsed (the good files were still published; the bad one stays in `ingest/`) or a
+fatal error (nothing was published). Networks that opted out after being published
+show up as warnings and need a removal PR. GitHub pauses scheduled workflows after 60
+days without repo activity; if that happens, re-enable the workflow from the Actions tab.
 
 ## Tests
 
