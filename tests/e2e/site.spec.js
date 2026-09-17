@@ -143,40 +143,62 @@ test('a database parse error quoting HTML is shown as text', async ({ page }) =>
   await page.goto('/index.html');
   const alert = page.getByRole('alert');
   await expect(alert).toContainText('Could not load the network database');
+  // The browser's parse error quotes the body; it must arrive as literal text.
+  await expect(alert).toContainText('<img');
   await expect(alert.locator('*:not(p)')).toHaveCount(0);
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
 
-for (const pagePath of ['/index.html', '/privacy.html']) {
-  test(`${pagePath} loads code only from its own origin and keeps a strict CSP`, async ({ page }) => {
+// The exact policy each page must carry; any added or loosened directive fails.
+const EXPECTED_CSP = {
+  '/index.html': {
+    'default-src': "'none'",
+    'script-src': "'self'",
+    'style-src': "'self'",
+    'img-src': "'self' data: https://tile.openstreetmap.org",
+    'connect-src': "'self'",
+    'base-uri': "'none'",
+    'form-action': "'none'",
+  },
+  '/privacy.html': {
+    'default-src': "'none'",
+    'style-src': "'self'",
+    'img-src': "'self'",
+    'base-uri': "'none'",
+    'form-action': "'none'",
+  },
+};
+
+for (const pagePath of Object.keys(EXPECTED_CSP)) {
+  test(`${pagePath} loads code only from its own origin and keeps a strict CSP`, async ({ page, baseURL }) => {
+    const origin = new URL(baseURL).origin;
     const foreign = [];
     page.on('request', (req) => {
-      const type = req.resourceType();
       const url = new URL(req.url());
-      if (url.origin !== 'http://127.0.0.1:4173' && type !== 'image') foreign.push(`${type} ${req.url()}`);
-      if (type === 'image' && url.protocol !== 'data:' && url.hostname !== '127.0.0.1' &&
-          url.hostname !== 'tile.openstreetmap.org') foreign.push(`${type} ${req.url()}`);
+      const allowed = req.resourceType() === 'image'
+        ? url.origin === origin || url.protocol === 'data:' || url.hostname === 'tile.openstreetmap.org'
+        : url.origin === origin;
+      if (!allowed) foreign.push(`${req.resourceType()} ${req.url()}`);
     });
     await useFixture(page, FIXTURE_3);
     await page.goto(pagePath);
     if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);
     expect(foreign).toEqual([]);
 
-    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
-    expect(csp).toContain("default-src 'none'");
-    expect(csp).toContain("base-uri 'none'");
-    expect(csp).not.toMatch(/unsafe-|cdnjs|\*|https?:\/\/(?!tile\.openstreetmap\.org)/);
-    for (const directive of ['script-src', 'style-src']) {
-      const value = (csp.split(';').map((d) => d.trim()).find((d) => d.startsWith(directive + ' ')) || '');
-      if (value) expect(value).toBe(`${directive} 'self'`);
-    }
+    const metas = page.locator('meta[http-equiv="Content-Security-Policy"]');
+    await expect(metas).toHaveCount(1);
+    const csp = Object.fromEntries((await metas.getAttribute('content')).split(';')
+      .map((d) => d.trim().split(/\s+/)).filter((parts) => parts[0])
+      .map(([name, ...values]) => [name.toLowerCase(), values.join(' ')]));
+    expect(csp).toEqual(EXPECTED_CSP[pagePath]);
 
-    // Every external link opens without handing over window.opener or the page URL.
-    for (const link of await page.locator('a[href^="http"]').all()) {
-      if (await link.evaluate((a) => !!a.closest('.leaflet-control-attribution'))) continue;
-      await expect(link).toHaveAttribute('rel', /noopener/);
-      await expect(link).toHaveAttribute('rel', /noreferrer/);
-    }
+    // External links in the page's own markup open without leaking window.opener or the
+    // page URL. (Leaflet's attribution links are same-tab and covered by the referrer policy.)
+    const links = await page.locator('a[href^="http"]').evaluateAll((as) => as
+      .filter((a) => !a.closest('.leaflet-control-attribution'))
+      .map((a) => ({ href: a.href, rel: (a.rel || '').split(/\s+/) })));
+    if (pagePath === '/index.html') expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link.rel, link.href).toEqual(expect.arrayContaining(['noopener', 'noreferrer']));
   });
 }
 

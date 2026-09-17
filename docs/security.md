@@ -17,7 +17,9 @@ text inside `data/networks.json`, which comes from whatever WiFi networks broadc
   columns planned in #12 and #13 need this.
 - **No new origins.** Scripts and styles come only from this site. The one
   allowed external host is the OpenStreetMap tile server, for images.
-- **External links** carry `rel="noopener noreferrer"`. A test enforces this.
+- **External links** in the page markup carry `rel="noopener noreferrer"`, and a test
+  enforces this. The attribution links that Leaflet renders are exempt: they open in
+  the same tab and are covered by the referrer policy.
 
 ## Content-Security-Policy
 
@@ -91,8 +93,10 @@ Without `data:`, panning quickly logs CSP violations.
   - `ingest.yml`: top-level `permissions: {}`. The one job gets `contents: write`
     (commit the database) and `pages: write` (request a Pages build if the push
     didn't start one). PRD R5.5 lists only `contents: write`; the extra scope is
-    accepted and should be added to the PRD wording. The push token is added only
-    inside the publish step, and only for a real run. File names from `ingest/` are
+    accepted and should be added to the PRD wording. The push header is written
+    to the checkout's git config only in the publish step, after the unit tests have
+    run, and only for a real run. It is not unset afterwards, but the only later step
+    is the first-party Pages check, which gets the same job token anyway. File names from `ingest/` are
     echoed between `::stop-commands::` markers, so a crafted file name cannot
     inject workflow commands. `workflow_dispatch` inputs reach the shell only
     through `env:`.
