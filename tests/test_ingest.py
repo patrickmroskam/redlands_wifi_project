@@ -375,6 +375,47 @@ class BssidDedupe(PipelineCase):
         self.assertEqual(self.read_db()["count"], 3)
         self.assertIn("duplicate:       0", out)
 
+    def test_cell_rows_with_tower_ids_count_as_not_wifi(self):
+        self.put("a.log", HEADER + row("310260_7_1234", typ="LTE") + row("310410_1_2", typ="GSM")
+                 + row("aa:bb:cc:00:00:25"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertIn("not wifi:        2", out)
+        self.assertIn("malformed:       0", out)
+
+    def test_invisible_characters_around_a_mac_are_ignored(self):
+        self.put("a.log", HEADER + row("\ufeffAA:BB:CC:00:00:26") + row("\u200baabbcc000027\u200b"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["aa:bb:cc:00:00:26", "aa:bb:cc:00:00:27"])
+
+    def test_opt_out_anywhere_in_the_batch_wins_in_either_file_order(self):
+        for first, second in (("Home_nomap", "Home"), ("Home", "Home_nomap")):
+            with self.subTest(first=first):
+                self.write_db([])
+                self.put("wardrive_1.log", HEADER + row("aa:bb:cc:00:00:50", ssid=first)
+                         + row("aa:bb:cc:00:00:51", ssid="Neighbour"))
+                self.put("wardrive_2.log", HEADER + row("AA-BB-CC-00-00-50", ssid=second)
+                         + row("aa:bb:cc:00:00:50", ssid="Home"))
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 0)
+                self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                                 ["aa:bb:cc:00:00:51"])
+                self.assertIn("rows added:        1", out)
+                self.assertIn("opt-out:         2", out)
+                self.assertIn("duplicate:       1", out)
+                self.assertEqual(self.inbox_files(), [])
+
+    def test_opt_out_in_batch_withholds_but_does_not_touch_other_networks(self):
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:52", ssid="Cafe")
+                 + row("aa:bb:cc:00:00:53", ssid="Cafe")
+                 + row("aa:bb:cc:00:00:52", ssid="Cafe_optout"))
+        _, dry = self.run_pipeline("--dry-run")
+        self.assertIn("rows added:        1", dry)
+        self.run_pipeline()
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["aa:bb:cc:00:00:53"])
+
     def assert_fatal_and_untouched(self, networks, *expected):
         self.write_db(networks)
         with open(self.db, "rb") as fh:

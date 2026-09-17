@@ -90,14 +90,15 @@ test('duplicate BSSIDs in the database render one marker per network (#15)', asy
   await useFixture(page, FIXTURE_DUP);
   await page.goto('/index.html');
 
-  // Five records: two spellings of ...:21, two of ...:22, and a mesh sibling ...:23 (a distinct network).
-  await expect(page.locator('#stats')).toContainText('3 networks mapped');
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  // Seven records: two spellings of ...:21, two of ...:22, a mesh sibling ...:23 (a distinct network),
+  // and two records with no BSSID, which are still shown and never merged with each other.
+  await expect(page.locator('#stats')).toContainText('5 networks mapped');
+  await expect(page.locator('path.net-marker')).toHaveCount(5);
   // The first record of each BSSID wins; the later (open) copies are never drawn.
   await expect(page.locator('path.net-open')).toHaveCount(0);
   const bssids = await page.evaluate(() =>
     window.__rwp.markers.map((m) => m.getPopup().getContent().querySelectorAll('dd')[1].textContent));
-  expect(bssids).toEqual(['aa:bb:cc:00:00:21', 'aa:bb:cc:00:00:22', 'aa:bb:cc:00:00:23']);
+  expect(bssids).toEqual(['aa:bb:cc:00:00:21', 'aa:bb:cc:00:00:22', 'aa:bb:cc:00:00:23', '—', '—']);
   expect(warnings).toContain('Skipped 2 duplicate network record(s) (same BSSID).');
 });
 

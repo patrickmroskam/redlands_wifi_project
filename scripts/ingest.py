@@ -56,6 +56,9 @@ _BSSID_FORMS = (
     re.compile(r"^[0-9a-f]{12}$"),
 )
 
+# Byte-order marks and zero-width characters that some tools prepend to a field.
+_INVISIBLE = "\ufeff\u200b\u200c\u200d\u2060"
+
 _FIRST_SEEN = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})$")
 
 
@@ -124,7 +127,7 @@ def normalize_bssid(value):
     """
     if not isinstance(value, str):
         return None
-    text = value.strip().lower()
+    text = value.strip().strip(_INVISIBLE).strip().lower()
     if not any(form.match(text) for form in _BSSID_FORMS):
         return None
     digits = re.sub(r"[^0-9a-f]", "", text)
@@ -314,25 +317,29 @@ def save_db(path, db):
 # --- pipeline ------------------------------------------------------------------
 
 def classify(row, fence, known):
-    """Return (reason, None) for a dropped row or (None, record) for a kept one."""
-    if row is None:
-        return "malformed", None
+    """Return (reason, None, bssid) for a dropped row or (None, record, bssid) for a kept one.
+
+    bssid is the canonical address, or None when the row has none.
+    """
+    if row is None or not row["MAC"].strip():
+        return "malformed", None, None
+    # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
+    if row["Type"].strip().upper() != "WIFI":
+        return "not_wifi", None, None
     bssid = normalize_bssid(row["MAC"])
     if bssid is None:
-        return "malformed", None
-    if row["Type"].strip().upper() != "WIFI":
-        return "not_wifi", None
+        return "malformed", None, None
     lat = parse_coord(row["CurrentLatitude"])
     lon = parse_coord(row["CurrentLongitude"])
     if lat is None or lon is None or (lat == 0 and lon == 0):
-        return "bad_coords", None
+        return "bad_coords", None, bssid
     if not fence.contains(lat=lat, lon=lon):
-        return "outside_area", None
+        return "outside_area", None, bssid
     ssid = row["SSID"]
     if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
-        return "opt_out", None
+        return "opt_out", None, bssid
     if bssid in known:
-        return "duplicate", None
+        return "duplicate", None, bssid
     return None, {
         "bssid": bssid,
         "ssid": ssid,
@@ -341,7 +348,7 @@ def classify(row, fence, known):
         "first_seen": normalize_first_seen(row["FirstSeen"]),
         "lat": lat,
         "lon": lon,
-    }
+    }, bssid
 
 
 def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
@@ -369,6 +376,7 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         "dry_run": dry_run,
     }
     added = []
+    opted_out = set()  # every BSSID seen with an opt-out SSID anywhere in this batch
     for name in candidate_files(ingest_dir):
         try:
             rows = read_log(os.path.join(ingest_dir, name))
@@ -378,18 +386,24 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         summary["files_processed"].append(name)
         for row in rows:
             summary["rows_read"] += 1
-            reason, record = classify(row, fence, known)
+            reason, record, bssid = classify(row, fence, known)
             if reason:
                 summary["dropped"][reason] += 1
-                bssid = normalize_bssid(row["MAC"]) if row is not None else None
                 if reason == "duplicate" and bssid in stored:
                     summary["duplicate_stored"] += 1
                 if reason == "opt_out":
+                    opted_out.add(bssid)
                     if bssid in stored and bssid not in summary["opted_out_but_published"]:
                         summary["opted_out_but_published"].append(bssid)
             else:
-                known.add(record["bssid"])
+                known.add(bssid)
                 added.append(record)
+    # An opt-out anywhere in the batch wins over the same BSSID seen without the suffix
+    # (in any file order): never publish it. Its kept row is recounted as an opt-out.
+    withheld = [r for r in added if r["bssid"] in opted_out]
+    if withheld:
+        added = [r for r in added if r["bssid"] not in opted_out]
+        summary["dropped"]["opt_out"] += len(withheld)
     summary["added"] = len(added)
 
     if dry_run:
