@@ -47,6 +47,18 @@ REASONS = (
 
 EXIT_OK, EXIT_PROBLEMS, EXIT_FATAL = 0, 1, 2
 
+# Accepted BSSID spellings: aa:bb:cc:dd:ee:ff, aa-bb-cc-dd-ee-ff, aabb.ccdd.eeff,
+# aabbccddeeff (any case). The canonical form is lower-case and colon-separated.
+_BSSID_FORMS = (
+    re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$"),
+    re.compile(r"^[0-9a-f]{2}(-[0-9a-f]{2}){5}$"),
+    re.compile(r"^[0-9a-f]{4}(\.[0-9a-f]{4}){2}$"),
+    re.compile(r"^[0-9a-f]{12}$"),
+)
+
+# Byte-order marks and zero-width characters that some tools prepend to a field.
+_INVISIBLE = "\ufeff\u200b\u200c\u200d\u2060"
+
 _FIRST_SEEN = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})$")
 
 
@@ -106,6 +118,21 @@ class Fence:
 
 
 # --- field parsing -------------------------------------------------------------
+
+def normalize_bssid(value):
+    """Return the canonical 'xx:xx:xx:xx:xx:xx' form of a MAC address, or None if malformed.
+
+    The BSSID is the network's identity (dedupe key). Different BSSIDs are different
+    networks even when they share an SSID (mesh nodes, dual-band radios).
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip().strip(_INVISIBLE).strip().lower()
+    if not any(form.match(text) for form in _BSSID_FORMS):
+        return None
+    digits = re.sub(r"[^0-9a-f]", "", text)
+    return ":".join(digits[i:i + 2] for i in range(0, 12, 2))
+
 
 def normalize_first_seen(value):
     """'2025-3-21 23:8:20' -> '2025-03-21 23:08:20'; unparseable values are kept as-is."""
@@ -221,6 +248,38 @@ def load_db(path):
     return db
 
 
+def stored_bssids(db, path):
+    """Canonical BSSIDs already in the database. Malformed or duplicate entries are fatal:
+    the database is only ever hand-edited through a PR, and a broken one must be fixed by
+    a human rather than republished (or grown) every day."""
+    seen = {}
+    malformed, duplicates = [], []
+    for index, net in enumerate(db["networks"]):
+        raw = net.get("bssid")
+        bssid = normalize_bssid(raw)
+        if bssid is None:
+            malformed.append("#{} {}".format(index, json.dumps(raw, ensure_ascii=False)))
+        elif bssid in seen:
+            duplicates.append("#{} and #{} ({})".format(seen[bssid], index, bssid))
+        else:
+            seen[bssid] = index
+    problems = []
+    if malformed:
+        problems.append("{} network(s) with a malformed bssid: {}".format(
+            len(malformed), _preview(malformed)))
+    if duplicates:
+        problems.append("{} duplicate bssid(s): {}".format(
+            len(duplicates), _preview(duplicates)))
+    if problems:
+        raise FatalError("database {} needs a manual fix; {}".format(path, "; ".join(problems)))
+    return set(seen)
+
+
+def _preview(items, limit=10):
+    shown = ", ".join(items[:limit])
+    return shown if len(items) <= limit else "{}, ... (+{} more)".format(shown, len(items) - limit)
+
+
 def save_db(path, db):
     """Atomically write valid JSON with one network per line (compact, diff-friendly)."""
     dump = lambda value: json.dumps(value, ensure_ascii=False)  # noqa: E731
@@ -258,23 +317,29 @@ def save_db(path, db):
 # --- pipeline ------------------------------------------------------------------
 
 def classify(row, fence, known):
-    """Return (reason, None) for a dropped row or (None, record) for a kept one."""
+    """Return (reason, None, bssid) for a dropped row or (None, record, bssid) for a kept one.
+
+    bssid is the canonical address, or None when the row has none.
+    """
     if row is None or not row["MAC"].strip():
-        return "malformed", None
+        return "malformed", None, None
+    # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
     if row["Type"].strip().upper() != "WIFI":
-        return "not_wifi", None
+        return "not_wifi", None, None
+    bssid = normalize_bssid(row["MAC"])
+    if bssid is None:
+        return "malformed", None, None
     lat = parse_coord(row["CurrentLatitude"])
     lon = parse_coord(row["CurrentLongitude"])
     if lat is None or lon is None or (lat == 0 and lon == 0):
-        return "bad_coords", None
+        return "bad_coords", None, bssid
     if not fence.contains(lat=lat, lon=lon):
-        return "outside_area", None
+        return "outside_area", None, bssid
     ssid = row["SSID"]
     if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
-        return "opt_out", None
-    bssid = row["MAC"].strip().lower()
+        return "opt_out", None, bssid
     if bssid in known:
-        return "duplicate", None
+        return "duplicate", None, bssid
     return None, {
         "bssid": bssid,
         "ssid": ssid,
@@ -283,7 +348,7 @@ def classify(row, fence, known):
         "first_seen": normalize_first_seen(row["FirstSeen"]),
         "lat": lat,
         "lon": lon,
-    }
+    }, bssid
 
 
 def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
@@ -296,7 +361,7 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
     if not os.path.isdir(ingest_dir):
         raise FatalError("ingest directory {} does not exist".format(ingest_dir))
     db = load_db(db_path)
-    stored = {str(n.get("bssid", "")).lower() for n in db["networks"]}
+    stored = stored_bssids(db, db_path)
     known = set(stored)
 
     summary = {
@@ -304,12 +369,14 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         "unparseable": [],
         "rows_read": 0,
         "dropped": {reason: 0 for reason, _ in REASONS},
+        "duplicate_stored": 0,
         "added": 0,
         "opted_out_but_published": [],
         "not_deleted": [],
         "dry_run": dry_run,
     }
     added = []
+    opted_out = set()  # every BSSID seen with an opt-out SSID anywhere in this batch
     for name in candidate_files(ingest_dir):
         try:
             rows = read_log(os.path.join(ingest_dir, name))
@@ -319,16 +386,24 @@ def run(ingest_dir, db_path, boundary_path, dry_run=False, now=None):
         summary["files_processed"].append(name)
         for row in rows:
             summary["rows_read"] += 1
-            reason, record = classify(row, fence, known)
+            reason, record, bssid = classify(row, fence, known)
             if reason:
                 summary["dropped"][reason] += 1
+                if reason == "duplicate" and bssid in stored:
+                    summary["duplicate_stored"] += 1
                 if reason == "opt_out":
-                    bssid = row["MAC"].strip().lower()
+                    opted_out.add(bssid)
                     if bssid in stored and bssid not in summary["opted_out_but_published"]:
                         summary["opted_out_but_published"].append(bssid)
             else:
-                known.add(record["bssid"])
+                known.add(bssid)
                 added.append(record)
+    # An opt-out anywhere in the batch wins over the same BSSID seen without the suffix
+    # (in any file order): never publish it. Its kept row is recounted as an opt-out.
+    withheld = [r for r in added if r["bssid"] in opted_out]
+    if withheld:
+        added = [r for r in added if r["bssid"] not in opted_out]
+        summary["dropped"]["opt_out"] += len(withheld)
     summary["added"] = len(added)
 
     if dry_run:
@@ -363,6 +438,10 @@ def format_summary(summary):
     out.append("rows dropped:")
     for reason, label in REASONS:
         out.append(reason_line(label + ":", summary["dropped"][reason]))
+        if reason == "duplicate":
+            stored = summary["duplicate_stored"]
+            out.append("    {:<15}{}".format("in database:", stored))
+            out.append("    {:<15}{}".format("in this batch:", summary["dropped"][reason] - stored))
     out.append(line("rows added:", summary["added"]))
     if summary["opted_out_but_published"]:
         out.append("")

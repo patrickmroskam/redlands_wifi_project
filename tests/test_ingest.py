@@ -294,6 +294,202 @@ class DropReasons(PipelineCase):
         self.assertIn("rows read:         1", out)
 
 
+class BssidDedupe(PipelineCase):
+    """Issue #15: the BSSID is the network's identity, whatever its spelling."""
+
+    def net(self, bssid, ssid="Stored"):
+        return {"bssid": bssid, "ssid": ssid, "auth": "[OPEN]", "channel": 1,
+                "first_seen": "2024-01-01 00:00:00", "lat": 34.05, "lon": -117.18}
+
+    def test_normalize_accepts_every_supported_spelling(self):
+        for raw in ("aa:bb:cc:0d:0e:0f", "AA:BB:CC:0D:0E:0F", "aa-bb-cc-0d-0e-0f",
+                    "AA-BB-CC-0D-0E-0F", "aabb.cc0d.0e0f", "AABB.CC0D.0E0F",
+                    "aabbcc0d0e0f", "  AaBbCc0d0E0f\t"):
+            self.assertEqual(ingest.normalize_bssid(raw), "aa:bb:cc:0d:0e:0f", raw)
+
+    def test_normalize_rejects_malformed_addresses(self):
+        for raw in ("", "   ", "aa:bb:cc:dd:ee", "aa:bb:cc:dd:ee:ff:00", "aa:bb:cc:dd:ee:fg",
+                    "aa:bb-cc:dd:ee:ff", "a:bb:cc:dd:ee:fff", "aabbccddeef",
+                    "aabbccddeeff0", "aa:bb:cc:dd:ee:ff ,x", "aabb.ccdd.eef",
+                    "aa bb cc dd ee ff", "aa::bb:cc:dd:ee:ff", "ａａ:bb:cc:dd:ee:ff",
+                    "٠٠:bb:cc:dd:ee:ff", None, 42):
+            self.assertIsNone(ingest.normalize_bssid(raw), repr(raw))
+
+    def test_rows_are_stored_in_canonical_form(self):
+        self.put("a.log", HEADER + row("AA-BB-CC-00-00-10") + row("aabb.cc00.0011")
+                 + row("AABBCC000012"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["aa:bb:cc:00:00:10", "aa:bb:cc:00:00:11", "aa:bb:cc:00:00:12"])
+
+    def test_separator_and_case_variants_are_duplicates_within_a_batch(self):
+        self.put("a.log", HEADER + row("AA:BB:CC:00:00:20", ssid="first")
+                 + row("aa-bb-cc-00-00-20", ssid="dash") + row("aabb.cc00.0020", ssid="dot")
+                 + row("AABBCC000020", ssid="bare"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["ssid"] for n in self.read_db()["networks"]], ["first"])
+        self.assertIn("duplicate:       3", out)
+        self.assertIn("in database:   0", out)
+        self.assertIn("in this batch: 3", out)
+
+    def test_variant_of_a_stored_bssid_never_overwrites_it(self):
+        self.write_db([self.net("aa:bb:cc:00:00:21")])
+        before = self.read_db()
+        self.put("a.log", HEADER + row("AA-BB-CC-00-00-21", ssid="Changed")
+                 + row("aabbcc000021", ssid="Again"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_db(), before)
+        self.assertIn("in database:   2", out)
+        self.assertIn("in this batch: 0", out)
+
+    def test_duplicates_across_batches(self):
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:22", ssid="day one"))
+        self.run_pipeline()
+        self.put("b.log", HEADER + row("AA-BB-CC-00-00-22", ssid="day two")
+                 + row("aa:bb:cc:00:00:23", ssid="new"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([(n["bssid"], n["ssid"]) for n in self.read_db()["networks"]],
+                         [("aa:bb:cc:00:00:22", "day one"), ("aa:bb:cc:00:00:23", "new")])
+        self.assertIn("in database:   1", out)
+        self.assertEqual(self.inbox_files(), [])
+
+    def test_malformed_macs_are_dropped_as_malformed(self):
+        self.put("a.log", HEADER + row("aa:bb:cc:dd:ee") + row("zz:bb:cc:dd:ee:ff")
+                 + row("aa:bb:cc:dd:ee:ff:00") + row("aa:bb:cc:00:00:24"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["aa:bb:cc:00:00:24"])
+        self.assertIn("malformed:       3", out)
+
+    def test_same_ssid_on_different_bssids_is_kept_as_distinct_networks(self):
+        # Mesh nodes and dual-band radios: one SSID, several BSSIDs. Not duplicates.
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:30", ssid="HomeMesh", channel="6")
+                 + row("aa:bb:cc:00:00:31", ssid="HomeMesh", channel="36")
+                 + row("ae:bb:cc:00:00:30", ssid="HomeMesh", channel="149"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_db()["count"], 3)
+        self.assertIn("duplicate:       0", out)
+
+    def test_cell_rows_with_tower_ids_count_as_not_wifi(self):
+        self.put("a.log", HEADER + row("310260_7_1234", typ="LTE") + row("310410_1_2", typ="GSM")
+                 + row("aa:bb:cc:00:00:25"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertIn("not wifi:        2", out)
+        self.assertIn("malformed:       0", out)
+
+    def test_invisible_characters_around_a_mac_are_ignored(self):
+        self.put("a.log", HEADER + row("\ufeffAA:BB:CC:00:00:26") + row("\u200baabbcc000027\u200b"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["aa:bb:cc:00:00:26", "aa:bb:cc:00:00:27"])
+
+    def test_opt_out_anywhere_in_the_batch_wins_in_either_file_order(self):
+        for first, second in (("Home_nomap", "Home"), ("Home", "Home_nomap")):
+            with self.subTest(first=first):
+                self.write_db([])
+                self.put("wardrive_1.log", HEADER + row("aa:bb:cc:00:00:50", ssid=first)
+                         + row("aa:bb:cc:00:00:51", ssid="Neighbour"))
+                self.put("wardrive_2.log", HEADER + row("AA-BB-CC-00-00-50", ssid=second)
+                         + row("aa:bb:cc:00:00:50", ssid="Home"))
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 0)
+                self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                                 ["aa:bb:cc:00:00:51"])
+                self.assertIn("rows added:        1", out)
+                self.assertIn("opt-out:         2", out)
+                self.assertIn("duplicate:       1", out)
+                self.assertEqual(self.inbox_files(), [])
+
+    def test_opt_out_in_batch_withholds_but_does_not_touch_other_networks(self):
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:52", ssid="Cafe")
+                 + row("aa:bb:cc:00:00:53", ssid="Cafe")
+                 + row("aa:bb:cc:00:00:52", ssid="Cafe_optout"))
+        _, dry = self.run_pipeline("--dry-run")
+        self.assertIn("rows added:        1", dry)
+        self.run_pipeline()
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["aa:bb:cc:00:00:53"])
+
+    def assert_fatal_and_untouched(self, networks, *expected):
+        self.write_db(networks)
+        with open(self.db, "rb") as fh:
+            before = fh.read()
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:99"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+        with open(self.db, "rb") as fh:
+            self.assertEqual(fh.read(), before)
+        self.assertIn("needs a manual fix", out)
+        self.assertIn("nothing was written or deleted", out)
+        for text in expected:
+            self.assertIn(text, out)
+
+    def test_stored_exact_duplicates_are_fatal(self):
+        self.assert_fatal_and_untouched(
+            [self.net("aa:bb:cc:00:00:40"), self.net("aa:bb:cc:00:00:41"),
+             self.net("aa:bb:cc:00:00:40")],
+            "1 duplicate bssid(s): #0 and #2 (aa:bb:cc:00:00:40)")
+
+    def test_stored_duplicates_differing_in_case_or_separator_are_fatal(self):
+        self.assert_fatal_and_untouched(
+            [self.net("aa:bb:cc:00:00:42"), self.net("AA-BB-CC-00-00-42"),
+             self.net("aabb.cc00.0042")],
+            "2 duplicate bssid(s)", "#0 and #1", "#0 and #2")
+
+    def test_stored_malformed_or_missing_bssid_is_fatal(self):
+        missing = self.net("x")
+        del missing["bssid"]
+        self.assert_fatal_and_untouched(
+            [self.net("aa:bb:cc:00:00:43"), self.net("not-a-mac"), missing, self.net(None)],
+            '3 network(s) with a malformed bssid: #1 "not-a-mac", #2 null, #3 null')
+
+    def test_fatal_report_is_capped(self):
+        self.assert_fatal_and_untouched(
+            [self.net("aa:bb:cc:00:00:44") for _ in range(13)],
+            "12 duplicate bssid(s)", "(+2 more)")
+
+    def test_dry_run_also_refuses_a_database_with_duplicates(self):
+        self.write_db([self.net("aa:bb:cc:00:00:45"), self.net("AA:BB:CC:00:00:45")])
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:46"))
+        code, out = self.run_pipeline("--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("duplicate bssid", out)
+
+    def test_stored_valid_non_canonical_spelling_is_accepted(self):
+        self.write_db([self.net("AA-BB-CC-00-00-47")])
+        self.put("a.log", HEADER + row("aa:bb:cc:00:00:47") + row("aa:bb:cc:00:00:48"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["AA-BB-CC-00-00-47", "aa:bb:cc:00:00:48"])
+
+    def test_opt_out_of_published_network_matches_any_spelling(self):
+        self.write_db([self.net("aa:bb:cc:00:00:49")])
+        self.put("a.log", HEADER + row("AA-BB-CC-00-00-49", ssid="Home_nomap"))
+        _, out = self.run_pipeline()
+        self.assertIn("already published but now opted out", out)
+        self.assertIn("  aa:bb:cc:00:00:49", out)
+
+
+class CommittedDatabase(unittest.TestCase):
+    """The published database must pass the pipeline's own checks (catches hand edits in PRs)."""
+
+    def test_committed_database_has_canonical_unique_bssids(self):
+        path = os.path.join(REPO, "data", "networks.json")
+        db = ingest.load_db(path)
+        ingest.stored_bssids(db, path)  # raises FatalError on malformed/duplicate
+        for net in db["networks"]:
+            self.assertEqual(net["bssid"], ingest.normalize_bssid(net["bssid"]))
+        self.assertEqual(db["count"], len(db["networks"]))
+
+
 class FieldNormalisation(unittest.TestCase):
     def test_first_seen_is_zero_padded_when_parseable(self):
         self.assertEqual(ingest.normalize_first_seen("2025-3-1 3:8:0"), "2025-03-01 03:08:00")
@@ -479,7 +675,8 @@ class FilesAndExitCodes(PipelineCase):
     def test_summary_lists_every_reason(self):
         code, out = self.run_pipeline()
         for label in ("files processed", "rows read", "bad coords", "outside area",
-                      "not wifi", "opt-out", "duplicate", "malformed", "rows added"):
+                      "not wifi", "opt-out", "duplicate", "in database", "in this batch",
+                      "malformed", "rows added"):
             self.assertIn(label, out)
 
 

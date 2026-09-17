@@ -59,6 +59,14 @@
     return Number(value);
   }
 
+  // A network's identity is its BSSID, whatever its spelling (case, ':' '-' '.' separators).
+  // Returns '' when there is no usable BSSID; such records are still shown.
+  function bssidKey(value) {
+    if (typeof value !== 'string') return '';
+    var hex = value.toLowerCase().replace(/[^0-9a-f]/g, '');
+    return hex.length === 12 ? hex : '';
+  }
+
   function formatUpdated(value) {
     if (!value) return 'never';
     var text = String(value);
@@ -129,12 +137,23 @@
     if (!db || !Array.isArray(db.networks)) throw new Error('database is not in the expected format');
     var plotted = 0;
     var skipped = 0;
+    var duplicates = 0;
+    var seen = Object.create(null);
     db.networks.forEach(function (net) {
       var lat = toCoord(net && net.lat);
       var lon = toCoord(net && net.lon);
       if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) {
         skipped += 1;
         return;
+      }
+      // Defense in depth: the pipeline never stores a BSSID twice, but one marker per network regardless.
+      var key = bssidKey(net.bssid);
+      if (key) {
+        if (seen[key]) {
+          duplicates += 1;
+          return;
+        }
+        seen[key] = true;
       }
       var kind = isEncrypted(net.auth) ? 'encrypted' : 'open';
       var marker = L.circleMarker([lat, lon], {
@@ -152,6 +171,9 @@
       ' mapped · last updated ' + formatUpdated(db.updated_at);
     if (skipped > 0) {
       console.warn('Skipped ' + skipped + ' network record(s) with invalid coordinates.');
+    }
+    if (duplicates > 0) {
+      console.warn('Skipped ' + duplicates + ' duplicate network record(s) (same BSSID).');
     }
   }).catch(function (err) {
     statsEl.textContent = '> database unavailable';
