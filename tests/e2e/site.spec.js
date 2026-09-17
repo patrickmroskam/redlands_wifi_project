@@ -293,6 +293,48 @@ test('privacy page links back to the map', async ({ page }) => {
   await expect(page.getByRole('link', { name: /back to the map/i })).toHaveAttribute('href', 'index.html');
 });
 
+test('privacy page covers every required section (R6)', async ({ page }) => {
+  await page.goto('/privacy.html');
+  await expect(page.locator('header time')).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}$/);
+
+  const sections = {
+    '#published': [/SSID/, /BSSID/, /Auth mode/, /Channel/, /Approximate location/, /First seen/],
+    '#not-collected': [/No personal information/i],
+    '#how': [/beacon/i, /never connects/i],
+    '#where': [/92373/, /92374/, /thrown away/i, /opted out/i, /history/i],
+    '#opt-out': [/_nomap/, /_optout/, /uppercase\s+or\s+lowercase/i, /not remembered/i],
+    '#removal': [/do not need to email/i, /Issues are public/i, /_nomap/],
+    '#visitors': [/No cookies/i, /No analytics/i, /No accounts/i],
+  };
+  for (const [id, patterns] of Object.entries(sections)) {
+    const section = page.locator(`main section${id}`);
+    await expect(section.getByRole('heading', { level: 2 })).toBeVisible();
+    for (const pattern of patterns) await expect(section).toContainText(pattern);
+    // Every section is reachable from the table of contents.
+    await expect(page.locator(`nav.toc a[href="${id}"]`)).toHaveCount(1);
+  }
+  // Every table-of-contents entry points at a real section.
+  for (const href of await page.locator('nav.toc a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
+    await expect(page.locator(`main section${href}`)).toHaveCount(1);
+  }
+  // Both third-party services that see visitors' IP addresses are disclosed.
+  for (const service of ['GitHub Pages', 'OpenStreetMap']) {
+    await expect(page.locator('#visitors li', { hasText: service })).toContainText(/IP address/);
+  }
+
+  // R6.5: removal requests go to a new GitHub issue, no email address.
+  await expect(page.locator('#removal a[href="https://github.com/patrickmroskam/redlands_wifi_project/issues/new"]'))
+    .toBeVisible();
+  await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
+
+  // External links never leak the opener or the full referrer.
+  const externals = page.locator('a[href^="http"]');
+  expect(await externals.count()).toBeGreaterThan(0);
+  for (const link of await externals.all()) {
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  }
+});
+
 test('site sets no cookies or storage (R1.6)', async ({ page, context }) => {
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
@@ -301,9 +343,9 @@ test('site sets no cookies or storage (R1.6)', async ({ page, context }) => {
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
 });
 
-for (const pagePath of ['/index.html', '/privacy.html']) {
-  test(`no horizontal overflow at 360 px on ${pagePath} (R1.4)`, async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 740 });
+for (const [pagePath, width] of [['/index.html', 360], ['/privacy.html', 360], ['/privacy.html', 1280]]) {
+  test(`no horizontal overflow at ${width} px on ${pagePath} (R1.4)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 740 });
     await useFixture(page, FIXTURE_3);
     await page.goto(pagePath);
     if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);

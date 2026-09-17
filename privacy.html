@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Privacy policy — Redlands Wifi Project</title>
+  <meta name="description" content="What the Redlands Wifi Project publishes about WiFi networks, how to opt out, and how to ask for a removal.">
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -12,18 +14,181 @@
   <header class="banner banner-small">
     <p class="prompt" aria-hidden="true">root@redlands:~$ cat privacy.txt</p>
     <h1 class="banner-title">Privacy policy<span class="cursor" aria-hidden="true"></span></h1>
+    <p class="tagline">Last updated: <time datetime="2026-09-17">September 17, 2026</time></p>
   </header>
 
   <main class="prose">
-    <p>The full privacy policy is coming soon.</p>
-    <p>
-      In short: this site publishes only information that WiFi networks broadcast publicly.
-      To keep your network off the map, add <code>_nomap</code> to the end of its name (SSID).
+    <p class="lede">
+      <strong>Short version:</strong> this site maps WiFi networks that announce themselves
+      over the air in Redlands, CA. It publishes what those networks broadcast to everyone
+      nearby, never who uses them. To keep your network off the map, add <code>_nomap</code>
+      to the end of its name. To remove a network that is already on the map,
+      <a href="https://github.com/patrickmroskam/redlands_wifi_project/issues/new" rel="noopener noreferrer">open an issue</a>.
     </p>
+
+    <nav class="toc" aria-labelledby="toc-heading">
+      <h2 id="toc-heading">Contents</h2>
+      <ol>
+        <li><a href="#about">About this project</a></li>
+        <li><a href="#published">What we publish</a></li>
+        <li><a href="#not-collected">What we don't collect</a></li>
+        <li><a href="#how">How networks are observed</a></li>
+        <li><a href="#where">Where we map</a></li>
+        <li><a href="#opt-out">Opting out</a></li>
+        <li><a href="#removal">Removal requests</a></li>
+        <li><a href="#visitors">Visiting this site</a></li>
+        <li><a href="#changes">Changes to this policy</a></li>
+      </ol>
+    </nav>
+
+    <section id="about" aria-labelledby="about-heading">
+      <h2 id="about-heading">About this project</h2>
+      <p>
+        The Redlands Wifi Project is a hobby project. One person travels around Redlands with a
+        small WiFi scanner, and this site plots the networks it heard. It works like
+        <a href="https://wigle.net/" rel="noopener noreferrer">WiGLE</a>, but only for Redlands.
+        Everything, including the code and the map data, is public in the
+        <a href="https://github.com/patrickmroskam/redlands_wifi_project" rel="noopener noreferrer">project's GitHub repository</a>.
+      </p>
+    </section>
+
+    <section id="published" aria-labelledby="published-heading">
+      <h2 id="published-heading">What we publish</h2>
+      <p>For each network, the map shows only these details:</p>
+      <dl class="fields">
+        <dt>SSID</dt>
+        <dd>The network name it broadcasts (shown as "hidden" if blank).</dd>
+        <dt>BSSID</dt>
+        <dd>The hardware (MAC) address of the access point, which is broadcast with every beacon.</dd>
+        <dt>Auth mode</dt>
+        <dd>The kind of security the network advertises, such as open, WEP, or WPA2.</dd>
+        <dt>Channel</dt>
+        <dd>The radio channel the network was heard on.</dd>
+        <dt>Approximate location</dt>
+        <dd>Where the scanner was when it heard the network. This is the scanner's position on the
+          street, not the exact spot of the router, and it can be off by many meters.</dd>
+        <dt>First seen</dt>
+        <dd>The date and time the network was first recorded for the map, by the scanner's clock.</dd>
+      </dl>
+      <p>
+        When a network is heard again, its map entry is not changed. The map does not show how a
+        network moves or changes over time.
+      </p>
+    </section>
+
+    <section id="not-collected" aria-labelledby="not-collected-heading">
+      <h2 id="not-collected-heading">What we don't collect</h2>
+      <ul role="list">
+        <li>No personal information: no names, addresses, phone numbers, or emails.</li>
+        <li>Nothing about the people or devices using a network: no phones, laptops, or client addresses.</li>
+        <li>No passwords and no network traffic. We never see what anyone sends or receives.</li>
+        <li>The map does not show signal strength, altitude, or GPS accuracy. (The raw scan files
+          do contain them; see <a href="#where">Where we map</a>.)</li>
+      </ul>
+    </section>
+
+    <section id="how" aria-labelledby="how-heading">
+      <h2 id="how-heading">How networks are observed</h2>
+      <p>
+        WiFi access points constantly broadcast short "beacon" messages that announce their
+        name, address, and security type to any device in range. Your phone uses these same
+        messages to list nearby networks, and the scanner collects them the
+        same way.
+      </p>
+      <p>
+        The scanner never connects to a network, never tries to log in or guess a password,
+        and never looks at anyone's traffic.
+      </p>
+    </section>
+
+    <section id="where" aria-labelledby="where-heading">
+      <h2 id="where-heading">Where we map</h2>
+      <p>
+        The map covers only ZIP codes <strong>92373</strong> and <strong>92374</strong> in
+        Redlands, California. Each time the map is updated, any network heard outside those two
+        ZIP codes is thrown away and never added to the map.
+      </p>
+      <p>
+        To be transparent about the raw scan files:
+      </p>
+      <ul role="list">
+        <li>They are uploaded to the project's public repository, and can be downloaded from
+          this site, until an update processes them. Updates do not run on a schedule yet, so
+          files can wait there for a while. A file that can't be read is kept until a person
+          fixes it.</li>
+        <li>They contain everything the scanner heard: networks outside Redlands, networks that
+          opted out, signal strength, altitude, GPS accuracy, and the scanner's timestamped route.</li>
+        <li>After an update deletes them, the repository's history still keeps a copy.</li>
+      </ul>
+    </section>
+
+    <section id="opt-out" aria-labelledby="opt-out-heading">
+      <h2 id="opt-out-heading">Opting out</h2>
+      <p>
+        Add <code>_nomap</code> to the end of your network's name (SSID), for example
+        <code>MyHomeWiFi_nomap</code>. While its name ends that way, the scanner's sightings of
+        it are skipped and not added to the map. (<code>_optout</code> works too, and uppercase
+        or lowercase doesn't matter.)
+      </p>
+      <p>
+        Renaming a network does not remove an entry that is already on the map. For that,
+        send a removal request. The opt-out is not remembered: if you later remove
+        <code>_nomap</code> from the name, the network can be added the next time it is heard.
+      </p>
+    </section>
+
+    <section id="removal" aria-labelledby="removal-heading">
+      <h2 id="removal-heading">Removal requests</h2>
+      <p>
+        To have a network removed from the map,
+        <a href="https://github.com/patrickmroskam/redlands_wifi_project/issues/new" rel="noopener noreferrer">open a new issue on the project's GitHub page</a>.
+        You do not need to email anyone. You will need a free GitHub account.
+      </p>
+      <ul role="list">
+        <li>Include the network's BSSID (MAC address) or its name, plus the nearest street or intersection.</li>
+        <li><strong>Issues are public.</strong> Don't include your name, your home address, or anything else personal.</li>
+        <li>A person reviews each request and removes the entry by hand.</li>
+        <li>Also add <code>_nomap</code> to the network's name. Otherwise, the next scan that hears
+          it could put it back on the map.</li>
+        <li>Older versions of the map data stay in the repository's history.</li>
+      </ul>
+    </section>
+
+    <section id="visitors" aria-labelledby="visitors-heading">
+      <h2 id="visitors-heading">Visiting this site</h2>
+      <ul role="list">
+        <li>No accounts and no sign-in.</li>
+        <li>No cookies and no local storage.</li>
+        <li>No analytics, ads, or trackers.</li>
+      </ul>
+      <p>Two outside services still see a visitor's IP address:</p>
+      <ul role="list">
+        <li>
+          <strong>GitHub Pages</strong> hosts the site, so GitHub receives each page request, including your IP address.
+          See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer">GitHub privacy statement</a>.
+        </li>
+        <li>
+          <strong>OpenStreetMap</strong> serves the map tiles. The tile servers see your IP address and
+          which part of the map you are looking at, and this site's address, but not which page you
+          were on. See the
+          <a href="https://osmfoundation.org/wiki/Privacy_Policy" rel="noopener noreferrer">OpenStreetMap Foundation privacy policy</a>.
+        </li>
+      </ul>
+    </section>
+
+    <section id="changes" aria-labelledby="changes-heading">
+      <h2 id="changes-heading">Changes to this policy</h2>
+      <p>
+        When this policy changes, the "last updated" date at the top changes too. Every earlier
+        version is kept in the
+        <a href="https://github.com/patrickmroskam/redlands_wifi_project/commits/main/privacy.html" rel="noopener noreferrer">repository's history</a>.
+      </p>
+    </section>
   </main>
 
   <footer class="footer">
     <p><a href="index.html">&lt; Back to the map</a></p>
+    <p class="fine">No accounts. No cookies. No analytics.</p>
   </footer>
 </body>
 </html>
