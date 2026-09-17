@@ -7,6 +7,11 @@
   // Used only if the boundary file fails to load: bbox of ZCTA 92373 + 92374.
   var FALLBACK_BOUNDS = [[33.93438, -117.24996], [34.09923, -117.03414]];
   var COLORS = { encrypted: '#33ff66', open: '#ffb000' };
+  // Keep auto-panned popups clear of the zoom control (top left); Leaflet's default elsewhere.
+  var POPUP_OPTIONS = { autoPanPaddingTopLeft: [50, 10], autoPanPaddingBottomRight: [5, 5] };
+  // Extra room on every side of the popup when the fence is loosened for it. Must cover the largest
+  // auto-pan padding above (50) plus the popup tip below the box (~20, outside offsetHeight).
+  var POPUP_SLACK = 60;
 
   var statsEl = document.getElementById('stats');
   var errorEl = document.getElementById('error');
@@ -117,8 +122,34 @@
     if (fenceBounds) updateMinZoom();
   });
 
+  // Leaflet auto-pans an opening popup into view, but the fence's moveend handler snaps the view
+  // straight back, leaving the popup clipped by the map edge (on a tall phone screen the fence is
+  // shorter than the map, so there is no room at all). While a popup is open, loosen the fence by
+  // that popup's size at the current zoom; the exact fence returns, and pans back, when it closes.
+  map.on('autopanstart', function () {
+    var popup = map.getPane('popupPane').lastElementChild;
+    if (!fenceBounds || !popup) return;
+    var zoom = map.getZoom();
+    var slack = L.point(popup.offsetWidth + POPUP_SLACK, popup.offsetHeight + POPUP_SLACK);
+    map.setMaxBounds(L.latLngBounds(
+      map.unproject(map.project(fenceBounds.getNorthWest(), zoom).subtract(slack), zoom),
+      map.unproject(map.project(fenceBounds.getSouthEast(), zoom).add(slack), zoom)));
+  });
+
+  // Switching markers closes one popup and opens the next in the same tick. Restore the fence only
+  // once no popup is open, or its snap-back would pan the new popup out of view again. If a popup
+  // reopened before the check, the fence stays loose until that popup closes, which restores it.
+  var openPopups = 0;
+  map.on('popupopen', function () { openPopups += 1; });
+  map.on('popupclose', function () {
+    openPopups -= 1;
+    setTimeout(function () {
+      if (fenceBounds && openPopups === 0) map.setMaxBounds(fenceBounds);
+    }, 0);
+  });
+
   // Expose read-only hooks for the smoke test.
-  window.__rwp = { map: map, markers: [] };
+  window.__rwp = { map: map, markers: [], fence: function () { return fenceBounds; } };
 
   var boundaryReady = fetchJson(BOUNDARY_URL).then(function (geo) {
     var layer = L.geoJSON(geo, {
@@ -163,7 +194,7 @@
         fillColor: COLORS[kind],
         fillOpacity: 0.9,
         className: 'net-marker net-' + kind
-      }).bindPopup(popupFor(net)).addTo(map);
+      }).bindPopup(popupFor(net), POPUP_OPTIONS).addTo(map);
       window.__rwp.markers.push(marker);
       plotted += 1;
     });

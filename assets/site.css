@@ -13,7 +13,9 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { background: var(--bg); }
+html { background: var(--bg); color-scheme: dark; }
+
+::selection { background: var(--green); color: var(--bg); }
 
 body {
   margin: 0;
@@ -62,7 +64,18 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   margin: 0 0 6px;
   color: var(--green-dim);
   font-size: 0.8rem;
-  overflow-wrap: anywhere;
+  /* Decorative (aria-hidden): one line, clipped rather than wrapped, typed in on load.
+     The box hugs the text so the clip reveals it at an even pace (about one step per character). */
+  width: fit-content;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: type-in 1.4s steps(40, end) 0.2s both;
+}
+
+@keyframes type-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
 
 .banner-title {
@@ -94,7 +107,7 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 @keyframes blink { 50% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .cursor { animation: none; }
+  .cursor, .prompt { animation: none; }
 }
 
 .tagline { margin: 8px 0 0; color: var(--amber); }
@@ -181,12 +194,25 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   border: 1px solid var(--green-dim);
   border-radius: 0;
 }
-.leaflet-popup-content { margin: 10px 12px; font-size: 13px; }
-.leaflet-container a.leaflet-popup-close-button { color: var(--amber); }
+.leaflet-popup-content {
+  /* Right margin leaves room for the close button. The width cap keeps the whole popup inside
+     the map on a phone: map = viewport - 34 px (page padding + frame); the popup adds 42 px of
+     content margin + 2 px of wrapper padding/border; auto-pan keeps 50 px left (clear of the zoom
+     control, POPUP_OPTIONS in map.js) and 5 px right. 34 + 42 + 2 + 50 + 5 = 133, rounded to 140. */
+  margin: 10px 30px 10px 12px;
+  max-width: min(300px, calc(100vw - 140px));
+  font-size: 13px;
+}
+.leaflet-container a.leaflet-popup-close-button { width: 28px; height: 28px; font: 22px/28px var(--mono); color: var(--amber); }
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus { color: #ffd166; }
 .leaflet-control-attribution { background: rgba(0, 0, 0, 0.7) !important; color: var(--green-dim); }
 .leaflet-control-attribution a { color: var(--amber); }
 .leaflet-bar a { background: var(--panel); color: var(--green); border-color: var(--line); }
 .leaflet-bar a:hover { background: #122212; color: var(--amber); }
+/* Leaflet's own rule for the zoom button at its limit is light grey; keep it dark, just dimmer. */
+.leaflet-bar a.leaflet-disabled,
+.leaflet-bar a.leaflet-disabled:hover { background: var(--panel); color: #3d5c44; cursor: not-allowed; }
 
 .net-popup { margin: 0; }
 .net-popup dt { color: var(--green-dim); }
