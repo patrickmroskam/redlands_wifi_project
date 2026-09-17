@@ -158,12 +158,12 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
-.prose h2::before { content: "## "; color: var(--green-dim); }
+.prose h2::before { content: "## " / ""; color: var(--green-dim); }
 .prose section { scroll-margin-top: 12px; }
 .prose ul, .prose ol { margin: 8px 0; padding-left: 1.4em; }
 .prose li { margin: 4px 0; }
 .prose ul { list-style: none; padding-left: 1.4em; }
-.prose ul li::before { content: "> "; margin-left: -1.4em; color: var(--green-dim); }
+.prose ul li::before { content: "> " / ""; margin-left: -1.4em; color: var(--green-dim); }
 .lede { padding: 10px 14px; border: 1px solid var(--line); background: var(--panel); }
 .toc { margin: 16px 0; padding: 4px 14px 8px; border-left: 2px solid var(--green-dim); }
 .toc h2 { margin-top: 8px; }

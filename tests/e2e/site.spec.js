@@ -301,10 +301,10 @@ test('privacy page covers every required section (R6)', async ({ page }) => {
     '#published': [/SSID/, /BSSID/, /Auth mode/, /Channel/, /Approximate location/, /First seen/],
     '#not-collected': [/No personal information/i],
     '#how': [/beacon/i, /never connects/i],
-    '#where': [/92373/, /92374/, /thrown away/i],
-    '#opt-out': [/_nomap/],
-    '#removal': [/do not need to email/i, /Issues are public/i],
-    '#visitors': [/No cookies/i, /No analytics/i, /No accounts/i, /OpenStreetMap/, /IP address/i],
+    '#where': [/92373/, /92374/, /thrown away/i, /opted out/i, /history/i],
+    '#opt-out': [/_nomap/, /_optout/, /uppercase\s+or\s+lowercase/i, /not remembered/i],
+    '#removal': [/do not need to email/i, /Issues are public/i, /_nomap/],
+    '#visitors': [/No cookies/i, /No analytics/i, /No accounts/i],
   };
   for (const [id, patterns] of Object.entries(sections)) {
     const section = page.locator(`main section${id}`);
@@ -312,6 +312,14 @@ test('privacy page covers every required section (R6)', async ({ page }) => {
     for (const pattern of patterns) await expect(section).toContainText(pattern);
     // Every section is reachable from the table of contents.
     await expect(page.locator(`nav.toc a[href="${id}"]`)).toHaveCount(1);
+  }
+  // Every table-of-contents entry points at a real section.
+  for (const href of await page.locator('nav.toc a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
+    await expect(page.locator(`main section${href}`)).toHaveCount(1);
+  }
+  // Both third-party services that see visitors' IP addresses are disclosed.
+  for (const service of ['GitHub Pages', 'OpenStreetMap']) {
+    await expect(page.locator('#visitors li', { hasText: service })).toContainText(/IP address/);
   }
 
   // R6.5: removal requests go to a new GitHub issue, no email address.
