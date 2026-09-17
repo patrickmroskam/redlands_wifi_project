@@ -166,17 +166,20 @@
     return el;
   }
 
-  function row(className, category, label, count, share, swatch) {
+  // One table row. opts.swatch draws the category colour; opts.context is read by screen readers only.
+  function row(className, category, label, count, share, opts) {
+    opts = opts || {};
     var tr = document.createElement('tr');
     tr.className = className;
     tr.setAttribute('data-category', category);
     var th = cell('th', null, 'cat-name');
     th.setAttribute('scope', 'row');
-    if (swatch) {
+    if (opts.swatch) {
       var sw = cell('span', null, 'pie-swatch cat-' + category);
       sw.setAttribute('aria-hidden', 'true');
       th.appendChild(sw);
     }
+    if (opts.context) th.appendChild(cell('span', opts.context + ' ', 'visually-hidden'));
     th.appendChild(cell('span', label, 'cat-label'));
     tr.appendChild(th);
     tr.appendChild(cell('td', count, 'cat-count'));
@@ -185,16 +188,9 @@
   }
 
   // Right column (#13): the same numbers as the pie, as a table, plus the default-looking split.
-  function renderList(nets, counts, pct, total) {
+  // split = security categories of the default-looking networks; hidden = blank-name count.
+  function renderList(counts, split, hidden, pct, total) {
     if (!list) return;
-    var labels = {};
-    var split = {};
-    CATEGORIES.forEach(function (c) { labels[c.id] = c.label; split[c.id] = 0; });
-    var hidden = 0;
-    nets.forEach(function (net) {
-      if (classify(net) === 'default') split[securityCategory(net)] += 1;
-      if (isHidden(net)) hidden += 1;
-    });
 
     var table = cell('table', null, 'cat-table');
     table.id = 'category-table';
@@ -212,18 +208,19 @@
     var body = document.createElement('tbody');
     CATEGORIES.forEach(function (c) {
       body.appendChild(row('cat-row', c.id, c.label, formatCount(counts[c.id]),
-        pct[c.id].toFixed(1) + '%', true));
+        pct[c.id].toFixed(1) + '%', { swatch: true }));
       if (c.id !== 'default') return;
       CATEGORIES.forEach(function (s) {
         if (s.id === 'default' || split[s.id] === 0) return;
         // The share cell stays blank so the Share column still adds up to 100%.
-        body.appendChild(row('sub-row', s.id, 'on ' + s.label, formatCount(split[s.id]), '', false));
+        body.appendChild(row('sub-row', s.id, 'on\u00a0' + s.label, formatCount(split[s.id]), '',
+          { context: c.label }));
       });
     });
     table.appendChild(body);
 
     var foot = document.createElement('tfoot');
-    foot.appendChild(row('total-row', 'total', 'Total', formatCount(total), '100.0%', false));
+    foot.appendChild(row('total-row', 'total', 'Total', formatCount(total), '100.0%'));
     table.appendChild(foot);
 
     list.appendChild(table);
@@ -237,7 +234,17 @@
     if (!status || !chart) return;
     clear();
     nets = nets || [];
-    var counts = countCategories(nets);
+    // One pass: category counts for both columns, plus the list's default-looking split and hidden count.
+    var counts = {};
+    var split = {};
+    var hidden = 0;
+    CATEGORIES.forEach(function (c) { counts[c.id] = 0; split[c.id] = 0; });
+    nets.forEach(function (net) {
+      var category = classify(net);
+      counts[category] += 1;
+      if (category === 'default') split[securityCategory(net)] += 1;
+      if (isHidden(net)) hidden += 1;
+    });
     var total = nets.length;
     if (total === 0) {
       setStatus('> no networks mapped yet');
@@ -314,7 +321,7 @@
     chart.appendChild(legend);
     chart.appendChild(totalEl);
     chart.hidden = false;
-    renderList(nets, counts, pct, total);
+    renderList(counts, split, hidden, pct, total);
     // The status line is the live region: keep it for screen readers so they hear the chart arrive.
     setStatus('> security breakdown loaded: ' + formatCount(total) + ' networks classified', true);
   }

@@ -423,10 +423,18 @@ test('the category list shows every category with counts that match the pie (#13
   // The default-looking split sits right under its row: 3 = 1 open + 2 WPA2 (order follows the categories).
   await expect(table.locator('tbody tr')).toHaveCount(12);
   await expect(table.locator('tbody tr').nth(0)).toHaveAttribute('data-category', 'default');
+  const subRows = table.locator('tbody tr.sub-row');
+  await expect(subRows).toHaveCount(2);
   await expect(table.locator('tbody tr').nth(1)).toHaveClass('sub-row');
   await expect(table.locator('tbody tr').nth(2)).toHaveClass('sub-row');
-  await expect(listRow(page, 'open', 'sub-row')).toHaveText(['on Open', '1', '']);
-  await expect(listRow(page, 'wpa2', 'sub-row')).toHaveText(['on WPA2', '2', '']);
+  await expect(table.locator('tbody tr').nth(1)).toHaveAttribute('data-category', 'open');
+  await expect(table.locator('tbody tr').nth(2)).toHaveAttribute('data-category', 'wpa2');
+  await expect(subRows.locator('.cat-label')).toHaveText(['on Open', 'on WPA2']);
+  // Screen readers hear which row a split belongs to.
+  await expect(table.getByRole('rowheader', { name: 'Default-looking on Open' })).toHaveCount(1);
+  await expect(listRow(page, 'open', 'sub-row')).toHaveText(['Default-looking on Open', '1', '']);
+  await expect(listRow(page, 'wpa2', 'sub-row')).toHaveText(['Default-looking on WPA2', '2', '']);
+  await expect(table.locator('.sub-row .visually-hidden')).toHaveText(['Default-looking ', 'Default-looking ']);
   // Sub-rows have no swatch; category rows have one per category.
   await expect(table.locator('.sub-row .pie-swatch')).toHaveCount(0);
   await expect(rows.locator('.pie-swatch')).toHaveCount(10);
@@ -478,7 +486,7 @@ test('securityCategory ignores the name; classify puts factory names first (#13)
 test('a slice over half the pie takes the long way round (#12)', async ({ page }) => {
   const nets = [['[OPEN]', 34.0556, -117.1825], ['[OPEN]', 34.0600, -117.1700], ['[OPEN]', 34.0500, -117.1900],
     ['[WPA2_PSK]', 34.0620, -117.1650]].map(([auth, lat, lon], i) =>
-    ({ bssid: `aa:bb:cc:00:03:0${i}`, ssid: `Net${i}`, auth, lat, lon }));
+    ({ bssid: `aa:bb:cc:00:03:0${i}`, ssid: i === 3 ? '' : `Net${i}`, auth, lat, lon }));
   await page.route('**/data/networks.json', (route) => route.fulfill({
     contentType: 'application/json', body: JSON.stringify({ updated_at: null, networks: nets }) }));
   await page.goto('/index.html');
@@ -491,6 +499,8 @@ test('a slice over half the pie takes the long way round (#12)', async ({ page }
   await expect(listRow(page, 'default')).toHaveText(['Default-looking', '0', '0.0%']);
   await expect(page.locator('#category-table .sub-row')).toHaveCount(0);
   await expect(listRow(page, 'open')).toHaveText(['Open', '3', '75.0%']);
+  await expect(page.locator('#category-list .hidden-note')).toHaveText(
+    '> 1 hidden network (blank name), counted under their security type');
 });
 
 test('a single-category database draws a full circle at 100% (#12)', async ({ page }) => {
@@ -553,6 +563,25 @@ test('the breakdown says unavailable when stats.js fails to load (#12)', async (
   await expectListUnavailable(page);
 });
 
+test('a cached stats.js from before the list existed marks the list unavailable (#13)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  // Serve the old script's shape: the pie only, and no securityCategory export.
+  const fs = require('fs');
+  const current = fs.readFileSync(path.join(__dirname, '..', '..', 'assets', 'stats.js'), 'utf8');
+  const old = current
+    .replace('renderList(counts, split, hidden, pct, total);', '')
+    .replace(/setListStatus\([^)]*\);/g, '')
+    .replace('securityCategory: securityCategory,', '');
+  expect(old).not.toContain('renderList(counts, split, hidden, pct, total);');
+  expect(old).not.toContain('setListStatus(\'');
+  expect(old).not.toContain('securityCategory: ');
+  await page.route(/stats\.js$/, (route) => route.fulfill({ contentType: 'text/javascript', body: old }));
+  await page.goto('/index.html');
+  await expectMarkers(page, 3);
+  await expect(page.locator('svg.pie')).toBeVisible();
+  await expect(page.locator('#list-status')).toHaveText('> category list unavailable');
+});
+
 test('a breakdown failure leaves the map and its stats line working (#12)', async ({ page }) => {
   await useFixture(page, FIXTURE_3);
   // Break the renderer before map.js calls it.
@@ -575,22 +604,13 @@ test('a breakdown failure leaves the map and its stats line working (#12)', asyn
 
 test('a category list failure clears the pie too, so the columns never disagree (#13)', async ({ page }) => {
   await useFixture(page, FIXTURE_3);
-  // The pie reads each SSID once (to count); the list reads them again, and the first of those throws.
+  // The pie is built from svg/ul/p elements; the list starts with a <table>, and that throws.
   await page.addInitScript(() => {
-    Object.defineProperty(window, 'RWPStats', {
-      configurable: true,
-      set(value) {
-        const render = value.render;
-        value.render = (nets) => {
-          let reads = 0;
-          return render(nets.map((n) => new Proxy(n, { get(target, key) {
-            if (key === 'ssid' && ++reads > nets.length) throw new Error('boom');
-            return target[key];
-          } })));
-        };
-        Object.defineProperty(window, 'RWPStats', { value, writable: true, configurable: true });
-      },
-    });
+    const create = Document.prototype.createElement;
+    Document.prototype.createElement = function (tag, ...rest) {
+      if (String(tag).toLowerCase() === 'table') throw new Error('boom');
+      return create.call(this, tag, ...rest);
+    };
   });
   await page.goto('/index.html');
   await expectMarkers(page, 3);
@@ -775,7 +795,7 @@ test('site sets no cookies or storage (R1.6)', async ({ page, context }) => {
 
 // Responsive QA (R1.4, #7): both pages at phone, tablet, and desktop widths.
 for (const pagePath of ['/index.html', '/privacy.html']) {
-  for (const width of [360, 768, 1280]) {
+  for (const width of [320, 360, 768, 1280]) {
     test(`no horizontal overflow at ${width} px on ${pagePath} (R1.4)`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 740 });
       await useFixture(page, FIXTURE_CATEGORIES);

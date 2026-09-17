@@ -18,6 +18,9 @@
   if (!window.RWPStats) {
     var breakdownStatus = document.getElementById('security-status');
     if (breakdownStatus) breakdownStatus.textContent = '> security breakdown unavailable';
+  }
+  // A missing stats.js, or a cached one from before the list existed (#13), never fills the list.
+  if (!window.RWPStats || !window.RWPStats.securityCategory) {
     var listStatus = document.getElementById('list-status');
     if (listStatus) listStatus.textContent = '> category list unavailable';
   }

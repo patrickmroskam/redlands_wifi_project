@@ -192,12 +192,13 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 .cat-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .cat-table th, .cat-table td { padding: 2px 0; text-align: left; vertical-align: baseline; }
 .cat-table thead th { color: var(--green-dim); font-weight: normal; border-bottom: 1px dashed var(--line); }
-.cat-table .cat-name { font-weight: normal; overflow-wrap: anywhere; }
+/* A wrapped name hangs under its first line (so it can't pass for another row) and breaks between words. */
+.cat-table .cat-name { padding-left: 22px; text-indent: -22px; font-weight: normal; overflow-wrap: break-word; }
 .cat-table .cat-name .pie-swatch { display: inline-block; margin-right: 8px; vertical-align: -1px; }
 .cat-table .cat-count, .cat-table .cat-share,
 .cat-table thead th + th { padding-left: 12px; text-align: right; white-space: nowrap; }
 .cat-table .cat-count, .cat-table .cat-share { color: var(--green); }
-.cat-table .sub-row .cat-name { padding-left: 22px; color: var(--green-dim); }
+.cat-table .sub-row .cat-name { padding-left: 44px; color: var(--green-dim); }
 .cat-table .sub-row .cat-name::before { content: "└ " / ""; }
 .cat-table .sub-row .cat-count { color: var(--green-dim); }
 .cat-table tfoot th, .cat-table tfoot td { border-top: 1px dashed var(--line); color: var(--amber); font-weight: bold; }
