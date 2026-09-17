@@ -5,9 +5,10 @@ const path = require('path');
 
 const FIXTURE_3 = path.join(__dirname, '..', 'fixtures', 'networks-3.json');
 const FIXTURE_EDGE = path.join(__dirname, '..', 'fixtures', 'networks-edge.json');
+const FIXTURE_XSS = path.join(__dirname, '..', 'fixtures', 'networks-xss.json');
 
 test.beforeEach(async ({ page }) => {
-  // Keep tests deterministic: never fetch map tiles (Leaflet itself still loads from cdnjs).
+  // Keep tests deterministic: never fetch map tiles (Leaflet is vendored under assets/).
   await page.route(/tile\.openstreetmap\.org/, (route) => route.abort());
   // Any Content-Security-Policy violation fails the test.
   page.cspViolations = [];
@@ -107,6 +108,77 @@ test('SSIDs are rendered as text, never as HTML', async ({ page }) => {
   await expect(popup.locator('img')).toHaveCount(0);
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
+
+// Security (#14): every field that reaches the page is rendered as text.
+test('every popup field and the stats line render HTML payloads as text', async ({ page }) => {
+  await useFixture(page, FIXTURE_XSS);
+  await page.goto('/index.html');
+  await expect(page.locator('path.net-marker')).toHaveCount(1);
+
+  // updated_at is not a date, so the stats line echoes it verbatim — as text.
+  await expect(page.locator('#stats')).toHaveText(
+    '> 1 network mapped · last updated <img src=x onerror="window.__xss=\'updated_at\'">');
+  await expect(page.locator('#stats *')).toHaveCount(0);
+
+  await page.locator('path.net-marker').click();
+  const popup = page.locator('.leaflet-popup-content');
+  await expect(popup.locator('dd')).toHaveText([
+    "<script>window.__xss='ssid'</script>",
+    '<img src=x onerror="window.__xss=\'bssid\'">',
+    '[WPA2]<svg onload="window.__xss=\'auth\'">',
+    '<b onmouseover="window.__xss=\'channel\'">6</b>',
+    '<iframe srcdoc="<script>parent.__xss=\'first_seen\'</script>"></iframe>',
+  ]);
+  await expect(popup.locator('dd *')).toHaveCount(0);
+  // Nothing from the payloads became an element anywhere in the document.
+  await expect(page.locator('img[src="x"], iframe, b, [onerror], [onload], [onmouseover]')).toHaveCount(0);
+  await expect(page.locator('script:not([src])')).toHaveCount(0);
+  await popup.locator('dd').nth(3).hover();
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+});
+
+test('a database parse error quoting HTML is shown as text', async ({ page }) => {
+  await page.route('**/data/networks.json', (route) =>
+    route.fulfill({ contentType: 'application/json', body: '<img src=x onerror="window.__xss=1">' }));
+  await page.goto('/index.html');
+  const alert = page.getByRole('alert');
+  await expect(alert).toContainText('Could not load the network database');
+  await expect(alert.locator('*:not(p)')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+});
+
+for (const pagePath of ['/index.html', '/privacy.html']) {
+  test(`${pagePath} loads code only from its own origin and keeps a strict CSP`, async ({ page }) => {
+    const foreign = [];
+    page.on('request', (req) => {
+      const type = req.resourceType();
+      const url = new URL(req.url());
+      if (url.origin !== 'http://127.0.0.1:4173' && type !== 'image') foreign.push(`${type} ${req.url()}`);
+      if (type === 'image' && url.protocol !== 'data:' && url.hostname !== '127.0.0.1' &&
+          url.hostname !== 'tile.openstreetmap.org') foreign.push(`${type} ${req.url()}`);
+    });
+    await useFixture(page, FIXTURE_3);
+    await page.goto(pagePath);
+    if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);
+    expect(foreign).toEqual([]);
+
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("base-uri 'none'");
+    expect(csp).not.toMatch(/unsafe-|cdnjs|\*|https?:\/\/(?!tile\.openstreetmap\.org)/);
+    for (const directive of ['script-src', 'style-src']) {
+      const value = (csp.split(';').map((d) => d.trim()).find((d) => d.startsWith(directive + ' ')) || '');
+      if (value) expect(value).toBe(`${directive} 'self'`);
+    }
+
+    // Every external link opens without handing over window.opener or the page URL.
+    for (const link of await page.locator('a[href^="http"]').all()) {
+      if (await link.evaluate((a) => !!a.closest('.leaflet-control-attribution'))) continue;
+      await expect(link).toHaveAttribute('rel', /noopener/);
+      await expect(link).toHaveAttribute('rel', /noreferrer/);
+    }
+  });
+}
 
 test('edge-case records: bad coordinates skipped, placeholders and fallbacks shown', async ({ page }) => {
   await useFixture(page, FIXTURE_EDGE);

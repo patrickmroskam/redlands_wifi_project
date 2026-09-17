@@ -1,0 +1,22 @@
+# Version updates for the only two dependency surfaces: the SHA-pinned Actions and
+# the Playwright dev dependency. Monthly and grouped, so there is at most one PR per
+# ecosystem per month. Leaflet is vendored (assets/vendor/) and upgraded by hand; see
+# docs/security.md.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      npm:
+        patterns: ['*']

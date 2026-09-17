@@ -7,6 +7,8 @@ Map WiFi networks in Redlands, CA — https://patrickmroskam.github.io/redlands_
 - `ingest/` — inbox for raw wardrive logs. See [`ingest/README.md`](ingest/README.md).
 - `scripts/ingest.py` — the ingest pipeline (Python 3, standard library only).
 - `scripts/publish_ingest.sh` — runs the pipeline and commits + pushes its result (used by the daily job).
+- `assets/vendor/` — Leaflet 1.9.4, vendored so the CSP allows only this site's own scripts.
+- `docs/security.md` — security rules, CSP rationale, and the audit record.
 - `docs/spec/` — product spec (`PRD.md`) and project rules (`constitution.md`).
 
 ## The ingest pipeline

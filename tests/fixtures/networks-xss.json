@@ -1,0 +1,7 @@
+{
+  "updated_at": "<img src=x onerror=\"window.__xss='updated_at'\">",
+  "count": 1,
+  "networks": [
+    {"bssid": "<img src=x onerror=\"window.__xss='bssid'\">", "ssid": "<script>window.__xss='ssid'</script>", "auth": "[WPA2]<svg onload=\"window.__xss='auth'\">", "channel": "<b onmouseover=\"window.__xss='channel'\">6</b>", "first_seen": "<iframe srcdoc=\"<script>parent.__xss='first_seen'</script>\"></iframe>", "lat": 34.0556, "lon": -117.1825}
+  ]
+}
