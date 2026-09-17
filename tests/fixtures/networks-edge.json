@@ -1,0 +1,12 @@
+{
+  "count": 7,
+  "networks": [
+    {"bssid": "aa:bb:cc:00:00:10", "ssid": "Mesh6E", "auth": "[RSN-SAE-CCMP]", "channel": 37, "first_seen": "2026-09-14 11:00:00", "lat": 34.0500, "lon": -117.1900},
+    {"bssid": "aa:bb:cc:00:00:11", "lat": "34.0600", "lon": "-117.1700"},
+    {"bssid": "aa:bb:cc:00:00:12", "ssid": "NullLat", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "x", "lat": null, "lon": -117.18},
+    {"bssid": "aa:bb:cc:00:00:13", "ssid": "BlankLon", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "x", "lat": 34.05, "lon": ""},
+    {"bssid": "aa:bb:cc:00:00:14", "ssid": "NullIsland", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "x", "lat": 0, "lon": 0},
+    {"bssid": "aa:bb:cc:00:00:15", "ssid": "Garbage", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "x", "lat": "abc", "lon": -117.18},
+    {"bssid": "aa:bb:cc:00:00:16", "ssid": "NoLon", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "x", "lat": 34.05}
+  ]
+}

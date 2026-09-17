@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Redlands Wifi Project</title>
+  <meta name="description" content="A map of WiFi networks observed by wardriving in Redlands, California (ZIP 92373 / 92374).">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <div class="crt" aria-hidden="true"></div>
+  <header class="banner">
+    <p class="prompt" aria-hidden="true">root@redlands:~$ ./scan --zip 92373,92374</p>
+    <h1 class="banner-title">Redlands Wifi Project<span class="cursor" aria-hidden="true"></span></h1>
+    <p class="tagline">Passive wardriving map of WiFi networks in Redlands, CA</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="stats-heading">
+      <h2 id="stats-heading" class="visually-hidden">Statistics</h2>
+      <p id="stats" class="stats" aria-live="polite">&gt; loading database…</p>
+      <ul class="legend" aria-label="Map legend">
+        <li><span class="swatch swatch-encrypted" aria-hidden="true"></span> encrypted (WEP / WPA)</li>
+        <li><span class="swatch swatch-open" aria-hidden="true"></span> open</li>
+      </ul>
+    </section>
+
+    <div id="error" class="error" role="alert" hidden></div>
+
+    <section class="map-frame" aria-label="Map of observed networks">
+      <div id="map"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      <a href="privacy.html">Privacy policy &amp; opt-out</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/patrickmroskam/redlands_wifi_project">Source</a>
+    </p>
+    <p class="fine">No accounts. No cookies. No analytics.</p>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+  <script src="assets/map.js"></script>
+</body>
+</html>
