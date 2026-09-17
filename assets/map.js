@@ -101,6 +101,10 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
+  // ~18k networks: one canvas for every marker instead of one SVG element each (#11). The boundary
+  // stays SVG. Tolerance widens the tap target on phones; padding redraws less while panning.
+  var markerRenderer = L.canvas({ padding: 0.5, tolerance: 4 });
+
   var fenceBounds = null;
 
   // Lowest zoom at which the whole fenced area still fits the current map size.
@@ -170,6 +174,7 @@
     var skipped = 0;
     var duplicates = 0;
     var seen = Object.create(null);
+    var markers = L.layerGroup();
     db.networks.forEach(function (net) {
       var lat = toCoord(net && net.lat);
       var lon = toCoord(net && net.lon);
@@ -187,17 +192,20 @@
         seen[key] = true;
       }
       var kind = isEncrypted(net.auth) ? 'encrypted' : 'open';
+      // The popup is built only when it opens; 18k detached popup trees would cost memory at load.
       var marker = L.circleMarker([lat, lon], {
+        renderer: markerRenderer,
+        kind: kind,
         radius: 5,
         weight: 1,
         color: '#000',
         fillColor: COLORS[kind],
-        fillOpacity: 0.9,
-        className: 'net-marker net-' + kind
-      }).bindPopup(popupFor(net), POPUP_OPTIONS).addTo(map);
+        fillOpacity: 0.9
+      }).bindPopup(function () { return popupFor(net); }, POPUP_OPTIONS).addTo(markers);
       window.__rwp.markers.push(marker);
       plotted += 1;
     });
+    markers.addTo(map);
     statsEl.textContent = '> ' + plotted.toLocaleString('en-US') + ' network' + (plotted === 1 ? '' : 's') +
       ' mapped · last updated ' + formatUpdated(db.updated_at);
     if (skipped > 0) {

@@ -28,6 +28,37 @@ async function useFixture(page, file) {
     route.fulfill({ path: file, contentType: 'application/json' }));
 }
 
+// Markers are drawn on one canvas (#11), so there is no element per marker: tests read them
+// through the page's test hook. Resolves to the kind of each marker, in draw order.
+function markerKinds(page) {
+  return page.evaluate(() => window.__rwp.markers.map((m) => m.options.kind));
+}
+
+async function expectMarkers(page, count) {
+  await expect.poll(() => page.evaluate(() => window.__rwp.markers.length)).toBe(count);
+  // Every marker is on the map, and none of them is a DOM element of its own.
+  expect(await page.evaluate(() => window.__rwp.markers.every((m) => window.__rwp.map.hasLayer(m)))).toBe(true);
+  await expect(page.locator('#map .leaflet-overlay-pane path:not(.boundary)')).toHaveCount(0);
+}
+
+// A real mouse click on the canvas at marker n's pixel.
+async function clickMarker(page, n) {
+  const point = await page.evaluate((i) => {
+    const { map, markers } = window.__rwp;
+    const p = map.latLngToContainerPoint(markers[i].getLatLng());
+    const box = map.getContainer().getBoundingClientRect();
+    return { x: box.left + p.x, y: box.top + p.y };
+  }, n);
+  await page.mouse.click(point.x, point.y);
+}
+
+async function clickFirstMarkerOfKind(page, kind) {
+  await expect.poll(() => page.evaluate(() => window.__rwp.markers.length)).toBeGreaterThan(0);
+  const n = (await markerKinds(page)).indexOf(kind);
+  expect(n).toBeGreaterThanOrEqual(0);
+  await clickMarker(page, n);
+}
+
 test('empty seed database: banner, bounded map, legend, zero stats, privacy link', async ({ page }) => {
   await page.goto('/index.html');
 
@@ -40,7 +71,7 @@ test('empty seed database: banner, bounded map, legend, zero stats, privacy link
   await expect(page.locator('.legend')).toContainText('encrypted');
   await expect(page.locator('.legend')).toContainText('open');
   await expect(page.locator('path.boundary')).toHaveCount(2);
-  await expect(page.locator('path.net-marker')).toHaveCount(0);
+  await expectMarkers(page, 0);
   await expect(page.locator('#error')).toBeHidden();
 
   const privacy = page.getByRole('link', { name: /privacy/i });
@@ -76,11 +107,11 @@ test('fixture database: one colored marker per network', async ({ page }) => {
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
 
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
-  await expect(page.locator('path.net-encrypted')).toHaveCount(2);
-  await expect(page.locator('path.net-open')).toHaveCount(1);
-  await expect(page.locator('path.net-encrypted').first()).toHaveAttribute('fill', '#33ff66');
-  await expect(page.locator('path.net-open')).toHaveAttribute('fill', '#ffb000');
+  await expectMarkers(page, 3);
+  expect(await markerKinds(page)).toEqual(['encrypted', 'encrypted', 'open']);
+  const fills = await page.evaluate(() => window.__rwp.markers.map((m) => m.options.fillColor));
+  expect(fills).toEqual(['#33ff66', '#33ff66', '#ffb000']);
+  await expect(page.locator('#map .leaflet-overlay-pane canvas')).toHaveCount(1);
   await expect(page.locator('#stats')).toContainText('3 networks mapped');
   await expect(page.locator('#stats')).toContainText('2026-09-15 08:30 UTC');
 });
@@ -94,11 +125,12 @@ test('duplicate BSSIDs in the database render one marker per network (#15)', asy
   // Seven records: two spellings of ...:21, two of ...:22, a mesh sibling ...:23 (a distinct network),
   // and two records with no BSSID, which are still shown and never merged with each other.
   await expect(page.locator('#stats')).toContainText('5 networks mapped');
-  await expect(page.locator('path.net-marker')).toHaveCount(5);
+  await expectMarkers(page, 5);
   // The first record of each BSSID wins; the later (open) copies are never drawn.
-  await expect(page.locator('path.net-open')).toHaveCount(0);
-  const bssids = await page.evaluate(() =>
-    window.__rwp.markers.map((m) => m.getPopup().getContent().querySelectorAll('dd')[1].textContent));
+  expect(await markerKinds(page)).not.toContain('open');
+  // Popup content is built on demand from a function.
+  const bssids = await page.evaluate(() => window.__rwp.markers.map((m) =>
+    m.getPopup().getContent()(m).querySelectorAll('dd')[1].textContent));
   expect(bssids).toEqual(['aa:bb:cc:00:00:21', 'aa:bb:cc:00:00:22', 'aa:bb:cc:00:00:23', '—', '—']);
   expect(warnings).toContain('Skipped 2 duplicate network record(s) (same BSSID).');
 });
@@ -107,7 +139,7 @@ test('popup shows network details and "hidden" for a blank SSID', async ({ page 
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
 
-  await page.locator('path.net-open').click();
+  await clickFirstMarkerOfKind(page, 'open');
   const popup = page.locator('.leaflet-popup-content');
   await expect(popup).toBeVisible();
   await expect(popup.locator('.ssid')).toHaveText('hidden');
@@ -120,7 +152,7 @@ test('popup shows network details and "hidden" for a blank SSID', async ({ page 
 test('SSIDs are rendered as text, never as HTML', async ({ page }) => {
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  await expectMarkers(page, 3);
 
   await page.evaluate(() => window.__rwp.markers[0].openPopup());
   const popup = page.locator('.leaflet-popup-content');
@@ -133,14 +165,14 @@ test('SSIDs are rendered as text, never as HTML', async ({ page }) => {
 test('every popup field and the stats line render HTML payloads as text', async ({ page }) => {
   await useFixture(page, FIXTURE_XSS);
   await page.goto('/index.html');
-  await expect(page.locator('path.net-marker')).toHaveCount(1);
+  await expectMarkers(page, 1);
 
   // updated_at is not a date, so the stats line echoes it verbatim — as text.
   await expect(page.locator('#stats')).toHaveText(
     '> 1 network mapped · last updated <img src=x onerror="window.__xss=\'updated_at\'">');
   await expect(page.locator('#stats *')).toHaveCount(0);
 
-  await page.locator('path.net-marker').click();
+  await clickMarker(page, 0);
   const popup = page.locator('.leaflet-popup-content');
   await expect(popup.locator('dd')).toHaveText([
     "<script>window.__xss='ssid'</script>",
@@ -202,7 +234,7 @@ for (const pagePath of Object.keys(EXPECTED_CSP)) {
     });
     await useFixture(page, FIXTURE_3);
     await page.goto(pagePath);
-    if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);
+    if (pagePath === '/index.html') await expectMarkers(page, 3);
     expect(foreign).toEqual([]);
 
     const metas = page.locator('meta[http-equiv="Content-Security-Policy"]');
@@ -227,12 +259,11 @@ test('edge-case records: bad coordinates skipped, placeholders and fallbacks sho
   await page.goto('/index.html');
 
   // Only the RSN row and the sparse row have usable coordinates.
-  await expect(page.locator('path.net-marker')).toHaveCount(2);
-  await expect(page.locator('path.net-encrypted')).toHaveCount(1); // [RSN-SAE-CCMP]
-  await expect(page.locator('path.net-open')).toHaveCount(1);      // no auth at all
+  await expectMarkers(page, 2);
+  expect((await markerKinds(page)).sort()).toEqual(['encrypted', 'open']); // [RSN-SAE-CCMP]; no auth at all
   await expect(page.locator('#stats')).toHaveText('> 2 networks mapped · last updated never');
 
-  await page.locator('path.net-open').click();
+  await clickFirstMarkerOfKind(page, 'open');
   const popup = page.locator('.leaflet-popup-content');
   await expect(popup.locator('.ssid')).toHaveText('hidden');
   await expect(popup).toContainText('unknown');
@@ -260,7 +291,7 @@ test('database load failure shows an on-page error (R2.7)', async ({ page }) => 
   await expect(alert).toBeVisible();
   await expect(alert).toContainText('Could not load the network database');
   await expect(page.locator('#stats')).toContainText('database unavailable');
-  await expect(page.locator('path.net-marker')).toHaveCount(0);
+  await expectMarkers(page, 0);
   // The fenced map is still usable.
   await expect(page.locator('path.boundary')).toHaveCount(2);
 });
@@ -278,7 +309,7 @@ test('boundary load failure still fences the map and reports the error', async (
   await page.goto('/index.html');
 
   await expect(page.getByRole('alert')).toContainText('Redlands boundary');
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  await expectMarkers(page, 3);
   expect(await page.evaluate(() => !!window.__rwp.map.options.maxBounds)).toBe(true);
 });
 
@@ -339,7 +370,7 @@ test('privacy page covers every required section (R6)', async ({ page }) => {
 test('site sets no cookies or storage (R1.6)', async ({ page, context }) => {
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  await expectMarkers(page, 3);
   expect(await context.cookies()).toEqual([]);
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
 });
@@ -351,7 +382,7 @@ for (const pagePath of ['/index.html', '/privacy.html']) {
       await page.setViewportSize({ width, height: 740 });
       await useFixture(page, FIXTURE_3);
       await page.goto(pagePath);
-      if (pagePath === '/index.html') await expect(page.locator('path.net-marker')).toHaveCount(3);
+      if (pagePath === '/index.html') await expectMarkers(page, 3);
       const overflow = await page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
@@ -378,13 +409,13 @@ test('popups open fully inside the fenced map on a phone; the fence returns on c
   await page.setViewportSize({ width: 360, height: 740 });
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  await expectMarkers(page, 3);
   const fence = await page.evaluate(() => window.__rwp.fence().toBBoxString());
   const zoom = await page.locator('.leaflet-control-zoom').boundingBox();
   const mapBox = await page.locator('#map').boundingBox();
 
   // A real tap on the first marker, then each popup in turn (switching closes the previous one).
-  await page.locator('path.net-marker').first().click();
+  await clickMarker(page, 0);
   for (let i = 0; i < 3; i++) {
     if (i > 0) await page.evaluate((n) => window.__rwp.markers[n].openPopup(), i);
     await expect.poll(() => popupInsideMap(page)).toBe('inside');
@@ -420,7 +451,7 @@ for (const [width, height] of [[360, 740], [740, 360]]) {
       await page.setViewportSize({ width, height });
       await useFixture(page, FIXTURE_CORNERS);
       await page.goto('/index.html');
-      await expect(page.locator('path.net-marker')).toHaveCount(5);
+      await expectMarkers(page, 5);
       const fence = await page.evaluate(() => window.__rwp.fence().toBBoxString());
       for (let i = 0; i < 5; i++) {
         await page.evaluate(([n, dz]) => {
@@ -442,7 +473,7 @@ for (const [width, height] of [[360, 740], [740, 360]]) {
 test('Leaflet controls keep the terminal theme in every state (#7)', async ({ page }) => {
   await useFixture(page, FIXTURE_3);
   await page.goto('/index.html');
-  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  await expectMarkers(page, 3);
   const panel = 'rgb(10, 18, 10)';
 
   // At the zoom-out limit Leaflet marks the button disabled; its default style is light grey.
@@ -472,4 +503,68 @@ test('banner prompt types in, and holds still for reduced motion (#7)', async ({
   await expect(page.locator('.prompt')).toHaveCSS('animation-name', 'none');
   await expect(page.locator('.cursor')).toHaveCSS('animation-name', 'none');
   await expect(page.locator('header.banner img, header.banner svg')).toHaveCount(0);
+});
+
+// Scale (#11): the first backfill publishes about 18k networks. Generated here, at test time, inside
+// the Redlands bbox; never written to disk, and never to ingest/.
+function generatedDatabase(count) {
+  let seed = 11;
+  const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const networks = [];
+  for (let i = 0; i < count; i++) {
+    const hex = i.toString(16).padStart(6, '0');
+    networks.push({
+      bssid: `02:00:00:${hex.slice(0, 2)}:${hex.slice(2, 4)}:${hex.slice(4)}`,
+      ssid: `net-${i}`,
+      auth: i % 5 === 0 ? '[ESS]' : '[WPA2-PSK-CCMP][ESS]',
+      channel: 1 + (i % 11),
+      first_seen: '2026-09-14 10:00:00',
+      lat: 34.00 + random() * 0.08,
+      lon: -117.24 + random() * 0.14,
+    });
+  }
+  return JSON.stringify({ updated_at: '2026-09-17T00:00:00Z', count, networks });
+}
+
+test('18,000 networks load quickly, stay off the DOM, and pan, zoom and open popups (#11)', async ({ page }) => {
+  const COUNT = 18000;
+  const body = generatedDatabase(COUNT);
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.route('**/data/networks.json', (route) => route.fulfill({ contentType: 'application/json', body }));
+
+  const started = Date.now();
+  await page.goto('/index.html');
+  // Generous budget for CI runners; about 0.5 s locally (about 2 s with SVG markers).
+  await expect(page.locator('#stats')).toContainText('18,000 networks mapped', { timeout: 15_000 });
+  expect(Date.now() - started).toBeLessThan(15_000);
+  await expectMarkers(page, COUNT);
+  const kinds = await markerKinds(page);
+  expect(kinds.filter((k) => k === 'open')).toHaveLength(COUNT / 5);
+
+  // One canvas, not one element per network (SVG markers made this about 18,080).
+  expect(await page.evaluate(() => document.getElementsByTagName('*').length)).toBeLessThan(500);
+
+  // Pan, zoom in, and zoom out all finish.
+  const moved = await page.evaluate(async () => {
+    const { map } = window.__rwp;
+    const t = performance.now();
+    const settle = (event, action) => new Promise((resolve) => { map.once(event, resolve); action(); });
+    await settle('moveend', () => map.panBy([120, 90], { animate: true, duration: 0.3 }));
+    await settle('zoomend', () => map.zoomIn(1));
+    await settle('zoomend', () => map.zoomOut(1));
+    return performance.now() - t;
+  });
+  expect(moved).toBeLessThan(10_000);
+
+  // A real click on a network in view opens its popup.
+  const n = await page.evaluate(() => {
+    const { map, markers } = window.__rwp;
+    const inner = map.getBounds().pad(-0.3);
+    return markers.findIndex((m) => inner.contains(m.getLatLng()));
+  });
+  expect(n).toBeGreaterThanOrEqual(0);
+  await page.evaluate((i) => window.__rwp.map.setView(window.__rwp.markers[i].getLatLng(),
+    window.__rwp.map.getMaxZoom(), { animate: false }), n);
+  await clickMarker(page, n);
+  await expect(page.locator('.leaflet-popup-content .ssid')).toHaveText(`net-${n}`);
 });
