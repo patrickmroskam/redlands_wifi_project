@@ -1,0 +1,11 @@
+{
+  "updated_at": "2026-09-15T08:30:00Z",
+  "count": 5,
+  "networks": [
+    {"bssid": "aa:bb:cc:00:00:21", "ssid": "FirstCopy", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-14 10:00:00", "lat": 34.0556, "lon": -117.1825},
+    {"bssid": "AA-BB-CC-00-00-21", "ssid": "SecondCopy", "auth": "[OPEN]", "channel": 11, "first_seen": "2026-09-14 11:00:00", "lat": 34.0600, "lon": -117.1700},
+    {"bssid": "aa:bb:cc:00:00:22", "ssid": "HomeMesh", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-14 10:05:00", "lat": 34.0634, "lon": -117.1650},
+    {"bssid": "aa:bb:cc:00:00:23", "ssid": "HomeMesh", "auth": "[WPA2_PSK]", "channel": 36, "first_seen": "2026-09-14 10:05:00", "lat": 34.0634, "lon": -117.1650},
+    {"bssid": "aabb.cc00.0022", "ssid": "ThirdCopy", "auth": "[OPEN]", "channel": 1, "first_seen": "2026-09-14 12:00:00", "lat": 34.0460, "lon": -117.2010}
+  ]
+}

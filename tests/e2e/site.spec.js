@@ -6,6 +6,7 @@ const path = require('path');
 const FIXTURE_3 = path.join(__dirname, '..', 'fixtures', 'networks-3.json');
 const FIXTURE_EDGE = path.join(__dirname, '..', 'fixtures', 'networks-edge.json');
 const FIXTURE_XSS = path.join(__dirname, '..', 'fixtures', 'networks-xss.json');
+const FIXTURE_DUP = path.join(__dirname, '..', 'fixtures', 'networks-dup.json');
 
 test.beforeEach(async ({ page }) => {
   // Keep tests deterministic: never fetch map tiles (Leaflet is vendored under assets/).
@@ -81,6 +82,23 @@ test('fixture database: one colored marker per network', async ({ page }) => {
   await expect(page.locator('path.net-open')).toHaveAttribute('fill', '#ffb000');
   await expect(page.locator('#stats')).toContainText('3 networks mapped');
   await expect(page.locator('#stats')).toContainText('2026-09-15 08:30 UTC');
+});
+
+test('duplicate BSSIDs in the database render one marker per network (#15)', async ({ page }) => {
+  const warnings = [];
+  page.on('console', (msg) => { if (msg.type() === 'warning') warnings.push(msg.text()); });
+  await useFixture(page, FIXTURE_DUP);
+  await page.goto('/index.html');
+
+  // Five records: two spellings of ...:21, two of ...:22, and a mesh sibling ...:23 (a distinct network).
+  await expect(page.locator('#stats')).toContainText('3 networks mapped');
+  await expect(page.locator('path.net-marker')).toHaveCount(3);
+  // The first record of each BSSID wins; the later (open) copies are never drawn.
+  await expect(page.locator('path.net-open')).toHaveCount(0);
+  const bssids = await page.evaluate(() =>
+    window.__rwp.markers.map((m) => m.getPopup().getContent().querySelectorAll('dd')[1].textContent));
+  expect(bssids).toEqual(['aa:bb:cc:00:00:21', 'aa:bb:cc:00:00:22', 'aa:bb:cc:00:00:23']);
+  expect(warnings).toContain('Skipped 2 duplicate network record(s) (same BSSID).');
 });
 
 test('popup shows network details and "hidden" for a blank SSID', async ({ page }) => {
