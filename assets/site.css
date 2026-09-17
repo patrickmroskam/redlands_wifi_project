@@ -1,0 +1,173 @@
+/* Redlands Wifi Project — retro terminal theme. No external fonts or images. */
+:root {
+  --bg: #050805;
+  --panel: #0a120a;
+  --line: #1d3b1d;
+  --green: #33ff66;
+  --green-dim: #1fae47;
+  --amber: #ffb000;
+  --text: #b8f5c8;
+  --error: #ff5f56;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+  margin: 0;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--mono);
+}
+
+/* Scanlines + vignette overlay (pure CSS). */
+.crt {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2000;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.22) 3px),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+a { color: var(--amber); }
+a:hover, a:focus-visible { color: #ffd166; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+code { color: var(--amber); overflow-wrap: anywhere; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.banner, main, .footer {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.banner { padding-top: 28px; padding-bottom: 12px; }
+
+.prompt {
+  margin: 0 0 6px;
+  color: var(--green-dim);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.banner-title {
+  margin: 0;
+  color: var(--green);
+  font-size: clamp(1.6rem, 7vw, 3.4rem);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 4px rgba(51, 255, 102, 0.9), 0 0 14px rgba(51, 255, 102, 0.45), 0 0 28px rgba(51, 255, 102, 0.25);
+}
+
+.banner-small .banner-title { font-size: clamp(1.3rem, 5vw, 2.2rem); }
+
+.cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.9em;
+  margin-left: 0.15em;
+  vertical-align: -0.05em;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(51, 255, 102, 0.8);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor { animation: none; }
+}
+
+.tagline { margin: 8px 0 0; color: var(--amber); }
+
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.stats { margin: 0; color: var(--green); min-width: 0; overflow-wrap: anywhere; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+
+.swatch {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 1px solid #000;
+}
+.swatch-encrypted { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.swatch-open { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+.error {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--error);
+  color: var(--error);
+  background: #1a0606;
+}
+
+.map-frame {
+  border: 1px solid var(--green-dim);
+  box-shadow: 0 0 18px rgba(51, 255, 102, 0.15);
+}
+
+#map {
+  width: 100%;
+  height: 65vh;
+  min-height: 320px;
+  background: #000;
+}
+
+.footer { padding-top: 16px; padding-bottom: 32px; text-align: center; }
+.footer p { margin: 4px 0; }
+.fine { color: var(--green-dim); font-size: 0.8rem; }
+
+.prose { max-width: 760px; }
+.prose p { overflow-wrap: anywhere; }
+
+/* Leaflet theme overrides. */
+.leaflet-container { font-family: var(--mono); background: #000; }
+/* Turn the light OSM basemap into a dim green-on-black terminal map. */
+.osm-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.75) contrast(1.1) saturate(0.3) sepia(0.35) hue-rotate(65deg); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--green-dim);
+  border-radius: 0;
+}
+.leaflet-popup-content { margin: 10px 12px; font-size: 13px; }
+.leaflet-container a.leaflet-popup-close-button { color: var(--amber); }
+.leaflet-control-attribution { background: rgba(0, 0, 0, 0.7) !important; color: var(--green-dim); }
+.leaflet-control-attribution a { color: var(--amber); }
+.leaflet-bar a { background: var(--panel); color: var(--green); border-color: var(--line); }
+.leaflet-bar a:hover { background: #122212; color: var(--amber); }
+
+.net-popup { margin: 0; }
+.net-popup dt { color: var(--green-dim); }
+.net-popup dd { margin: 0 0 4px; color: var(--green); overflow-wrap: anywhere; }
+.net-popup .ssid { color: var(--amber); font-weight: bold; }

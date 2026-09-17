@@ -1,0 +1,12 @@
+{
+  "name": "redlands-wifi-project",
+  "private": true,
+  "description": "Static map of WiFi networks observed in Redlands, CA",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:unit": "python3 -m unittest discover -s tests -v"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

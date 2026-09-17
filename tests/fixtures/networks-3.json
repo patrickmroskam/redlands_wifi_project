@@ -1,0 +1,9 @@
+{
+  "updated_at": "2026-09-15T08:30:00Z",
+  "count": 3,
+  "networks": [
+    {"bssid": "aa:bb:cc:00:00:01", "ssid": "Citrus<img src=x onerror=\"window.__xss=1\">", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-14 10:00:00", "lat": 34.0556, "lon": -117.1825},
+    {"bssid": "aa:bb:cc:00:00:02", "ssid": "UniversityGuest", "auth": "[WEP]", "channel": 11, "first_seen": "2026-09-14 10:05:00", "lat": 34.0634, "lon": -117.1650},
+    {"bssid": "aa:bb:cc:00:00:03", "ssid": "", "auth": "[ESS]", "channel": 1, "first_seen": "2026-09-14 10:10:00", "lat": 34.0460, "lon": -117.2010}
+  ]
+}
