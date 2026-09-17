@@ -110,6 +110,10 @@ test('empty database: banner, bounded map, legend, zero stats, privacy link', as
   await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
   await expect(page.locator('#security-status')).not.toHaveClass(/visually-hidden/);
   await expect(page.locator('svg.pie')).toHaveCount(0);
+  // #13: so does the category list.
+  await expect(page.locator('#list-status')).toHaveText('> no networks mapped yet');
+  await expect(page.locator('#category-list')).toHaveCSS('display', 'none');
+  await expect(page.locator('#category-table')).toHaveCount(0);
   await expect(page.locator('.legend')).toContainText('encrypted');
   await expect(page.locator('.legend')).toContainText('open');
   await expect(page.locator('path.boundary')).toHaveCount(2);
@@ -223,6 +227,11 @@ test('every popup field and the stats line render HTML payloads as text', async 
   await expect(page.locator('#stats *')).toHaveCount(0);
   // The breakdown classifies the payload network without rendering any of it (#12).
   await expect(page.locator('#security-legend li')).toHaveText(['Other100.0% (1)']);
+  // …and so does the category list (#13): only counts, never the payload.
+  await expect(listRow(page, 'other')).toHaveText(['Other', '1', '100.0%']);
+  await expect(page.locator('#category-table .sub-row')).toHaveCount(0);
+  await expect(page.locator('#category-list .hidden-note')).toHaveText(
+    '> 0 hidden networks (blank name), counted under their security type');
 
   await clickMarker(page, 0);
   const popup = page.locator('.leaflet-popup-content');
@@ -389,10 +398,95 @@ test('the security pie sits under the map and matches the plotted networks (#12)
   expect(new Set(colors.map((c) => c.slice)).size).toBe(colors.length);
 });
 
+// The cells of a category list row (#13): name, count, share.
+function listRow(page, category, kind = 'cat-row') {
+  return page.locator(`#category-table tr.${kind}[data-category="${category}"]`).locator('th, td');
+}
+
+test('the category list shows every category with counts that match the pie (#13)', async ({ page }) => {
+  await useFixture(page, FIXTURE_CATEGORIES);
+  await page.goto('/index.html');
+  await expectMarkers(page, 18);
+
+  const table = page.getByRole('table', { name: 'Networks by category' });
+  await expect(table).toBeVisible();
+  await expect(page.locator('#list-status')).toBeHidden();
+  await expect(table.getByRole('columnheader')).toHaveText(['Category', 'Networks', 'Share']);
+  // Every category, in pie order, with its count and the legend's percentage.
+  const rows = table.locator('tbody tr.cat-row');
+  await expect(rows.locator('th')).toHaveText(CATEGORY_LEGEND.map(([label]) => label));
+  // Screen readers pair each number with its row header (sub-rows and the total are row headers too).
+  await expect(table.getByRole('rowheader')).toHaveCount(13);
+  await expect(rows.locator('td.cat-count')).toHaveText(CATEGORY_LEGEND.map(([, v]) => v.match(/\((.*)\)/)[1]));
+  await expect(rows.locator('td.cat-share')).toHaveText(CATEGORY_LEGEND.map(([, v]) => v.split(' ')[0]));
+
+  // The default-looking split sits right under its row: 3 = 1 open + 2 WPA2 (order follows the categories).
+  await expect(table.locator('tbody tr')).toHaveCount(12);
+  await expect(table.locator('tbody tr').nth(0)).toHaveAttribute('data-category', 'default');
+  const subRows = table.locator('tbody tr.sub-row');
+  await expect(subRows).toHaveCount(2);
+  await expect(table.locator('tbody tr').nth(1)).toHaveClass('sub-row');
+  await expect(table.locator('tbody tr').nth(2)).toHaveClass('sub-row');
+  await expect(table.locator('tbody tr').nth(1)).toHaveAttribute('data-category', 'open');
+  await expect(table.locator('tbody tr').nth(2)).toHaveAttribute('data-category', 'wpa2');
+  await expect(subRows.locator('.cat-label')).toHaveText(['on Open', 'on WPA2']);
+  // Screen readers hear which row a split belongs to.
+  await expect(table.getByRole('rowheader', { name: 'Default-looking on Open' })).toHaveCount(1);
+  await expect(listRow(page, 'open', 'sub-row')).toHaveText(['Default-looking on Open', '1', '']);
+  await expect(listRow(page, 'wpa2', 'sub-row')).toHaveText(['Default-looking on WPA2', '2', '']);
+  await expect(table.locator('.sub-row .visually-hidden')).toHaveText(['Default-looking ', 'Default-looking ']);
+  // Sub-rows have no swatch; category rows have one per category.
+  await expect(table.locator('.sub-row .pie-swatch')).toHaveCount(0);
+  await expect(rows.locator('.pie-swatch')).toHaveCount(10);
+
+  await expect(page.locator('#category-list .hidden-note')).toHaveText(
+    '> 2 hidden networks (blank name), counted under their security type');
+
+  // Total = stats line = sum of the category rows; shares add up to 100.0.
+  await expect(listRow(page, 'total', 'total-row')).toHaveText(['Total', '18', '100.0%']);
+  await expect(page.locator('#stats')).toContainText('> 18 networks mapped');
+  const counts = (await rows.locator('td.cat-count').allTextContents()).map(Number);
+  expect(counts.reduce((a, b) => a + b, 0)).toBe(18);
+  const tenths = (await rows.locator('td.cat-share').allTextContents())
+    .reduce((sum, text) => sum + Math.round(parseFloat(text) * 10), 0);
+  expect(tenths).toBe(1000);
+
+  // Each share equals the pie legend's percentage, and each swatch the pie slice's colour.
+  const pairs = await page.evaluate(() => Array.from(document.querySelectorAll('#security-legend li')).map((li) => {
+    const tr = document.querySelector(`#category-table tr.cat-row[data-category="${li.dataset.category}"]`);
+    return {
+      category: li.dataset.category,
+      legend: li.querySelector('.pie-value').textContent.split(' ')[0],
+      list: tr.querySelector('.cat-share').textContent,
+      slice: getComputedStyle(document.querySelector(`.slice[data-category="${li.dataset.category}"]`)).fill,
+      swatch: getComputedStyle(tr.querySelector('.pie-swatch')).backgroundColor,
+    };
+  }));
+  expect(pairs).toHaveLength(10);
+  for (const p of pairs) {
+    expect(p.list, p.category).toBe(p.legend);
+    expect(p.swatch, p.category).toBe(p.slice);
+  }
+});
+
+test('securityCategory ignores the name; classify puts factory names first (#13)', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(() => {
+    const S = window.RWPStats;
+    const nets = [
+      { ssid: 'NETGEAR42', auth: '[WPA2_PSK]' }, { ssid: 'NETGEAR42', auth: '[OPEN]' },
+      { ssid: 'Cafe', auth: '[WPA3]' }, { ssid: 'DIRECT-x', auth: '[WPA2_EAP]' }, {}, null,
+    ];
+    return { security: nets.map(S.securityCategory), classes: nets.map(S.classify) };
+  });
+  expect(result.security).toEqual(['wpa2', 'open', 'wpa3', 'wpa2-enterprise', 'open', 'open']);
+  expect(result.classes).toEqual(['default', 'default', 'wpa3', 'default', 'open', 'open']);
+});
+
 test('a slice over half the pie takes the long way round (#12)', async ({ page }) => {
   const nets = [['[OPEN]', 34.0556, -117.1825], ['[OPEN]', 34.0600, -117.1700], ['[OPEN]', 34.0500, -117.1900],
     ['[WPA2_PSK]', 34.0620, -117.1650]].map(([auth, lat, lon], i) =>
-    ({ bssid: `aa:bb:cc:00:03:0${i}`, ssid: `Net${i}`, auth, lat, lon }));
+    ({ bssid: `aa:bb:cc:00:03:0${i}`, ssid: i === 3 ? '' : `Net${i}`, auth, lat, lon }));
   await page.route('**/data/networks.json', (route) => route.fulfill({
     contentType: 'application/json', body: JSON.stringify({ updated_at: null, networks: nets }) }));
   await page.goto('/index.html');
@@ -401,6 +495,12 @@ test('a slice over half the pie takes the long way round (#12)', async ({ page }
   await expect(page.locator('path.slice.cat-open')).toHaveAttribute('d', /A1 1 0 1 1 /);
   await expect(page.locator('path.slice.cat-wpa2')).toHaveAttribute('d', /A1 1 0 0 1 /);
   await expect(page.locator('#security-legend .pie-value')).toHaveText(['75.0% (3)', '25.0% (1)']);
+  // No default-looking networks: a zero row and no split under it (#13).
+  await expect(listRow(page, 'default')).toHaveText(['Default-looking', '0', '0.0%']);
+  await expect(page.locator('#category-table .sub-row')).toHaveCount(0);
+  await expect(listRow(page, 'open')).toHaveText(['Open', '3', '75.0%']);
+  await expect(page.locator('#category-list .hidden-note')).toHaveText(
+    '> 1 hidden network (blank name), counted under their security type');
 });
 
 test('a single-category database draws a full circle at 100% (#12)', async ({ page }) => {
@@ -416,7 +516,22 @@ test('a single-category database draws a full circle at 100% (#12)', async ({ pa
   await expect(page.locator('svg.pie circle.slice.cat-open')).toHaveCount(1);
   await expect(page.locator('svg.pie path')).toHaveCount(0);
   await expect(page.locator('#security-legend li')).toHaveText(['Open100.0% (2)']);
+  // The list still shows all ten categories, the empty ones as zero (#13).
+  const rows = page.locator('#category-table tbody tr.cat-row');
+  await expect(rows).toHaveCount(10);
+  await expect(rows.locator('td.cat-count')).toHaveText(['0', '2', '0', '0', '0', '0', '0', '0', '0', '0']);
+  await expect(rows.locator('td.cat-share')).toHaveText(
+    ['0.0%', '100.0%', '0.0%', '0.0%', '0.0%', '0.0%', '0.0%', '0.0%', '0.0%', '0.0%']);
+  await expect(page.locator('#category-list .hidden-note')).toHaveText(
+    '> 0 hidden networks (blank name), counted under their security type');
 });
+
+async function expectListUnavailable(page) {
+  await expect(page.locator('#list-status')).toHaveText('> category list unavailable');
+  await expect(page.locator('#list-status')).toBeVisible();
+  await expect(page.locator('#category-list')).toHaveCSS('display', 'none');
+  await expect(page.locator('#category-table')).toHaveCount(0);
+}
 
 for (const [name, setup, errorText] of [
   ['the database fails to load', (page) => page.route('**/data/networks.json',
@@ -433,6 +548,7 @@ for (const [name, setup, errorText] of [
     await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
     await expect(page.locator('#security-status')).toBeVisible();
     await expect(page.locator('svg.pie')).toHaveCount(0);
+    await expectListUnavailable(page);
   });
 }
 
@@ -444,6 +560,26 @@ test('the breakdown says unavailable when stats.js fails to load (#12)', async (
   await expect(page.locator('#stats')).toContainText('3 networks mapped');
   await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
   await expect(page.locator('#security-chart')).toHaveCSS('display', 'none');
+  await expectListUnavailable(page);
+});
+
+test('a cached stats.js from before the list existed marks the list unavailable (#13)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  // Serve the old script's shape: the pie only, and no securityCategory export.
+  const fs = require('fs');
+  const current = fs.readFileSync(path.join(__dirname, '..', '..', 'assets', 'stats.js'), 'utf8');
+  const old = current
+    .replace('renderList(counts, split, hidden, pct, total);', '')
+    .replace(/setListStatus\([^)]*\);/g, '')
+    .replace('securityCategory: securityCategory,', '');
+  expect(old).not.toContain('renderList(counts, split, hidden, pct, total);');
+  expect(old).not.toContain('setListStatus(\'');
+  expect(old).not.toContain('securityCategory: ');
+  await page.route(/stats\.js$/, (route) => route.fulfill({ contentType: 'text/javascript', body: old }));
+  await page.goto('/index.html');
+  await expectMarkers(page, 3);
+  await expect(page.locator('svg.pie')).toBeVisible();
+  await expect(page.locator('#list-status')).toHaveText('> category list unavailable');
 });
 
 test('a breakdown failure leaves the map and its stats line working (#12)', async ({ page }) => {
@@ -462,7 +598,25 @@ test('a breakdown failure leaves the map and its stats line working (#12)', asyn
   await expectMarkers(page, 3);
   await expect(page.locator('#stats')).toContainText('3 networks mapped');
   await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
+  await expectListUnavailable(page);
   await expect(page.locator('#error')).toBeHidden();
+});
+
+test('a category list failure clears the pie too, so the columns never disagree (#13)', async ({ page }) => {
+  await useFixture(page, FIXTURE_3);
+  // The pie is built from svg/ul/p elements; the list starts with a <table>, and that throws.
+  await page.addInitScript(() => {
+    const create = Document.prototype.createElement;
+    Document.prototype.createElement = function (tag, ...rest) {
+      if (String(tag).toLowerCase() === 'table') throw new Error('boom');
+      return create.call(this, tag, ...rest);
+    };
+  });
+  await page.goto('/index.html');
+  await expectMarkers(page, 3);
+  await expect(page.locator('#security-status')).toHaveText('> security breakdown unavailable');
+  await expect(page.locator('svg.pie')).toHaveCount(0);
+  await expectListUnavailable(page);
 });
 
 // The exact policy each page must carry; any added or loosened directive fails.
@@ -641,7 +795,7 @@ test('site sets no cookies or storage (R1.6)', async ({ page, context }) => {
 
 // Responsive QA (R1.4, #7): both pages at phone, tablet, and desktop widths.
 for (const pagePath of ['/index.html', '/privacy.html']) {
-  for (const width of [360, 768, 1280]) {
+  for (const width of [320, 360, 768, 1280]) {
     test(`no horizontal overflow at ${width} px on ${pagePath} (R1.4)`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 740 });
       await useFixture(page, FIXTURE_CATEGORIES);
@@ -649,6 +803,7 @@ for (const pagePath of ['/index.html', '/privacy.html']) {
       if (pagePath === '/index.html') {
         await expectMarkers(page, 18);
         await expect(page.locator('svg.pie')).toBeVisible();
+        await expect(page.locator('#category-table')).toBeVisible();
         // #12: two columns side by side on wide screens, stacked below 720 px.
         const [left, right] = await Promise.all(['#security-col', '#list-col']
           .map((sel) => page.locator(sel).boundingBox()));
@@ -810,6 +965,8 @@ test('18,000 networks load quickly, stay off the DOM, and pan, zoom and open pop
   // Generous budget for CI runners; about 0.5 s locally (about 2 s with SVG markers).
   await expect(page.locator('#stats')).toContainText('18,000 networks mapped', { timeout: 15_000 });
   console.log(`18k networks: stats line after ${Date.now() - started} ms`);
+  // The list formats large counts with thousands separators (#13).
+  await expect(page.locator('#category-table tfoot td.cat-count')).toHaveText('18,000');
   await expectMarkers(page, COUNT);
   const kinds = await markerKinds(page);
   expect(kinds.filter((k) => k === 'open')).toHaveLength(COUNT / 5);

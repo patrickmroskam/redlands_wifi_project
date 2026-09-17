@@ -77,6 +77,13 @@ into exactly one category, so the pie adds up to 100%:
 The patterns live only in `DEFAULT_SSID_PATTERNS` in `assets/stats.js`; update
 this table when you change them.
 
+The right-hand column lists the same categories as a table, with counts and the
+same percentages as the pie legend. Categories with no networks still show `0`.
+Under **Default-looking**, indented rows show how those networks are secured
+(using the step 2 rules alone). A note below the table counts hidden (blank)
+SSIDs; those networks are already counted under their security type. The total
+equals the number of networks on the map.
+
 ## `redlands-boundary.geojson` — the fence
 
 ZIP Code Tabulation Area polygons for **92373** and **92374** (Redlands, CA),
