@@ -737,6 +737,35 @@ test('map library failure shows an on-page error', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('map library failed to load');
 });
 
+test('footer credits CaliCoders LLC above the privacy link (#20)', async ({ page }) => {
+  await useFixture(page, FIXTURE_EMPTY);
+  await page.goto('/index.html');
+
+  const credit = page.locator('footer .credit');
+  await expect(credit).toBeVisible();
+  await expect(credit).toHaveText(
+    'Security research brought to you by CaliCoders LLC, a security first managed service provider ' +
+    'based in Redlands, where our goal is to create a safer, more secure network for not only our ' +
+    'clients but our community at large.', { useInnerText: true });
+
+  // Only the company name is a link, and it is a plain outbound link (R1.6).
+  const links = credit.locator('a');
+  await expect(links).toHaveCount(1);
+  await expect(links).toHaveText('CaliCoders LLC');
+  await expect(links).toHaveAttribute('href', 'https://www.calicoders.com');
+  await expect(links).toHaveAttribute('target', '_blank');
+  await expect(links).toHaveAttribute('rel', 'noopener noreferrer');
+
+  // The credit comes before the privacy link in the footer.
+  const order = await page.evaluate(() => {
+    const footer = document.querySelector('footer');
+    const creditEl = footer.querySelector('.credit');
+    const privacyEl = footer.querySelector('a[href="privacy.html"]');
+    return !!privacyEl && !!(creditEl.compareDocumentPosition(privacyEl) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  expect(order).toBe(true);
+});
+
 test('privacy page links back to the map', async ({ page }) => {
   await page.goto('/privacy.html');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Privacy policy');
