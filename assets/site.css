@@ -158,6 +158,9 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   background: #000;
 }
 
+/* Markers are drawn on a canvas; map.js sets this class while the pointer is over one. */
+body:not(.leaflet-dragging) #map.over-marker { cursor: pointer; }
+
 .footer { padding-top: 16px; padding-bottom: 32px; text-align: center; }
 .footer p { margin: 4px 0; }
 .fine { color: var(--green-dim); font-size: 0.8rem; }

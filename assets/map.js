@@ -101,6 +101,15 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
+  // ~18k networks: one canvas for every marker instead of one SVG element each (#11). The boundary
+  // stays SVG. Padding keeps nearby markers drawn while dragging; more would risk mobile canvas limits.
+  var markerRenderer = L.canvas({ padding: 0.3 });
+  var MARKER_RADIUS = 5;
+  // How far from a marker's centre a click still picks it, in CSS pixels: the drawn circle, plus
+  // some slop for fingers.
+  var COARSE_POINTER = !!(window.matchMedia && window.matchMedia('(any-pointer: coarse)').matches);
+  var HIT_RADIUS = MARKER_RADIUS + 1 + (COARSE_POINTER ? 6 : 0);
+
   var fenceBounds = null;
 
   // Lowest zoom at which the whole fenced area still fits the current map size.
@@ -151,6 +160,55 @@
   // Expose read-only hooks for the smoke test.
   window.__rwp = { map: map, markers: [], fence: function () { return fenceBounds; } };
 
+  // Canvas hit-testing gives a click to the last-drawn marker in range, not the one aimed at, and
+  // opens the popup at the click point. So markers are not interactive themselves: a click on the
+  // map opens the marker whose centre is nearest, anchored on that centre.
+  var projected = { zoom: null, points: [] };
+  function nearestMarker(latlng) {
+    var markers = window.__rwp.markers;
+    var zoom = map.getZoom();
+    if (projected.zoom !== zoom || projected.points.length !== markers.length) {
+      projected = { zoom: zoom, points: markers.map(function (m) { return map.project(m.getLatLng(), zoom); }) };
+    }
+    var at = map.project(latlng, zoom);
+    var best = -1;
+    var bestDistance = HIT_RADIUS * HIT_RADIUS;
+    for (var i = 0; i < projected.points.length; i++) {
+      var dx = projected.points[i].x - at.x;
+      var dy = projected.points[i].y - at.y;
+      var distance = dx * dx + dy * dy;
+      // On a tie the later marker wins: it is drawn on top.
+      if (distance <= bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return best < 0 ? null : markers[best];
+  }
+
+  map.on('click', function (e) {
+    var marker = nearestMarker(e.latlng);
+    if (marker) marker.openPopup();
+  });
+
+  // A pointer cursor over markers, checked at most once per frame. This listens to the DOM, because
+  // the canvas renderer drops map mousemove events that come within 32 ms of the last one.
+  var hoverFrame = 0;
+  var hoverAt = null;
+  L.DomEvent.on(map.getContainer(), 'mousemove', function (e) {
+    hoverAt = map.mouseEventToLatLng(e);
+    if (hoverFrame) return;
+    hoverFrame = window.requestAnimationFrame(function () {
+      hoverFrame = 0;
+      L.DomUtil[nearestMarker(hoverAt) ? 'addClass' : 'removeClass'](map.getContainer(), 'over-marker');
+    });
+  });
+  map.on('mouseout', function () {
+    window.cancelAnimationFrame(hoverFrame);
+    hoverFrame = 0;
+    L.DomUtil.removeClass(map.getContainer(), 'over-marker');
+  });
+
   var boundaryReady = fetchJson(BOUNDARY_URL).then(function (geo) {
     var layer = L.geoJSON(geo, {
       interactive: false,
@@ -170,6 +228,7 @@
     var skipped = 0;
     var duplicates = 0;
     var seen = Object.create(null);
+    var markers = L.layerGroup();
     db.networks.forEach(function (net) {
       var lat = toCoord(net && net.lat);
       var lon = toCoord(net && net.lon);
@@ -187,17 +246,21 @@
         seen[key] = true;
       }
       var kind = isEncrypted(net.auth) ? 'encrypted' : 'open';
+      // The popup is built only when it opens; 18k detached popup trees would cost memory at load.
       var marker = L.circleMarker([lat, lon], {
-        radius: 5,
+        renderer: markerRenderer,
+        interactive: false,
+        kind: kind,
+        radius: MARKER_RADIUS,
         weight: 1,
         color: '#000',
         fillColor: COLORS[kind],
-        fillOpacity: 0.9,
-        className: 'net-marker net-' + kind
-      }).bindPopup(popupFor(net), POPUP_OPTIONS).addTo(map);
+        fillOpacity: 0.9
+      }).bindPopup(function () { return popupFor(net); }, POPUP_OPTIONS).addTo(markers);
       window.__rwp.markers.push(marker);
       plotted += 1;
     });
+    markers.addTo(map);
     statsEl.textContent = '> ' + plotted.toLocaleString('en-US') + ' network' + (plotted === 1 ? '' : 's') +
       ' mapped · last updated ' + formatUpdated(db.updated_at);
     if (skipped > 0) {
