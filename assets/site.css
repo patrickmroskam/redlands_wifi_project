@@ -76,6 +76,8 @@ code { color: var(--amber); overflow-wrap: anywhere; }
   text-shadow: 0 0 4px rgba(51, 255, 102, 0.9), 0 0 14px rgba(51, 255, 102, 0.45), 0 0 28px rgba(51, 255, 102, 0.25);
 }
 
+/* Match the narrower prose column on text pages. */
+.banner-small { max-width: 760px; }
 .banner-small .banner-title { font-size: clamp(1.3rem, 5vw, 2.2rem); }
 
 .cursor {
@@ -147,8 +149,27 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 .footer p { margin: 4px 0; }
 .fine { color: var(--green-dim); font-size: 0.8rem; }
 
-.prose { max-width: 760px; }
-.prose p { overflow-wrap: anywhere; }
+.prose { max-width: 760px; padding-bottom: 8px; }
+.prose p, .prose li, .prose dd { overflow-wrap: anywhere; }
+.prose h2 {
+  margin: 28px 0 8px;
+  color: var(--green);
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.prose h2::before { content: "## "; color: var(--green-dim); }
+.prose section { scroll-margin-top: 12px; }
+.prose ul, .prose ol { margin: 8px 0; padding-left: 1.4em; }
+.prose li { margin: 4px 0; }
+.prose ul { list-style: none; padding-left: 1.4em; }
+.prose ul li::before { content: "> "; margin-left: -1.4em; color: var(--green-dim); }
+.lede { padding: 10px 14px; border: 1px solid var(--line); background: var(--panel); }
+.toc { margin: 16px 0; padding: 4px 14px 8px; border-left: 2px solid var(--green-dim); }
+.toc h2 { margin-top: 8px; }
+.fields { margin: 8px 0; }
+.fields dt { margin-top: 10px; color: var(--amber); font-weight: bold; }
+.fields dd { margin: 2px 0 0 1.4em; }
 
 /* Leaflet theme overrides. */
 .leaflet-container { font-family: var(--mono); background: #000; }
