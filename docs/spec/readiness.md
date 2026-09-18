@@ -4,7 +4,7 @@
 
 **Updated in place each product-owner run.** Standing decisions live here; each run emits only the delta.
 
-- **Cycle:** 2 · **as of** 2026-09-18T07:45Z · *(cycle 1 = first pass, 01:44Z)*
+- **Cycle:** 3 · **as of** 2026-09-18T13:40Z · *(cycle 1 = first pass, 01:44Z)*
 - **Spec:** `docs/spec/PRD.md`, status **ratified** 2026-09-17 (`080acfe`)
 
 ## Burndown — v1 Definition of Done: 8 of 9
@@ -23,7 +23,7 @@
 
 **R5 in one line:** the workflow is built and correct, but its `schedule` trigger is gated on repo variable `INGEST_SCHEDULE`, which has never been set — so every scheduled run is skipped. Setting it is deliberately sequenced *after* the private-inbox cutover (#30) so new logs never pass through the public repo. **v1 is one owner action away from done.**
 
-Re-verified at cycle 2 (07:38–07:41Z), so the ✅ rows are not inherited on trust: site HTTP 200 with 18,152 records; **R4.12** holds against the *live* published database (every record carries exactly `bssid, ssid, auth, channel, first_seen, lat, lon` — no RSSI, altitude or accuracy); **R2.5** `updated_at`/`count` present and rendered; CI green on the last push; the `Ingest wardrive logs` schedule still logs as *skipped*.
+Re-verified at cycle 2 (07:38–07:41Z) and spot-re-checked at cycle 3 (13:39Z — site HTTP 200, CI green on the last three pushes, `actions/variables` still empty so the schedule is still gated off), so the ✅ rows are not inherited on trust: site HTTP 200 with 18,152 records; **R4.12** holds against the *live* published database (every record carries exactly `bssid, ssid, auth, channel, first_seen, lat, lon` — no RSSI, altitude or accuracy); **R2.5** `updated_at`/`count` present and rendered; CI green on the last push; the `Ingest wardrive logs` schedule still logs as *skipped*.
 
 ## Standing decision queue (owner)
 
@@ -31,7 +31,7 @@ Re-verified at cycle 2 (07:38–07:41Z), so the ✅ rows are not inherited on tr
 
 Ten minutes, GitHub login. Steps: [`docs/setup/private-inbox.md`](https://github.com/patrickmroskam/redlands_wifi_project/blob/main/docs/setup/private-inbox.md). Reply on OH HAI with **`DONE private-inbox`**.
 
-The ask (`msg_92a6bc9c`) came back `yes` + "Rewrite history" — read as approval of the plan, not as the setup being done. The gate is object existence, not reply text, and it was re-run at **cycle 2, 07:39Z**: the repo `redlands_wifi_inbox` still does not exist, there is still no `ingest` environment, and the repo still holds 0 secrets. Until those exist, #30 cannot be worked, R5 cannot be met, and the dev-team routine stays disabled (it has no other workable issue).
+The ask (`msg_92a6bc9c`) came back `yes` + "Rewrite history" — read as approval of the plan, not as the setup being done. The gate is object existence, not reply text, and it was re-run again at **cycle 3, 13:39Z**: the repo `redlands_wifi_inbox` still does not exist, there is still no `ingest` environment, the repo still holds 0 secrets, and `actions/variables` is still empty. Until those exist, #30 cannot be worked and R5 cannot be met. The ask has now been answered-but-not-actioned for ~22 h.
 
 ### 2. Close the domain-takeover window — #17 (p1) · live exposure
 
@@ -41,47 +41,89 @@ Two ways to close it, both owner-only, both minutes: **verify the domain** (Part
 
 Note: #17 has been parked on a `DONE custom-domain` reply since 2026-09-17 — but **no OH HAI ask was ever sent for it**, so that reply was never actually requested.
 
-**Re-resolved at cycle 2 (07:38Z): unchanged and still live** — apex `A` still 185.199.108-111.153, `www` still CNAMEd to `patrickmroskam.github.io`, challenge TXT still absent, apex still 404, and the repo's Pages config still reports `cname: null` / `protected_domain_state: null`.
+**Re-resolved again at cycle 3 (13:39Z): unchanged and still live** — apex `A` still 185.199.108-111.153, `www` still CNAMEd to `patrickmroskam.github.io`, challenge TXT still absent, apex still 404, and the repo's Pages config still reports `cname: null` / `protected_domain_state: null`.
 
 **Cycle 2 cleared the deadlock rather than re-describing it.** New doc [`docs/setup/domain-takeover.md`](https://github.com/patrickmroskam/redlands_wifi_project/blob/main/docs/setup/domain-takeover.md) — the security-only half, two options, ~5 minutes — and the ask that had never been sent is now open: **`msg_e812f339-e53b-46d4-bb67-ce8e5f6edced`**, resume key **`DONE domain-takeover`**. It was split out of `custom-domain.md` on purpose: that doc routes the verification TXT through Cloudflare, making a 5-minute fix read as "first migrate your DNS". The TXT goes straight into Namecheap's Advanced DNS tab.
 
-The gate is the DNS, not the reply — every cycle re-resolves it. Escalation rung, committed: **cycle 4 (~12:38 PT)** sends at priority `high` if the exposure is still live and the ask still unanswered; cycle 3 sends nothing new and no cycle re-asks while `msg_e812f339` is open.
+The gate is the DNS, not the reply — every cycle re-resolves it. Escalation rung, committed at cycle 2 and executed since: cycle 3 re-resolved the DNS (still exposed), re-checked the ask with `ask await` (still **open**), sent nothing new, and did not re-ask. **Cycle 4 (~2026-09-18T19:38Z ≈ 12:38 PT) sends at priority `high`** if the exposure is still live and the ask still unanswered.
 
 ### 3. Spec proposals — PO may not apply these
 
 - **Custom domain scope.** The ratified PRD still lists "Custom domain, CDN, or any hosting other than GitHub Pages" under *Out of Scope (v1)*, while #17 is an active owner request. Move it into scope, or confirm it stays post-v1? (The PO is treating it as post-v1 and therefore **not** a v1 blocker.)
 - **History rewrite.** The reply on `msg_92a6bc9c` contained "Rewrite history", which satisfies #30's own gate. It is recorded, not executed: it rewrites every commit on the public `main`, and existing clones, forks and archives keep the old objects. The PRD files the history exposure under *Known consideration (**not a requirement**)*, so this is new scope. Confirm at execution time, in the session that runs it.
 
-### 4. Low priority, owner-only, never asked — #21 (p3)
+### 4. Should the worker keep running while you're deciding? — process, ~1 minute
+
+**New at cycle 3, and it is a correction of my own earlier reporting.** Cycles 1–2 told you the
+dev-team routine is off because there was nothing left for it to do. That was wrong. Three issues
+are open, unassigned, unblocked, and depend on neither #30 nor #17:
+
+| Issue | | What it is |
+|---|---|---|
+| **#25** | p3 | Ingest: don't silently delete a log whose rows are all malformed |
+| **#29** | p3 | Map: smooth the popup-pan edge cases left by #7 |
+| **#34** | p3 | Tests: split the >1,000-line `tests/e2e/site.spec.js` |
+
+The routine is off because the constitution's Human-in-the-loop protocol **step 4 says to turn it
+off** — *"Disable the dev-team routine… Do not pick another issue. Exit."* — for as long as any
+issue is `waiting` on you. That rule bundles two sensible intents (never work an issue that is
+blocked on a human; never burn hourly runs on an empty backlog) into one switch, so a single
+owner gate stops everything. The worker has been halted since **2026-09-17T15:05Z (~22.5 h)**.
+
+Nothing is at risk — these are all polish items — so this is a *"do you want throughput while you
+decide"* question, not an alarm. Your options:
+
+- **Amend the rule** (the PO's recommendation): step 4 becomes *"skip the blocked issue and
+  continue with the next unblocked one; disable the routine only when no unblocked p0–p3 issue
+  remains."* Keeps both original intents, drops the coupling.
+- **Just re-enable it** and leave the constitution alone — simplest, but it will self-disable
+  again the next time an actor hits a human gate.
+- **Do nothing** — the p3s wait for `DONE private-inbox`, which resumes the routine anyway.
+
+The PO did **not** re-enable it on its own: a hard invariant in the constitution is not the PO's
+to overrule, and turning a scheduled routine back on spends your machine's compute, not the
+backlog's. Answering **`DONE private-inbox`** (item 1) makes this question disappear entirely.
+
+### 5. Low priority, owner-only, never asked — #21 (p3)
 
 Dependabot alerts, private vulnerability reporting, SHA-pinning enforcement. No ask has ever been sent, and cycle 2 **deliberately still did not send one**: a third owner ask, at p3, competing with a live p1 security item and a blocking p2 setup would lower the odds of both. Recorded on the issue with its unblock condition — once #30 and #17 clear, #21 gets its own setup doc and ask, or rides along as a postscript. Nothing here is at risk in the meantime.
 
-### 5. Open closure proposal — #22
+### 6. Open closure proposal — #22
 
 Verdict `addressed-in-#30` (the option-C decision is made and has moved to #30). Self-closes after **2026-09-20T01:42Z** unless objected. Say so if you want #22 kept open.
 
 ## Convergence
 
-- **Net open: 8** (1 tracking · 1 p1 · 2 p2 · 4 p3) — **flat** cycle 1 → 2. History `[8, 8]`; the K=3 tripwire fires only on three straight *rises*, so it is two clean samples from firing and nothing is trending wrong.
-- **Closure accounting (project to date):** closed 14, proposed 1, contested 0 — unchanged.
+- **Net open: 8** (1 tracking · 1 p1 · 2 p2 · 4 p3) — **flat** across cycles 1 → 3. History `[8, 8, 8]`; the K=3 tripwire fires only on three straight *rises*, so it is three clean samples from firing and nothing is trending wrong.
+- **Closure accounting (project to date):** closed 14, proposed 1, contested 0 — unchanged at cycle 3.
 - **Polish backlog depth:** 0 (`docs/polish-backlog.md` absent).
 - No launch-blockers. No in-flight PRs. CI green. 100 unit tests pass.
-- **Throughput is owner-gated, not agent-gated.** Every remaining item in the queue is an action only the owner can take; there is no agent work left to schedule, which is why the dev-team routine is off rather than idling.
+- **Throughput is owner-gated — but not for lack of agent work.** Every item in the *decision queue* above needs the owner. Separately, three agent-workable p3 issues (#25, #29, #34) are parked because protocol step 4 halts the whole routine while anything is `waiting` — see decision item 4. *(This replaces cycles 1–2's claim that there was no agent work left to schedule; that claim was wrong.)*
 
 ## Delta this run
 
-**Cycle 2 delta: nothing moved.** No owner reply arrived (the newest hub message is still cycle 1's own notify `msg_8f830af8`, 01:46:45Z), no issue or PR changed, no commit landed but cycle 1's. The queue above is identical to cycle 1's.
+**Cycle 3 delta: nothing moved, again.** No owner reply arrived — the newest hub message is still
+cycle 2's own ask `msg_e812f339` (07:46:15Z). The only issues touched since the watermark are #21
+and #17, both by cycle 2's own comments. `main` is still `9bb27d8`, 0 open PRs, CI green, site 200.
 
-What cycle 2 actually did, rather than restating cycle 1:
+What cycle 3 did:
 
-1. **Re-ran both gates objectively** instead of inheriting them — #30's three existence checks (all still negative) and #17's five DNS/HTTP checks (exposure still live). Both are recorded in the decision log.
-2. **Spot-checked the privacy guarantee against what is actually served** — R4.12 holds on the live 18,152-record database, and R2.5 renders. These are the promises the public privacy page makes; they are now verified against the published artifact, not just the script that writes it.
-3. **Closed out the #21 process debt** with a deferral recorded on the issue, so no later cycle re-discovers it as a mystery.
-4. **Sent the #17 ask that had never been sent** — cycle 1 diagnosed that deadlock, cycle 2 cleared it (new doc, ask `msg_e812f339-…`, key `DONE domain-takeover`). This run's single owner message is that ask rather than a notify: an ask waits in the inbox instead of alerting, so it costs nothing at 00:50 PT, and it is the mechanism that actually unblocks a `waiting` issue. Escalation committed to **cycle 4** (~12:38 PT, priority `high`) so the rung is decided once rather than re-argued every six hours.
-5. **Self-reported an error:** working out `ask submit`'s flags sent a real, meaningless ask to the inbox (`msg_65c5813b-…`, titled "probe"). The CLI has no withdraw verb, so the real ask opens by naming it and asking the owner to dismiss it. Logged with the rule that prevents a third one: never probe a send command by invoking it — a well-formed-but-incomplete invocation sends, and only an unknown flag errors first.
-6. **Checked, and declined, a constitution amendment** — the invariant barring raw logs outside `ingest/` contradicts option C, but #30's body already scopes that edit and the owner's `yes` on `msg_92a6bc9c` already ratifies it. Editing it six hours ahead of the flow it describes would split #30's acceptance across two actors. Logged as a check for whoever works #30.
+1. **Re-ran both gates objectively and re-checked the ask.** #30: repo, `ingest` environment and
+   secrets all still absent (and `actions/variables` still empty, so `INGEST_SCHEDULE` is unset
+   too). #17: challenge TXT still absent, apex `A` still 185.199.108-111.153, apex still 404,
+   `pages.cname` still null. `ask await` on `msg_e812f339` → *not resolved*, still open.
+2. **Executed the committed escalation rung instead of re-arguing it** — cycle 2 decided cycle 3
+   sends nothing new and cycle 4 goes `high`. Cycle 3 did exactly that: no re-ask, one `low` notify.
+3. **Corrected its own earlier reporting** — found that #25, #29 and #34 are workable and parked,
+   and that cycles 1–2 had wrongly justified the disabled routine as an empty backlog. Logged as a
+   reversal, fixed in the digest and above, and turned into a standing rule: no cycle may claim
+   "no workable issue" without citing the `gh issue list` output that proves it.
+4. **Raised the step-4 amendment as a proposal, and declined to act on it** — a hard invariant is
+   not the PO's to rewrite, and re-enabling a routine spends the owner's compute. It rides in the
+   mandatory notify as a recommendation rather than as a competing ask, on the same queue-contention
+   reasoning cycle 2 used for #21.
 
 ## Routine status
 
 - `autonomy-product-owner-redlands-wifi-project` — **enabled**, 6-hourly.
-- `autonomy-dev-team-redlands-wifi-project` — **disabled**, deliberately, since dev-team run 15 (#30 is human-in-the-loop and is the only workable issue left). Re-enabled automatically by a PO run that sees `DONE private-inbox`. Confirmed still disabled and still correct at cycle 2: there is no workable p0–p3 issue a dev-team run could pick up.
+- `autonomy-dev-team-redlands-wifi-project` — **disabled** since 2026-09-17T15:05Z (dev-team run 15), as the constitution's Human-in-the-loop protocol step 4 requires while any issue is `waiting`. Re-enabled automatically by a PO run that sees `DONE private-inbox`. Confirmed still disabled and still *rule-compliant* at cycle 3 — but **not** because the backlog is empty: #25, #29 and #34 are workable and parked. See decision item 4.
