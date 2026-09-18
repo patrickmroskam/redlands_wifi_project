@@ -174,3 +174,18 @@
 - confidence: high
 - alternatives: flipping R5 to `[x]` on the strength of two scheduled runs appearing — rejected, and it was the live risk this cycle: the run list alone looks like R5.1 satisfied, and only opening the workflow and reading the job's `if:` shows every scheduled run is a no-op. R5.4 ("no commit when nothing changes") is *also* not evidenced by these runs, because the job never ran to decide that.
 - watch-next: flip R5 only when a **scheduled** run shows `conclusion: success` with the `ingest` job actually executed. That cannot happen until `INGEST_SCHEDULE` is set, which is inside #30.
+
+## 2026-09-18T19:52:00Z — session product-owner cycle 4 (send record)
+
+- decision: `cycle 4's single owner message` — notify **`msg_a663c534-fcb9-4bb9-8009-df14264a5d5f`**, priority **`high`**, status `delivered`, verified from the hub ack. Not an ask: no new decision is owed, the decision (`yes`) is already made and the outstanding item is work. Its one call to action is #30's ~10 minutes of setup; #17 appears only to say explicitly that no action is needed and that the chasing has stopped, and the junk `probe` ask is flagged for dismissal.
+- confidence: high
+- alternatives: an ask — rejected, re-asking an answered ask is the anti-pattern logged twice already; splitting into two messages — rejected, the run sends exactly one; `normal` — rejected, #30 is the sole blocker for the last release criterion *and* the whole dev-team routine, it is one action, it is safe now, and the owner is awake (12:52 PT).
+- watch-next: the notify names an explicit commitment — #17 gets **one** more mention (~2026-09-20T01:38Z) and then goes quiet. Honour it.
+
+### Cycle 4 actions taken
+
+- #17: `waiting` → removed, `blocked` → added, `p1` → `p2`, decision comment posted.
+- #30: gate comment posted (four checks + the deadlock diagnosis + the R5 link). `waiting` kept.
+- #22: cross-reference comment recording the history-rewrite opt-in. Closure window untouched.
+- `autonomy-dev-team-redlands-wifi-project`: **left disabled** — the #30 gate is objectively unmet.
+- Tripwire reading at 19:47Z: apex **404**, latent, no alert.
