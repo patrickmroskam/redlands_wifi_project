@@ -93,15 +93,15 @@ This repo is public; nothing sensitive may land in it.
 - R8.3 — THE SYSTEM SHALL keep test fixtures separate from `ingest/` (fixtures are never deleted by the pipeline).
 
 ## Release Criteria (v1 Definition of Done)
-- [ ] R1 — one page, HTML/CSS banner, retro theme, responsive, privacy link
-- [ ] R2 — map shows every network from the database, fenced to 92373/92374, popups + legend + stats
-- [ ] R3 — `ingest/` folder with plain-language README
-- [ ] R4 — pipeline: boundary filter, WIFI-only, `_nomap` opt-out, BSSID dedupe, append, delete processed files, loud failure on bad files
-- [ ] R5 — daily GitHub Actions ingest that commits to `main` and triggers a Pages redeploy
-- [ ] R6 — privacy policy page modeled on wigle.net
-- [ ] R7 — no secrets; raw logs never persist outside `ingest/`
-- [ ] R8 — unit tests + Playwright smoke test green in CI
-- [ ] The initial batch of wardrive logs pushed on 2026-09-16 has been ingested and the live site shows them
+- [x] R1 — one page, HTML/CSS banner, retro theme, responsive, privacy link
+- [x] R2 — map shows every network from the database, fenced to 92373/92374, popups + legend + stats
+- [x] R3 — `ingest/` folder with plain-language README
+- [x] R4 — pipeline: boundary filter, WIFI-only, `_nomap` opt-out, BSSID dedupe, append, delete processed files, loud failure on bad files
+- [ ] R5 — daily GitHub Actions ingest that commits to `main` and triggers a Pages redeploy — **the only unmet criterion.** The workflow exists (#5) but gates scheduled runs on `vars.INGEST_SCHEDULE == 'on'`, which is unset, so every scheduled run is skipped. Tracked on #30 behind the private-inbox cutover.
+- [x] R6 — privacy policy page modeled on wigle.net
+- [x] R7 — no secrets; raw logs never persist outside `ingest/`
+- [x] R8 — unit tests + Playwright smoke test green in CI
+- [x] The initial batch of wardrive logs pushed on 2026-09-16 has been ingested and the live site shows them
 
 ## Out of Scope (v1)
 - User accounts, login, or a web upload form
