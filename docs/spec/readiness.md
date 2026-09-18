@@ -41,7 +41,11 @@ Two ways to close it, both owner-only, both minutes: **verify the domain** (Part
 
 Note: #17 has been parked on a `DONE custom-domain` reply since 2026-09-17 — but **no OH HAI ask was ever sent for it**, so that reply was never actually requested.
 
-**Re-resolved at cycle 2 (07:38Z): unchanged and still live** — apex `A` still 185.199.108-111.153, `www` still CNAMEd to `patrickmroskam.github.io`, challenge TXT still absent, apex still 404, and the repo's Pages config still reports `cname: null` / `protected_domain_state: null`. Cycle 2 holds the message at the same priority because it lands at 00:45 PT; **cycle 3 (~06:38 PT) escalates this to `high` if it is still open**, and that is committed, not re-decided each pass.
+**Re-resolved at cycle 2 (07:38Z): unchanged and still live** — apex `A` still 185.199.108-111.153, `www` still CNAMEd to `patrickmroskam.github.io`, challenge TXT still absent, apex still 404, and the repo's Pages config still reports `cname: null` / `protected_domain_state: null`.
+
+**Cycle 2 cleared the deadlock rather than re-describing it.** New doc [`docs/setup/domain-takeover.md`](https://github.com/patrickmroskam/redlands_wifi_project/blob/main/docs/setup/domain-takeover.md) — the security-only half, two options, ~5 minutes — and the ask that had never been sent is now open: **`msg_e812f339-e53b-46d4-bb67-ce8e5f6edced`**, resume key **`DONE domain-takeover`**. It was split out of `custom-domain.md` on purpose: that doc routes the verification TXT through Cloudflare, making a 5-minute fix read as "first migrate your DNS". The TXT goes straight into Namecheap's Advanced DNS tab.
+
+The gate is the DNS, not the reply — every cycle re-resolves it. Escalation rung, committed: **cycle 4 (~12:38 PT)** sends at priority `high` if the exposure is still live and the ask still unanswered; cycle 3 sends nothing new and no cycle re-asks while `msg_e812f339` is open.
 
 ### 3. Spec proposals — PO may not apply these
 
@@ -73,8 +77,9 @@ What cycle 2 actually did, rather than restating cycle 1:
 1. **Re-ran both gates objectively** instead of inheriting them — #30's three existence checks (all still negative) and #17's five DNS/HTTP checks (exposure still live). Both are recorded in the decision log.
 2. **Spot-checked the privacy guarantee against what is actually served** — R4.12 holds on the live 18,152-record database, and R2.5 renders. These are the promises the public privacy page makes; they are now verified against the published artifact, not just the script that writes it.
 3. **Closed out the #21 process debt** with a deferral recorded on the issue, so no later cycle re-discovers it as a mystery.
-4. **Committed the #17 escalation trigger to cycle 3** (~06:38 PT → priority `high`), so the rung is decided once rather than re-argued every six hours.
-5. **Checked, and declined, a constitution amendment** — the invariant barring raw logs outside `ingest/` contradicts option C, but #30's body already scopes that edit and the owner's `yes` on `msg_92a6bc9c` already ratifies it. Editing it six hours ahead of the flow it describes would split #30's acceptance across two actors. Logged as a check for whoever works #30.
+4. **Sent the #17 ask that had never been sent** — cycle 1 diagnosed that deadlock, cycle 2 cleared it (new doc, ask `msg_e812f339-…`, key `DONE domain-takeover`). This run's single owner message is that ask rather than a notify: an ask waits in the inbox instead of alerting, so it costs nothing at 00:50 PT, and it is the mechanism that actually unblocks a `waiting` issue. Escalation committed to **cycle 4** (~12:38 PT, priority `high`) so the rung is decided once rather than re-argued every six hours.
+5. **Self-reported an error:** working out `ask submit`'s flags sent a real, meaningless ask to the inbox (`msg_65c5813b-…`, titled "probe"). The CLI has no withdraw verb, so the real ask opens by naming it and asking the owner to dismiss it. Logged with the rule that prevents a third one: never probe a send command by invoking it — a well-formed-but-incomplete invocation sends, and only an unknown flag errors first.
+6. **Checked, and declined, a constitution amendment** — the invariant barring raw logs outside `ingest/` contradicts option C, but #30's body already scopes that edit and the owner's `yes` on `msg_92a6bc9c` already ratifies it. Editing it six hours ahead of the flow it describes would split #30's acceptance across two actors. Logged as a check for whoever works #30.
 
 ## Routine status
 
