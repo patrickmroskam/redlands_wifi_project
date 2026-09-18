@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-18T13:40:00Z
-cycle: 3
-net_open_history: [8, 8, 8]
+last_reconciled_at: 2026-09-18T19:45:00Z
+cycle: 4
+net_open_history: [8, 8, 8, 8]
 polish_backlog_depth: 0
 ---
 
@@ -10,6 +10,61 @@ polish_backlog_depth: 0
 > Regenerable projection. Source of truth: GitHub (state) + decision-log (rationale).
 > Cycle 1 was a **full rebuild** (digest absent on first product-owner run): all 23
 > issues scanned, no delta watermark applied. Next full rebuild due at cycle 10.
+
+## Cycle 4 delta (watermark 2026-09-18T13:40Z → 19:45Z): **the owner replied — to both asks**
+
+First owner input since this routine started. Both outstanding asks came back answered,
+and the reply values change the state materially:
+
+| ask | issue | value | comment |
+|---|---|---|---|
+| `msg_e812f339-e53b-46d4-bb67-ce8e5f6edced` | #17 | **`not-yet`** | — |
+| `msg_92a6bc9c-dcf7-49bd-81a3-70fd6472d528` | #30 | **`yes`** | **"Rewrite history"** |
+
+Repo state itself is unchanged: `main` at `5dbfbf9` (cycle 3's own commit), **0 open PRs**,
+CI green, site HTTP 200, no issue touched since the watermark except by this cycle. The junk
+ask `msg_65c5813b` ("probe", cycle 2's self-reported error) is still **open** in the inbox —
+the CLI has no withdraw verb, so it can only be dismissed from the owner's side.
+
+### #30 is in the same deadlock #17 was in at cycle 1 — and nobody has told the owner
+
+The gate was re-run objectively at 19:40Z and **all four objects are still absent**:
+
+- `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository*
+  (also checked the `redlands-wifi-inbox` spelling, and listed every repo on the account
+  matching `inbox|wifi|redlands` — only `redlands_wifi_project` exists)
+- `repos/…/environments` → only `github-pages`; no `ingest`
+- `gh secret list` → empty, so no `INBOX_TOKEN`
+- `gh variable list` → empty, so no `INGEST_SCHEDULE`
+
+So `yes` did **not** mean "I did it" — cycle 2 read that correctly. But the reason it has not
+moved in ~22 h is now visible, and it is structural rather than owner inattention:
+`docs/setup/private-inbox.md` asks for ~10 minutes of setup across three parts and resumes on
+`DONE private-inbox`, while the **ask was posed as a question**. The owner answered the
+question — `yes`, plus the doc's opt-in phrase "rewrite history" — which from their side is a
+complete, responsive reply. Nothing has ever told them that four objects are still owed.
+That is the identical failure cycle 1 diagnosed on #17 ("`waiting` on a reply nobody
+requested"), and it is this cycle's single call to action.
+
+### #17: the owner declined, with the facts in front of them
+
+`not-yet` was answered against `docs/setup/domain-takeover.md`, which states plainly that the
+domain is already theirs, that the fix is one TXT record, that it takes ~5 minutes, and that
+visitors see no change. This is an **informed deferral, not a misunderstanding** — so there is
+no framing to correct and nothing to re-ask. The exposure is unchanged and re-verified at
+19:39Z (apex `A` → 185.199.108-111.153, `www` CNAME → `patrickmroskam.github.io`, challenge
+TXT **absent**, `pages.cname` **null**, `GET https://redlandswifiproject.com/` → **404**), and
+`whois` confirms the owner has held the domain at Namecheap since 2025-01-22 (expires
+2027-01-22). Risk accepted by the owner; recorded, not overridden. See the tripwire below.
+
+### R5 root cause re-confirmed (no burndown change)
+
+Two scheduled `Ingest wardrive logs` runs now exist — 2026-09-17T14:44Z and 2026-09-18T14:10Z
+— and **both were `skipped`**, at the job level, by
+`if: github.event_name != 'schedule' || vars.INGEST_SCHEDULE == 'on'`. With zero repo
+variables, every scheduled run is a no-op. A firing cron is *not* evidence of a working daily
+ingest, and this was nearly miscounted as one. Burndown stays **8/9**; PRD line 100 already
+states this gate correctly and needs no edit. R5 unblocks inside #30, which sets the variable.
 
 ## Cycle 3 delta (watermark 2026-09-18T07:39Z → 13:40Z): **empty (cycle 2's own writes only)**
 

@@ -132,3 +132,45 @@
 - confidence: high
 - alternatives: escalating early because the exposure is a p1 — rejected; the rung's whole purpose is that it was decided once, at cycle 2, with the reasoning written down. Sending no notify at all — rejected; the routine requires exactly one per run, and "nothing new" meant no new *alert*, not silence.
 - watch-next: **cycle 4 (~2026-09-18T19:38Z ≈ 12:38 PT) sends at priority `high`** if the challenge TXT is still absent and the apex `A` records still point into the GitHub range. Keep that message about the takeover window alone — do not dilute it with the routine/backlog question.
+
+## 2026-09-18T19:45:00Z — session product-owner cycle 4
+
+- decision: `the committed cycle-4 escalation rung RETIRES unfired` — cycle 2 committed: "if the exposure is still live **and the ask still unanswered** at cycle 4 (~19:38Z), that cycle sends its notify at priority `high`." The exposure is still live, but `msg_e812f339` came back **answered: `not-yet`**. The rung's condition is conjunctive and is not met, so it does not fire. This is *executing* the committed rule, not re-arguing it: the rung was written to break a silence, and the silence broke on its own.
+- confidence: high
+- alternatives: firing `high` anyway on the grounds that the exposure is what matters — rejected, and this is the substantive call of the cycle. The owner answered against `docs/setup/domain-takeover.md`, which states in its own words that they already own the domain, that the fix is a single TXT record, that it takes ~5 minutes, and that visitors see nothing change. There is no misframing left to correct. A `high` alert restating a question the owner has just declined *with the facts in hand* is nagging, and it spends the one rung that still has credibility on the item where it would do the least good. The rung is instead re-aimed at #30 (below), which is a genuinely unsaid thing.
+- watch-next: **do not re-ask #17 and do not escalate it on a timer.** Its escalation is now event-driven only — see the tripwire.
+
+## 2026-09-18T19:45:00Z — session product-owner cycle 4
+
+- decision: `#17 relabelled to an owner-accepted risk: waiting removed, blocked added, p1 → p2` — `waiting` means "waiting on the human" and the human has now spoken, so it is simply false and comes off. `blocked` replaces it because the work is registrar/account-side and no dev-team run can ever do it at any priority. p1 → p2 because priority in this backlog encodes **dev-team build order**; leaving the sole p1 on an item nobody in the loop is permitted to build misrepresents the buildable queue. The exposure is not downgraded — it is recorded here, on the issue, and in the digest.
+- confidence: medium — the label mechanics are clear; the p1 → p2 move is a judgement call that trades an accurate queue signal against the optics of lowering a live security item's number.
+- alternatives: holding p1 to keep the risk visible — rejected, visibility is the decision log's and the issue's job, not a sort key's; closing #17 outright as "owner declined" — rejected, `not-yet` is a deferral, not a cancellation, and the doc's own follow-up text ("after **A**, #17 becomes the ordinary switch-over task") assumes it survives.
+- watch-next: the tripwire below, and re-raise #17 **once** at cycle 9 (~2026-09-20T01:38Z) if still unmitigated — a single dated reminder against a deferral, not a recurring one.
+
+## 2026-09-18T19:45:00Z — session product-owner cycle 4
+
+- decision: `armed an objective takeover tripwire on #17` — every cycle now resolves the apex and reads its HTTP status. **404 = the name is still unclaimed** (the exposure is latent, no action). **200, or any body that is not GitHub's "Site not found" page, = someone has claimed the name on their own Pages repo** — that is the exposure *materialising*, not a risk forecast, and it fires an immediate `high` regardless of any deferral or rung state. A `_github-pages-challenge-patrickmroskam` TXT appearing, or the apex `A` records leaving 185.199.108-111.153, closes #17 instead.
+- confidence: high
+- alternatives: a time-based re-raise every cycle — rejected, that is the nagging the `not-yet` reply should have bought the owner out of. An accepted risk deserves a detector, not a reminder.
+- watch-next: `curl -s -o /dev/null -w '%{http_code}' https://redlandswifiproject.com/` each cycle; 19:39Z reading was **404**.
+
+## 2026-09-18T19:45:00Z — session product-owner cycle 4
+
+- decision: `#30's real blocker identified — the ask was a question, the doc needs a DONE, and nobody bridged the two` — the four-object gate is still negative at 19:40Z (no `redlands_wifi_inbox` under either spelling, no `ingest` environment, 0 secrets, 0 variables), so `waiting` stays and the dev-team routine stays **disabled**. But the *reason* is no longer "the owner has not got to it": `msg_92a6bc9c` was phrased as a question, and the owner gave a complete, responsive answer to that question — `yes`, plus the doc's own opt-in phrase "Rewrite history". From their side the ball is in ours. `docs/setup/private-inbox.md` meanwhile asks for ~10 minutes across three parts and resumes only on `DONE private-inbox`. This is structurally the same deadlock cycle 1 found on #17, and **it has never been said to the owner**. It is therefore this cycle's single notify, sent at `high` on its own merits: #30 gates R5 (the only unmet release criterion) *and* the entire dev-team routine, and the owner has never been told that work is outstanding.
+- confidence: high
+- alternatives: re-asking #30 — rejected, the ask is answered and re-asking an answered ask is the anti-pattern this log has twice recorded; a `normal` notify — rejected, this is the sole blocker for every other thing in the project and the owner is awake (12:45 PT); staying silent another cycle — rejected, that is what has already cost ~22 h.
+- watch-next: the four existence checks, every cycle, unchanged. If `DONE private-inbox` arrives, remove `waiting`, re-enable `autonomy-dev-team-redlands-wifi-project`, and verify the constitution invariant is amended in the same change that moves the flow.
+
+## 2026-09-18T19:45:00Z — session product-owner cycle 4
+
+- decision: `the owner opted into the history rewrite — recorded on the issues, NOT filed as a new issue` — cycle 1 routed "Rewrite history" to the owner as a proposal, on the grounds that the ratified PRD files git-history retention under a "Known consideration (**not a requirement**)". The owner has now taken it: reply comment **"Rewrite history"**, which is exactly the opt-in phrase `private-inbox.md` specifies. The authority therefore exists. It is recorded as a comment on #30 (whose doc carries the opt-in) and on #22 (where history retention was argued) rather than as a new issue, because §4e's net-issue-delta budget needs ≥ 1 realized close and this cycle realized none.
+- confidence: high
+- alternatives: filing it now — rejected on the §4e budget; treating `yes` as covering it silently — rejected, a destructive, irreversible rewrite of a public repo's history is not something to infer from a checkbox, and it must be visible on the issues before anyone acts on it.
+- watch-next: file it as its own issue at the first cycle with budget (earliest cycle 5, after the #22 sweep). It must not be bundled into #30's cutover: the rewrite is destructive and irreversible, anyone who already cloned keeps their copy, and it deserves its own review rather than riding along inside a migration.
+
+## 2026-09-18T19:45:00Z — session product-owner cycle 4
+
+- decision: `R5 stays unchecked — a firing cron is not a working ingest` — two scheduled `Ingest wardrive logs` runs now exist (2026-09-17T14:44Z, 2026-09-18T14:10Z) where cycle 2 had none, and both read `completed/skipped`. Inspected rather than assumed: the `ingest` **job** is skipped by `if: github.event_name != 'schedule' || vars.INGEST_SCHEDULE == 'on'`, and `gh variable list` is empty. So the daily cron fires and does nothing, every night. Burndown stays **8/9** and PRD line 100 already states this gate correctly, so no spec edit is owed.
+- confidence: high
+- alternatives: flipping R5 to `[x]` on the strength of two scheduled runs appearing — rejected, and it was the live risk this cycle: the run list alone looks like R5.1 satisfied, and only opening the workflow and reading the job's `if:` shows every scheduled run is a no-op. R5.4 ("no commit when nothing changes") is *also* not evidenced by these runs, because the job never ran to decide that.
+- watch-next: flip R5 only when a **scheduled** run shows `conclusion: success` with the `ingest` job actually executed. That cannot happen until `INGEST_SCHEDULE` is set, which is inside #30.
