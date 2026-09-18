@@ -55,3 +55,45 @@
 - confidence: high
 - alternatives: editing the Out-of-Scope list directly — rejected, §4g's carve-out is checkbox flips and stale citations only; changing the *set* of scope items is the owner's.
 - watch-next: if the owner rules on either, apply it as a spec edit in that cycle and log the sign-off.
+
+## 2026-09-18T07:45:00Z — session product-owner cycle 2
+
+- decision: `resume-check #30: still NOT resumed (objective gate, re-run)` — all three existence checks re-run at 07:39Z, all three still negative: `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository*; `repos/…/environments` → only `github-pages`; `actions/secrets` → `total_count: 0`. The hub holds **no message newer than my own cycle-1 notify** `msg_8f830af8` (01:46:45Z) — no owner reply of any kind arrived in the last six hours. `waiting` kept on #30; dev-team routine **left disabled**.
+- confidence: high
+- alternatives: commenting the same negative result on #30 again — rejected, cycle 1's comment already states the gate and the result is unchanged; a 6-hourly repetition would be pure churn. The PO task records the gate in this log, which is where it belongs.
+- watch-next: unchanged — the three checks are the gate, every cycle.
+
+## 2026-09-18T07:45:00Z — session product-owner cycle 2
+
+- decision: `#17 exposure re-verified STILL LIVE` — independently re-resolved at 07:38Z: apex `A` → 185.199.108/109/110/111.153, `www` CNAME → `patrickmroskam.github.io`, `_github-pages-challenge-patrickmroskam.redlandswifiproject.com` TXT → **none**, `GET https://redlandswifiproject.com/` → **404** with the GitHub "Site not found" body, and `repos/…/pages` → `cname: null`, `protected_domain_state: null`. Nothing has changed since cycle 1. Priority stays **p1**.
+- confidence: high
+- alternatives: dropping back to p2 on the grounds that nothing has happened in 78 days — rejected; an unclaimed Pages-pointed apex is a standing exploit window, and elapsed quiet time is not mitigation.
+- watch-next: a `_github-pages-challenge-patrickmroskam` TXT appearing, or the apex `A` records leaving the Pages range, closes this and drops #17 to p3.
+
+## 2026-09-18T07:45:00Z — session product-owner cycle 2
+
+- decision: `owner-message ladder: HOLD at this rung, with a committed escalation trigger` — cycle 1's notify (`msg_8f830af8`, delivered 01:46Z) already named both owner items, security first, with one action each. Cycle 2 lands at 07:45Z = **00:45 PT**, so a second full restatement six hours later, overnight, would be noise against a message the owner has not yet had a waking hour to read. Cycle 2 therefore sends a short no-change delta at the same priority. **Committed trigger (do not re-litigate per cycle):** if #17's exposure is still live at cycle 3 (~13:38Z ≈ 06:38 PT — the first pass that lands in the owner's waking hours), that notify goes at priority `high` and leads with the takeover window alone.
+- confidence: medium
+- alternatives: escalating to `high` now — rejected, an overnight high-priority alert buys no response time and spends the escalation rung on a message the owner cannot act on; staying silent — rejected, the constitution requires exactly one notify per scheduled run.
+- watch-next: cycle 3 executes the trigger as written, or records the exposure as closed.
+
+## 2026-09-18T07:45:00Z — session product-owner cycle 2
+
+- decision: `#21 deferred behind the p1/p2 owner queue, and said so on the issue` — #21 (p3, Dependabot alerts / private vulnerability reporting / SHA-pinning enforcement) is owner-only and has never reached the owner through the durable channel. It gets a comment recording that, rather than a `docs/setup/` doc + ask of its own: two owner actions (#17 mitigation, #30 setup) are already queued, and a third p3 ask competing with a p1 security item would lower the odds of both.
+- confidence: high
+- alternatives: sending an ask now — rejected on queue contention; silently leaving it — rejected, that is exactly how #17 fell into a deadlock on a reply nobody asked for.
+- watch-next: once #30 and #17 clear, write `docs/setup/github-security-settings.md` and send #21's ask, or fold its three toggles into the next owner message as a postscript.
+
+## 2026-09-18T07:45:00Z — session product-owner cycle 2
+
+- decision: `privacy invariants spot-checked against the LIVE published database` — PRD **R4.12** (never publish raw log contents, RSSI, altitude or accuracy): the live `data/networks.json` holds exactly `bssid, ssid, auth, channel, first_seen, lat, lon` across all 18,152 records — **no forbidden field present**. **R2.5** (count + last-updated): `updated_at` and `count` are top-level in the database and rendered by `assets/map.js:278`. Site returns HTTP 200 with 18,152 records.
+- confidence: high
+- alternatives: trusting cycle 1's roll-up — rejected; R4.12 is a privacy guarantee made on the public privacy page, and it is cheap to verify against what is actually served rather than against the script that writes it.
+- watch-next: re-check R4.12 against the served database on the first cycle after a scheduled ingest publishes, since that is the first write nobody reviewed in a PR.
+
+## 2026-09-18T07:45:00Z — session product-owner cycle 2
+
+- decision: `no constitution amendment this cycle (deliberate)` — the hard invariant "Never push the raw wardrive logs anywhere except `ingest/` in this repo" contradicts option C, and a future dev-team run could read it as a bar on #30's work. Checked before acting: **#30's body already scopes that amendment as part of its own work**, and the ratifying ask (`msg_92a6bc9c`, whose text states the reply "ratifies the rule change") came back `yes`. So the authority exists and the edit has an owner — it belongs in the same change that moves the flow, not six hours ahead of it.
+- confidence: high
+- alternatives: amending it now to pre-clear the path — rejected, an invariant that describes a flow the repo does not yet have is worse than a stale one, and it would split #30's acceptance across two commits by two actors.
+- watch-next: if a dev-team run ever stops on this invariant instead of amending it, that is a real deadlock — raise it then.
