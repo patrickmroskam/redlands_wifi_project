@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-19T13:38:00Z
-cycle: 7
-net_open_history: [8, 8, 8, 8, 8, 8, 8]
+last_reconciled_at: 2026-09-19T19:38:00Z
+cycle: 8
+net_open_history: [8, 8, 8, 8, 8, 8, 8, 8]
 polish_backlog_depth: 0
 ---
 
@@ -10,6 +10,107 @@ polish_backlog_depth: 0
 > Regenerable projection. Source of truth: GitHub (state) + decision-log (rationale).
 > Cycle 1 was a **full rebuild** (digest absent on first product-owner run): all 23
 > issues scanned, no delta watermark applied. Next full rebuild due at cycle 10.
+
+## Cycle 8 delta (watermark 2026-09-19T13:38Z → 19:38Z): **zero owner movement; the blocked-queue sweep is aimed at the two issues that must never be parked**
+
+**Nothing moved.** The newest message in the OH HAI inbox is cycle 7's own notify
+(`msg_2dd5fe22`, 2026-09-19T13:45:13Z) — the owner has sent nothing since. `main` at `965beaa`
+(cycle 7's own commit), **0 open PRs**, CI green, site HTTP 200. The only issue touched since the
+watermark is #30 at 13:42:17Z — cycle 7's own banner edit. Open count flat at **8** for an eighth
+cycle; net issue delta **0**.
+
+### Both standing gates re-run objectively — both still negative
+
+**#30, all four checks at 19:38Z** (unchanged since cycle 4 — a **fifth** consecutive negative):
+
+- `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository*
+  (the `redlands-wifi-inbox` spelling too)
+- `repos/…/environments` → `total_count: 1`, only `github-pages`
+- `actions/secrets` → `total_count: 0` — no `INBOX_TOKEN`
+- `actions/variables` → `total_count: 0` — no `INGEST_SCHEDULE`
+
+`ask await` on `msg_92a6bc9c` re-read unchanged: `yes` + "Rewrite history". Not the resume key.
+`waiting` kept on #30; dev-team routine re-verified **`enabled: false`**, `lastRunAt` still
+2026-09-17T15:05:07.762Z — the three workable p3s have now been parked **~52.5 h**.
+
+**#17 tripwire at 19:38Z:** apex → **404**, body is GitHub's own *"Site not found · GitHub Pages"*
+page, apex `A` → 185.199.108/109/110/111.153, `_github-pages-challenge-patrickmroskam` TXT → none,
+`repos/…/pages` → `cname: null`, `protected_domain_state: null`. **404 = still unclaimed, latent,
+no action.** Fire condition not met.
+
+**R5 evidence, now three data points.** Today's scheduled ingest fired **2026-09-19T13:43:57Z** and
+concluded **`skipped`** — joining 2026-09-18T14:10:34Z and 2026-09-17T14:44:46Z. Every scheduled
+run this workflow has ever had is `skipped`, gated on `vars.INGEST_SCHEDULE == 'on'` at
+`.github/workflows/ingest.yml:28`. R5 is implemented and gated off, not unbuilt.
+
+### The find: the PO's own step 4h sweep is aimed at #22 and #30
+
+Cycle 5 parked #21 with `needs-human`. Cycle 6 parked #22 with `blocked`, **deliberately not**
+`needs-human`, because `needs-human` also suppresses closure churn and would switch off the
+cycle-10 aging sweep scheduled to resolve #22. Cycle 7 recorded the general principle: *use the
+narrowest durable label that does not disable the machinery scheduled to resolve it.*
+
+What no cycle checked is that the product-owner skill's **§4h blocked-queue sweep** is itself a
+consumer of those labels, and its enumeration is literally:
+
+```
+gh issue list --state open --search "label:blocked sort:created-asc -label:needs-human"   → #22
+gh issue list --state open --search "label:waiting sort:created-asc -label:needs-human"   → #30
+```
+
+Run at 19:38Z, that returns **exactly {#22, #30}** — the two issues in this backlog that must
+never receive `needs-human`. #22 because it would suppress its own cycle-10 closure sweep; #30
+because this routine's resume check enumerates open issues labelled `waiting`, so parking #30
+switches off the check that restarts the whole project.
+
+§4h's third branch reads: escalate to `needs-human` when there is *"no clear issue dependency, an
+ambiguous/external blocker, a design/scope call, **or it has aged past `closure_aging_window_hours`
+with the blocker unchanged and no path you can verify**."* Both issues are now past the 48 h window
+with their blockers unchanged — #22 since 2026-09-17T05:08:48Z, #30 `waiting` since
+2026-09-17T15:06Z — and neither has a *"Blocked by #N"* dependency of the kind the first two
+branches look for. A run that matched on age and on the absence of an issue dependency, without
+weighing the "no path you can verify" clause, lands on the escalate branch.
+
+**Both are branch (b), leave it — and the verifiable paths are these, recorded so the next cycle
+does not have to re-derive them:**
+
+| # | label | blocker | the path that makes this branch (b), not (c) |
+|---|---|---|---|
+| #22 | `blocked` | none; the label is PO parking, not a dependency | the §4d aging sweep resolves it at **cycle 10 (~2026-09-20T07:38Z)**, window shuts 2026-09-20T01:42Z |
+| #30 | `waiting` | the owner's `DONE private-inbox` | four objective existence checks, re-run every cycle; the reply resumes it |
+
+**Confidence: high on the mechanism, medium on the hazard.** The commands above were run, not
+reasoned about, and their output is the whole finding — that part is certain. Whether a careful run
+would actually escalate is less certain: the "no path you can verify" clause is in the same
+sentence as the age trigger, and both paths here are verifiable and dated. So this is a **guard
+against a plausible misread, not a claim that the misread was coming** — recorded that way on
+purpose, in the same calibration cycle 7 used on #30.
+
+**No label was added or removed this cycle.** The remedy is a durable carve-out in `po-tasks.md`,
+which every cycle reads before acting.
+
+### Reconciliation correction: the Hosting rollup has been four cycles stale
+
+The *Hosting / custom domain* section below still reads `open: 1 (p0:0 p1:1 p2:0 p3:0)` and
+*"Priority holds at p1"*. That has been wrong since **cycle 4**, which deliberately moved #17
+`p1 → p2` when the owner answered `not-yet` (decision log, 2026-09-18T19:45Z: *"priority in this
+backlog encodes dev-team build order"*). GitHub's label timeline confirms `unlabeled p1` /
+`labeled p2` at 2026-09-18T19:45:33Z. The readiness report's parked table was updated at the time;
+this per-area rollup was not, and cycles 5, 6 and 7 carried it forward unread.
+
+Corrected below to `open: 1 (p0:0 p1:0 p2:1 p3:0)`. **Operationally harmless** — every tier search
+reads GitHub labels, never this file — but it is the PO's own working memory contradicting the PO's
+own decision, and the digest is what a future cycle grounds on. The other five rollups were
+re-checked against the live list and are all correct.
+
+### Open-count accounting
+
+Still **8 open** (`gh issue list --json number,labels,assignees`, 19:38Z). Workable-by-an-agent:
+**#25, #29, #34** (p3, unassigned, unlabelled — all three bodies re-read this cycle and all three
+pass the staleness test: pure repo work, no halt-or-re-ask instruction, no owner decision language).
+Durably parked: **#17, #21** (`needs-human`), **#22** (`blocked` + `po-closure-proposed`).
+Owner-gated: **#30** (`waiting`, banner verified intact with the original body byte-for-byte below
+it). Tracking parent: **#1**, carries no priority label so it never enters a tier search.
 
 ## Cycle 7 delta (watermark 2026-09-19T07:38Z → 13:38Z): **zero owner movement; a staleness trap on the resume path's first pick**
 
@@ -315,8 +416,8 @@ is now surfaced as an owner decision: the worker has been halted since 2026-09-1
 
 ## Hosting / custom domain (explicitly OUT of v1 scope)
 
-- open: 1 (p0:0 p1:1 p2:0 p3:0), launch-blockers: 0, in-flight: 0
-- notable: exposure **independently re-resolved at cycle 2 (07:38Z) and still live** — apex `A` still in the Pages range, `www` still CNAMEd, challenge TXT still absent, apex still 404, `repos/…/pages` → `cname: null`, `protected_domain_state: null`. Priority holds at p1. #17 was raised p2 → **p1** at cycle 1 for a live, independently re-verified security exposure: apex `A` records point at GitHub Pages (185.199.108-111.153) and `www` CNAMEs to `patrickmroskam.github.io`, but there is no `_github-pages-challenge-patrickmroskam` TXT, so the domain is unverified and unclaimed (`GET https://redlandswifiproject.com/` → 404 from Pages) — any GitHub user could claim it. Compounding it, the issue sits `waiting` on a `DONE custom-domain` reply **for which no OH HAI ask was ever sent** (its own 04:14Z comment says so): a silent deadlock. The p1 applies to the mitigation only; the domain switch itself remains out of v1 scope per the ratified PRD.
+- open: 1 (p0:0 p1:0 p2:1 p3:0), launch-blockers: 0, in-flight: 0
+- notable: exposure **independently re-resolved at cycle 2 (07:38Z) and still live** — apex `A` still in the Pages range, `www` still CNAMEd, challenge TXT still absent, apex still 404, `repos/…/pages` → `cname: null`, `protected_domain_state: null`. **Priority is p2** — corrected at cycle 8; this line read "holds at p1" for four cycles after cycle 4 moved it (see the cycle-8 delta). #17 was raised p2 → **p1** at cycle 1 for a live, independently re-verified security exposure: apex `A` records point at GitHub Pages (185.199.108-111.153) and `www` CNAMEs to `patrickmroskam.github.io`, but there is no `_github-pages-challenge-patrickmroskam` TXT, so the domain is unverified and unclaimed (`GET https://redlandswifiproject.com/` → 404 from Pages) — any GitHub user could claim it. Compounding it, the issue sits `waiting` on a `DONE custom-domain` reply **for which no OH HAI ask was ever sent** (its own 04:14Z comment says so): a silent deadlock. Cycle 4 then moved it **p1 → p2** (2026-09-18T19:45:33Z) when the owner answered `not-yet`: priority in this backlog encodes dev-team build order, and no actor may build this at any tier. The severity is unchanged and lives on the issue, in the decision log, and in the standing tripwire — not in the sort key. The domain switch itself remains out of v1 scope per the ratified PRD.
 
 ## Tests / CI (PRD R8)
 

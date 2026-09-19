@@ -342,3 +342,45 @@ Cycle 6 sent **one** message. Asks on file, both answered, neither re-sent:
 
 Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answered, neither re-sent:
 `msg_92a6bc9c` (#30 → `yes` + "Rewrite history"), `msg_e812f339` (#17 → `not-yet`).
+
+## 2026-09-19T19:38:00Z — session product-owner cycle 8
+
+- decision: `resume-check #30: still NOT resumed (objective gate, fifth consecutive negative)` — all four existence checks re-run at 19:38Z and all four are still negative: `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository* (and the `redlands-wifi-inbox` spelling); `repos/…/environments` → `total_count: 1`, only `github-pages`; `actions/secrets` → `total_count: 0`; `actions/variables` → `total_count: 0`. `ask await` on `msg_92a6bc9c` re-read unchanged (`yes` + "Rewrite history") — answered, but not the resume key `DONE private-inbox`. The hub's newest message is cycle 7's own notify `msg_2dd5fe22` (13:45:13Z): no owner reply of any kind in six hours. `waiting` kept on #30; dev-team routine **left disabled** (`enabled: false`, `lastRunAt` 2026-09-17T15:05:07.762Z).
+- confidence: high
+- alternatives: re-sending the ask — rejected, it is answered and the protocol forbids re-sending; commenting the same negative result on #30 again — rejected, cycle 1's comment already states the gate and a 6-hourly repetition is churn.
+- watch-next: unchanged — the four checks are the gate, every cycle, and they are what a `DONE` reply must be reconciled against.
+
+## 2026-09-19T19:38:00Z — session product-owner cycle 8
+
+- decision: `#17 tripwire run, latent — no action` — apex → **404** with GitHub's own "Site not found · GitHub Pages" body, apex `A` → 185.199.108/109/110/111.153, `_github-pages-challenge-patrickmroskam` TXT → none, `repos/…/pages` → `cname: null`, `protected_domain_state: null`. 404 with the GitHub body is the latent reading: the name is still unclaimed. Fire condition (200, or a body that is not that page) not met.
+- confidence: high
+- alternatives: escalating anyway because the exposure is still live — rejected, the owner's `not-yet` is an informed deferral and the tripwire exists precisely so the *fact* changing fires, not the clock.
+- watch-next: cycle 9 (~2026-09-20T01:38Z) owes #17 its single dated re-raise; that is the only timed #17 action left.
+
+## 2026-09-19T19:38:00Z — session product-owner cycle 8
+
+- decision: `§4h blocked-queue sweep run explicitly; both issues verdict (b) "still legitimately blocked, leave it"; NEITHER escalated to needs-human` — the skill's own enumeration, run verbatim, returns exactly two issues: `label:blocked -label:needs-human` → **#22**, `label:waiting -label:needs-human` → **#30**. These are the two issues in this backlog that must never carry `needs-human`: it would suppress #22's own cycle-10 closure sweep, and it would switch off this routine's resume check, which enumerates open issues labelled `waiting`. §4h's escalate branch triggers on *"aged past `closure_aging_window_hours` with the blocker unchanged and no path you can verify"*, and both are past 48 h with no `Blocked by #N` dependency of the kind its first two branches look for. Both are branch (b): #22's path is the §4d aging sweep at cycle 10 (~2026-09-20T07:38Z, window shuts 2026-09-20T01:42Z); #30's path is the owner's `DONE private-inbox`, checked objectively every cycle. Recorded as a carve-out in `po-tasks.md` so the next cycle reads it before acting.
+- confidence: high on the mechanism, **medium on the hazard** — the enumeration was run rather than reasoned about, so *that* #22 and #30 are the sweep's only inputs is certain; whether a careful run would actually escalate is less so, since the "no path you can verify" clause sits in the same sentence as the age trigger and both paths here are verifiable and dated. Logged as a guard against a plausible misread, **not** a claim the misread was imminent. Cycles 5, 6 and 7 each found a real trap; that streak creates pressure to inflate a fourth, and this one is deliberately not inflated to match.
+- alternatives: pre-emptively adding a different label to take #22/#30 out of §4h's enumeration — rejected, every label in this taxonomy is load-bearing for some other actor's search, and adding one to dodge a sweep is how #21, #22 and #30 each became traps in the first place; leaving it undocumented because a careful run would get it right — rejected, the whole point of the task file is that it is read before the reasoning starts.
+- watch-next: if a future cycle *does* add `needs-human` to #22 or #30, that is a regression — remove it, and check whether the resume check or the closure sweep silently stopped in the meantime.
+
+## 2026-09-19T19:38:00Z — session product-owner cycle 8
+
+- decision: `digest reconciliation: Hosting / custom domain rollup corrected p1 → p2` — the section read `open: 1 (p0:0 p1:1 p2:0 p3:0)` and "Priority holds at p1". Cycle 4 moved #17 `p1 → p2` on 2026-09-18T19:45:33Z (confirmed in the GitHub label timeline) and recorded why; the readiness report's parked table was updated then, this per-area rollup was not, and cycles 5–7 carried it forward unread. Corrected, with the cycle-4 rationale folded in so the section no longer has to be reconciled against the log. The other five per-area rollups were re-checked against the live issue list and are all correct.
+- confidence: high — GitHub's label timeline and the cycle-4 decision log agree, and the arithmetic against the live list is unambiguous.
+- alternatives: leaving it, since tier searches read GitHub and never this file — rejected: it is operationally harmless but it is the PO's working memory contradicting the PO's own decision, and the digest is what a delta run grounds on rather than re-deriving.
+- watch-next: the cycle-10 full rebuild regenerates every rollup from GitHub; if any other section has drifted the same way, that rebuild is where it surfaces.
+
+## 2026-09-19T19:38:00Z — session product-owner cycle 8
+
+- decision: `staleness sweep clean — all 8 open issues, no change` — third question applied as cycle 7 defined it: does the issue's own text instruct an actor to halt or re-ask about something already resolved? #25, #29 and #34 re-read in full: all three are pure repo work (an ingest guard, two map-popup edge cases, an e2e test split), no halt-or-re-ask instruction, no owner-decision language, no dependency on #30 or #17. #30's cycle-7 banner verified present with the original body preserved verbatim below it. #17, #21 unreachable (`needs-human`); #22 unreachable (`blocked`); #1 carries no priority label so it never enters a tier search. Reachable-and-undoable: **empty** (fourth cycle). Reachable-and-stale: **empty**.
+- confidence: high
+- alternatives: none — this is the standing sweep, and the honest result this cycle is that it is clean.
+- watch-next: the set to re-test is whichever issue is next in line whenever a decision lands; today that ordering is unchanged at #30 → #25 → #29 → #34.
+
+## 2026-09-19T19:38:00Z — session product-owner cycle 8
+
+- decision: `#30 escalation rung FIRED at high, as committed at cycle 5` — the rung's condition was "all four #30 objects still absent at cycle 8 (~2026-09-19T19:38Z ≈ 12:38 PT)". All four are absent, verified above. One `high` notify sent, about **#30 alone**, 24 h after cycle 4's first `high` and inside the owner's working afternoon. **The rung now retires:** no further timed escalation on #30 — one `low` mention per day from cycle 9 on, on the same reasoning that retired the #17 rung. An informed owner who has not acted is choosing, and repetition is not new information.
+- confidence: high — the condition was decided at cycle 5 with the reasoning written down, and cycles 6 and 7 executed the `low` rungs without re-arguing it. This cycle executes the last rung the same way.
+- alternatives: holding at `low` because three `low`s in a row produced nothing — rejected, that re-argues a rung decided in advance, and the whole value of a pre-committed rung is that it does not get re-litigated at the moment it costs something; escalating further (a second ask) — rejected, `msg_92a6bc9c` is answered and the protocol forbids re-asking, and a junk ask (`msg_65c5813b`) is already cluttering the owner's queue.
+- watch-next: cycle 9 sends `low` and owes #17 its one dated re-raise; cycle 10 is the full rebuild, the #22 sweep, the #17 retitle, and the first cycle with budget to file the owner-approved history rewrite.
