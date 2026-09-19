@@ -9,6 +9,7 @@
 | `tracking` | A tracking/parent issue — never assigned; descend to sub-issues. |
 | `blocked` / `waiting` | Not workable yet. `waiting` = waiting on the human (see Human-in-the-loop protocol). |
 | `needs-triage` | Flagged for human/PO re-evaluation. |
+| `needs-human` | Parked for the human: no actor can move it (account/registrar/settings work, or a decision already deferred). Excluded from every `dev-team` tier search and claim gate, and skipped by the PO's blocked-queue sweep. Added by the PO; removed when the human acts. Parking is not dropping — the readiness report surfaces the count. |
 | `stakeholder` | Issue filed by the `stakeholder` actor from an acceptance run (its dedup scopes by this label). |
 | `qa` | Issue filed by the `qa` actor from a regression dogfood of recently-shipped features (its dedup scopes by this label). |
 | `demo-gallery` | Marks the single pinned issue the `stakeholder` updates with the keyed demo-clip gallery (when `capture_demo` is on). |

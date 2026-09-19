@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-18T19:45:00Z
-cycle: 4
-net_open_history: [8, 8, 8, 8]
+last_reconciled_at: 2026-09-19T01:38:00Z
+cycle: 5
+net_open_history: [8, 8, 8, 8, 8]
 polish_backlog_depth: 0
 ---
 
@@ -10,6 +10,61 @@ polish_backlog_depth: 0
 > Regenerable projection. Source of truth: GitHub (state) + decision-log (rationale).
 > Cycle 1 was a **full rebuild** (digest absent on first product-owner run): all 23
 > issues scanned, no delta watermark applied. Next full rebuild due at cycle 10.
+
+## Cycle 5 delta (watermark 2026-09-18T19:45Z → 2026-09-19T01:38Z): **no owner movement; one scheduling trap found and defused**
+
+**Nothing the owner controls moved.** No hub reply of any kind since cycle 4's `high` notify
+(`msg_a663c534`, 2026-09-18T19:46:21Z). No new comment on any issue since 19:46Z. `main` at
+`05463ad` (cycle 4's own commit), **0 open PRs**, CI green, site HTTP 200 / 18,152 networks.
+Both asks re-read with `ask await` and both are unchanged: `msg_e812f339` → `not-yet`,
+`msg_92a6bc9c` → `yes` + "Rewrite history".
+
+Timing worth recording: the `high` went out at **12:46 PT** and this cycle runs at **18:38 PT**
+— a full working afternoon passed with the message in the inbox and nothing moved.
+
+### Both standing gates re-run objectively — both still negative
+
+**#30, all four checks at 01:38Z** (unchanged from cycle 4):
+
+- `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository*
+- `repos/…/environments` → `total_count: 1`, only `github-pages`
+- `actions/secrets` → `total_count: 0` — no `INBOX_TOKEN`
+- `actions/variables` → `total_count: 0` — no `INGEST_SCHEDULE`
+
+**#17 tripwire at 01:39Z:** apex → **404**, `www` → 404, apex `A` → 185.199.108/109/110/111.153,
+`_github-pages-challenge-patrickmroskam` TXT → none. **404 = still unclaimed, latent, no action** —
+the tripwire's fire condition was not met.
+
+### R5 evidence, now empirical rather than inferred
+
+The scheduled ingest **fired on 2026-09-18T14:10:34Z and came back `skipped`** (as did the
+2026-09-17T14:44:46Z run). That is the workflow's `if: github.event_name != 'schedule' ||
+vars.INGEST_SCHEDULE == 'on'` gate doing its job with the variable unset. R5 is
+**implemented but gated off**, not unbuilt — the cron fires nightly and does nothing.
+
+R4.12 re-spot-checked against the **served** database: record keys are exactly
+`auth, bssid, channel, first_seen, lat, lon, ssid` across 18,152 records — no RSSI, altitude or
+accuracy. `count` and `updated_at` present (R2.5).
+
+### The find: #21 was a landmine under the resume path
+
+#21 was the **oldest open `p3`** (2026-09-17T05:08:46Z, older than #25, #29 and #34), unassigned,
+and carried **no** `blocked` / `waiting` / `needs-human` label — so it was the first issue a
+dev-team run would select. But its own body says an agent may not do it (repository settings),
+which means the worker's only legal move is the Human-in-the-loop protocol: write the doc, label
+`waiting`, send an ask, and **disable the routine**.
+
+So the moment the owner replied `DONE private-inbox`, the routine would have re-enabled, selected
+#21, re-disabled itself, and sent a *second* interruption — leaving #25, #29 and #34 parked
+exactly as they have been since 2026-09-17T15:05Z. Fixed this cycle, label-only (see the
+decision log). Post-resume selection order is now **#30 → #25 → #29 → #34**.
+
+### Open-count accounting
+
+Still **8 open**, unchanged for five cycles. Net issue delta this cycle: **0** — no issue filed,
+none closed. Workable-by-an-agent set is now explicit: **#25, #29, #34** (all p3, unassigned,
+unlabelled), parked behind protocol step 4 for ~34.5 h. Parked-for-human set: **#17, #21**
+(`needs-human`). Owner-gated: **#30** (`waiting`). Pending closure handshake: **#22**.
 
 ## Cycle 4 delta (watermark 2026-09-18T13:40Z → 19:45Z): **the owner replied — to both asks**
 
