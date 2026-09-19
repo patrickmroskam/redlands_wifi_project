@@ -275,3 +275,19 @@ Cycle 5 sent **one** message. Asks on file, both answered, neither re-sent:
 - confidence: high
 - alternatives: pulling the `high` forward to this cycle because #30 blocks all of v1 — rejected on the ground the rung was built on: a `high` that wakes someone at half past midnight for a ten-minute task they can only do at a computer spends the priority flag and buys no response time.
 - watch-next: **cycle 8 (~2026-09-19T19:38Z ≈ 12:38 PT) goes `high` on #30 alone if all four objects are still absent.** After cycle 8, no further timed escalation — one `low` mention per day. Cycle 9 (~2026-09-20T01:38Z) still owes #17 its single dated re-raise; cycle 10 (~2026-09-20T07:38Z) owes the #22 sweep, the full digest rebuild, and — only once that sweep frees §4e budget — the git-history-rewrite filing.
+
+## 2026-09-19T07:52:00Z — session product-owner cycle 6 (send record)
+
+- decision: `cycle 6's single owner message sent` — `msg_acdced06-5aaa-4e66-b7a1-393037326cd7`, notify, priority **`low`**, acked `delivered`. Titled "redlands product-owner cycle 6: still the same 10 minutes — plus a second trap defused". Content: #30 unchanged with all four objects re-verified absent and the `DONE private-inbox` resume phrase repeated; burndown 8/9 with the nightly job still skipping; the #22 fix explained by what it saves them (a second interruption over a decision they made two days ago) and by the rule change behind it; #17 restated as parked-by-their-decision and checked automatically, still unclaimed; the two optional tidy-ups (dismiss `msg_65c5813b`, rule on the step-4 amendment). **No ask sent** — both asks on file are answered, and the outstanding item needs action, not another question.
+- confidence: high
+- alternatives: pulling cycle 8's `high` forward — rejected, the rung was committed at cycle 5 precisely so later cycles execute rather than re-argue it, and this run lands at 00:38 PT. Notifies are fire-and-forget and were **not** retried.
+- watch-next: exactly one notify per run. Cycle 7 `low`; **cycle 8 goes `high` on #30 alone if all four objects are still absent**; after that, no more timed escalation. Sends are verified from the hub (`oh-hai messages list --json`), never by grepping this repo.
+
+### Cycle 6 send ledger
+
+| id | type | priority | status |
+|---|---|---|---|
+| `msg_acdced06-5aaa-4e66-b7a1-393037326cd7` | notify | `low` | delivered |
+
+Cycle 6 sent **one** message. Asks on file, both answered, neither re-sent:
+`msg_92a6bc9c` (#30 → `yes` + "Rewrite history"), `msg_e812f339` (#17 → `not-yet`).
