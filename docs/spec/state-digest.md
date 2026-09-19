@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-19T01:38:00Z
-cycle: 5
-net_open_history: [8, 8, 8, 8, 8]
+last_reconciled_at: 2026-09-19T07:38:00Z
+cycle: 6
+net_open_history: [8, 8, 8, 8, 8, 8]
 polish_backlog_depth: 0
 ---
 
@@ -10,6 +10,65 @@ polish_backlog_depth: 0
 > Regenerable projection. Source of truth: GitHub (state) + decision-log (rationale).
 > Cycle 1 was a **full rebuild** (digest absent on first product-owner run): all 23
 > issues scanned, no delta watermark applied. Next full rebuild due at cycle 10.
+
+## Cycle 6 delta (watermark 2026-09-19T01:38Z → 07:38Z): **zero owner movement; a second resume-path landmine found and defused**
+
+**Nothing moved.** The newest message in the OH HAI inbox is cycle 5's own notify
+(`msg_25b8e68a`, 2026-09-19T01:46:46Z) — the owner has sent nothing since. `main` at `0164f61`
+(cycle 5's own commit), **0 open PRs**, CI green, site HTTP 200. No issue touched since the
+watermark except by this cycle. No new workflow run: the nightly ingest next fires ~14:10Z.
+Open count flat at **8** for a sixth cycle; net issue delta **0**.
+
+### Both standing gates re-run objectively — both still negative
+
+**#30, all four checks at 07:38Z** (unchanged since cycle 4):
+
+- `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository*
+  (the `redlands-wifi-inbox` spelling too)
+- `repos/…/environments` → `total_count: 1`, only `github-pages`
+- `actions/secrets` → `total_count: 0` — no `INBOX_TOKEN`
+- `actions/variables` → `total_count: 0` — no `INGEST_SCHEDULE`
+
+`ask await` on `msg_92a6bc9c` re-read unchanged: `yes` + "Rewrite history". Not the resume key.
+`waiting` kept on #30; dev-team routine re-verified **`enabled: false`**, `lastRunAt` still
+2026-09-17T15:05:07Z.
+
+**#17 tripwire at 07:38Z:** apex → **404**, body is GitHub's own *"Site not found · GitHub Pages"*
+page, apex `A` → 185.199.108/109/110/111.153, `_github-pages-challenge-patrickmroskam` TXT →
+none. **404 = still unclaimed, latent, no action.** Fire condition not met.
+
+### The find: #22 was the second landmine, and cycle 5's sweep could not have seen it
+
+Cycle 5 defused #21 and left a standing sweep scoped to *"each open issue with no
+`blocked`/`waiting`/`needs-human`/`po-closure-proposed` label"*. That scope assumed
+**`po-closure-proposed` is durable parking**. It is not.
+
+The dev-team's step-0 checker duty runs *before* selection, pulls the oldest open closure
+proposal — #22 — and on a **disagree** verdict posts `closure-objection:` and **removes
+`po-closure-proposed`**. Disagree is the *likely* branch here, not the edge case: the verdict on
+file is `addressed-in-#30`, #30 will still be open and unstarted at resume time, and the skill
+says in terms that an unverifiable rationale gets an objection rather than a concurrence.
+
+#22 would then be an unlabelled **p2** created 2026-09-17T05:08:48Z — **older than #30**
+(09:09:57Z) — so the first pick of the very next run. Its body says in bold that it is a
+decision for the owner, not something an agent should act on. Protocol step 4 again: routine
+disables itself, owner interrupted a second time, over a decision they made on 2026-09-17
+("Go with option C").
+
+Fixed label-only with **`blocked`**, which the tier search excludes independently of
+`po-closure-proposed`. Deliberately **not** `needs-human`: that label also suppresses the PO's
+closure churn, which would switch off the cycle-10 aging sweep scheduled to resolve #22 — the
+same mistake as parking #30, whose `waiting` label is what the resume check enumerates. The
+handshake is untouched: window still shuts 2026-09-20T01:42Z, sweep still first eligible at
+cycle 10. Post-resume order unchanged: **#30 → #25 → #29 → #34**.
+
+### Open-count accounting
+
+Still **8 open**. Workable-by-an-agent: **#25, #29, #34** (p3, unassigned, unlabelled — bodies
+re-read this cycle, all three are pure repo work), parked behind protocol step 4 for ~40.5 h.
+Durably parked: **#17, #21** (`needs-human`), **#22** (`blocked` + `po-closure-proposed`).
+Owner-gated: **#30** (`waiting`). Tracking parent: **#1**, carries no priority label so it never
+enters a tier search.
 
 ## Cycle 5 delta (watermark 2026-09-18T19:45Z → 2026-09-19T01:38Z): **no owner movement; one scheduling trap found and defused**
 
