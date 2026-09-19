@@ -291,3 +291,38 @@ Cycle 5 sent **one** message. Asks on file, both answered, neither re-sent:
 
 Cycle 6 sent **one** message. Asks on file, both answered, neither re-sent:
 `msg_92a6bc9c` (#30 → `yes` + "Rewrite history"), `msg_e812f339` (#17 → `not-yet`).
+
+## 2026-09-19T13:45:00Z — session product-owner cycle 7
+
+- decision: `resume-check #30: NOT resumed (fourth consecutive negative)` — `ask await` on `msg_92a6bc9c` re-read unchanged (`answered`, `yes`, comment "Rewrite history"); that is the approval, not the resume key `DONE private-inbox`. All four objective checks re-run at 13:38Z and all four negative: inbox repo absent (both spellings), `environments` `total_count: 1` (only `github-pages`), `actions/secrets` 0, `actions/variables` 0. `waiting` kept on #30; `autonomy-dev-team-redlands-wifi-project` re-verified `enabled: false`, `lastRunAt` still 2026-09-17T15:05:07Z.
+- confidence: high
+- alternatives: reading `yes` as DONE and re-enabling — rejected for the fourth cycle on the same objective ground, the four artefacts the work checks out demonstrably do not exist; re-sending the ask — rejected, it is answered, not open, and the protocol forbids re-sending.
+- watch-next: the same four checks every cycle. They are the gate, not the reply text.
+
+## 2026-09-19T13:45:00Z — session product-owner cycle 7
+
+- decision: `verified protocol step 4 against exact constitution text rather than inheriting cycle 3's reading` — step 4 reads "Disable the dev-team routine … **Do not pick another issue. Exit.**", and the resume path ties re-enabling to the human's `DONE <slug>` reply, not to whether other workable issues exist. Cycle 3's correction stands, now grounded in literal wording. The routine is off for a protocol reason, not an empty backlog — evidenced again this cycle by `gh issue list --json number,labels,assignees`: #25, #29 and #34 are open, unassigned and unlabelled, parked ~46.5 h.
+- confidence: high
+- alternatives: leaving the reading inherited — rejected, it is the single rule parking three workable issues and a re-read is cheap; applying the step-4 amendment unilaterally — rejected, it is a hard invariant and re-enabling a routine spends the owner's machine and compute.
+- watch-next: the amendment stays the owner's call and remains unruled. It moots itself if `DONE private-inbox` arrives first.
+
+## 2026-09-19T13:45:00Z — session product-owner cycle 7
+
+- decision: `added an additive status banner to #30's body` — #30 is the first pick on resume, and two of its instructions predate the owner's answer: "the run that works this issue must write `docs/setup/<slug>.md` and send the ask first" (done — PR #37, ask answered) and "**Not decided — ask the owner, don't assume:** whether to rewrite this repo's history" (decided — the reply carried the opt-in phrase "Rewrite history"). Read top-down and literally, either line drives a resuming run back into protocol step 4: doc, ask, `waiting`, routine disabled — a third owner interruption over decisions already made. Banner prepended marking both resolved with their evidence; the original body preserved **verbatim** below it and verified byte-for-byte after the edit.
+- confidence: **medium** — deliberately rated below the #21 (cycle 5) and #22 (cycle 6) landmines, which were near-certain: owner-only issues sitting at the top of a workable tier. Here the resolution was already on file in the 2026-09-17T15:06:58Z comment, so a careful run would probably have got it right. The banner costs nothing and removes the ambiguity; it is **not** a claim that a run would have failed. Recorded explicitly because two consecutive cycles finding a landmine creates pressure to manufacture a third.
+- alternatives: (a) a label — rejected, no label can express "these two lines are already answered"; (b) rewriting the stale lines in place — rejected, it would destroy the owner's original framing of a decision they made; (c) another comment only — rejected, the resolution already lived in comments and that is precisely what the body was contradicting; (d) doing nothing — rejected, the fix is additive, reversible and free.
+- watch-next: if a resuming run still re-asks despite the banner, the trap is structural (body text outranked by nothing) and the next remedy is closing #30 in favour of a freshly-written successor issue.
+
+## 2026-09-19T13:45:00Z — session product-owner cycle 7
+
+- decision: `sweep rule gains a third question — staleness` — cycles 5–6 tested reachability ("can it reach the top of a tier?") and doability ("could an actor do it?"). #30 passes **both** and was still a trap, so the test adds **(3) does the issue's own text instruct an actor to halt or re-ask about something already resolved?** Applied to all 8 open issues this cycle: reachable-and-undoable set **empty** (third cycle running), reachable-and-stale set **{#30}**, now banner-corrected.
+- confidence: high
+- alternatives: folding staleness into the doability question — rejected, they fail differently: doability is a property of the world, staleness a property of the text, and only the second is fixable by the PO alone.
+- watch-next: apply all three questions every cycle, hardest against whichever issue is next in line — its text is the oldest relative to the decisions taken since. One ordering check recorded: #22's `blocked` could in principle be stripped by the merge-time unblock step if #30 merges, but the cycle-10 sweep resolves #22 first and #30 cannot merge before the owner acts, so the ordering holds.
+
+## 2026-09-19T13:45:00Z — session product-owner cycle 7
+
+- decision: `R5 re-evidenced; INGEST_SCHEDULE still not a shortcut` — the nightly ingest's last scheduled run (2026-09-18T14:10:34Z) concluded `skipped`, gated on `vars.INGEST_SCHEDULE == 'on'` at `.github/workflows/ingest.yml:28`. R5 is implemented but gated off. Next firing ~14:10Z today; it will skip again.
+- confidence: high
+- alternatives: setting `INGEST_SCHEDULE=on` to close R5 — rejected again and re-recorded so it is not re-proposed: with the schedule on, the only intake is the **public** `ingest/` folder, the exact harm #30 exists to prevent. It is step 4 of `docs/setup/private-inbox.md` and belongs to the owner, *after* the inbox exists.
+- watch-next: R5 closes when the inbox exists and the cutover lands — not before.

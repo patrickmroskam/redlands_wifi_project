@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-19T07:38:00Z
-cycle: 6
-net_open_history: [8, 8, 8, 8, 8, 8]
+last_reconciled_at: 2026-09-19T13:38:00Z
+cycle: 7
+net_open_history: [8, 8, 8, 8, 8, 8, 8]
 polish_backlog_depth: 0
 ---
 
@@ -10,6 +10,97 @@ polish_backlog_depth: 0
 > Regenerable projection. Source of truth: GitHub (state) + decision-log (rationale).
 > Cycle 1 was a **full rebuild** (digest absent on first product-owner run): all 23
 > issues scanned, no delta watermark applied. Next full rebuild due at cycle 10.
+
+## Cycle 7 delta (watermark 2026-09-19T07:38Z → 13:38Z): **zero owner movement; a staleness trap on the resume path's first pick**
+
+**Nothing moved.** The newest message in the OH HAI inbox is cycle 6's own notify
+(`msg_acdced06`, 2026-09-19T07:43:22Z) — the owner has sent nothing since. `main` at `c6fdb88`
+(cycle 6's own commit), **0 open PRs**, CI green (last 8 runs all `success`), site HTTP 200 with
+18,152 networks. The only issue comment since the watermark is this cycle's own. Open count flat
+at **8** for a seventh cycle; net issue delta **0**.
+
+### Both standing gates re-run objectively — both still negative
+
+**#30, all four checks at 13:38Z** (unchanged since cycle 4 — a fourth consecutive negative):
+
+- `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository*
+  (the `redlands-wifi-inbox` spelling too)
+- `repos/…/environments` → `total_count: 1`, only `github-pages`
+- `actions/secrets` → `total_count: 0` — no `INBOX_TOKEN`
+- `actions/variables` → `total_count: 0` — no `INGEST_SCHEDULE`
+
+`ask await` on `msg_92a6bc9c` re-read unchanged: `yes` + "Rewrite history". Not the resume key.
+`waiting` kept on #30; dev-team routine re-verified **`enabled: false`**, `lastRunAt` still
+2026-09-17T15:05:07Z — the three workable p3s have now been parked **~46.5 h**.
+
+**#17 tripwire at 13:38Z:** apex → **404**, body is GitHub's own *"Site not found"* page, apex `A`
+→ 185.199.108/109/110/111.153, `_github-pages-challenge-patrickmroskam` TXT → none.
+**404 = still unclaimed, latent, no action.** Fire condition not met.
+
+**R5 evidence re-confirmed:** the nightly ingest's last scheduled run (2026-09-18T14:10:34Z)
+concluded **`skipped`**, gated on `vars.INGEST_SCHEDULE == 'on'` at `.github/workflows/ingest.yml:28`.
+Next firing ~14:10Z today; it will skip again. Setting the variable is still **not** a shortcut to
+closing R5 — with the schedule on, the only intake is the **public** `ingest/` folder, the exact
+harm #30 exists to prevent.
+
+### Step 4 verified against exact text, not inherited
+
+The reading that has kept the routine off since 2026-09-17T15:05Z was re-grounded in the
+constitution's literal wording this cycle rather than carried forward: protocol step 4 reads
+*"Disable the dev-team routine … **Do not pick another issue. Exit.**"*, and the resume path ties
+re-enabling to the human's `DONE <slug>` reply — not to whether other workable issues exist.
+**Cycle 3's correction stands, now verified.** The step-4 amendment remains genuinely the owner's
+call; the PO may not apply it (hard invariant, and re-enabling spends the owner's compute).
+
+### The find: #30's own body would send a resuming run back into step 4
+
+#30 is the **first pick** on resume. Two instructions in its body predate the owner's answer:
+*"the run that works this issue must write `docs/setup/<slug>.md` and send the ask first"* (done —
+PR #37, ask answered) and *"**Not decided — ask the owner, don't assume:** whether to rewrite this
+repo's history"* (decided — the reply carried the opt-in phrase "Rewrite history"). Read top-down
+and literally, either line produces a doc, an ask, a `waiting` label and a disabled routine — a
+third owner interruption about decisions already made.
+
+Fixed **additively**: a status banner marking both items resolved with their evidence, prepended
+to the body, with the original text preserved **verbatim** below it (verified byte-for-byte after
+the edit). No label changed; the handshake is untouched.
+
+**Confidence is lower than cycles 5–6 and is recorded as such.** #21 and #22 were near-certain —
+owner-only issues sitting at the top of a workable tier. Here the later comments already carry the
+correct plan, so a careful run would probably have got it right. The banner costs nothing and
+removes the ambiguity; it is not a claim that a run *would* have failed. Two consecutive cycles
+finding a landmine creates pressure to produce a third, and this one is deliberately not inflated
+to match them.
+
+### The sweep rule gains a third question
+
+Cycles 5–6 built the sweep on two questions — can it reach the top of a tier, could an actor do
+it? #30 passes **both** and was still a trap. The test adds: **(3) does the issue's own text
+instruct an actor to halt or re-ask about something already resolved?** A staleness check,
+distinct from doability, biting hardest on whichever issue is next in line — the one whose text
+was written earliest relative to the decisions taken since.
+
+### Reachability sweep — full pass over all 8 open issues
+
+| # | labels | reaches top of a tier? | an actor could do it? | text stale? | verdict |
+|---|---|---|---|---|---|
+| #1 | `tracking` | no — never assigned, dev-team descends to sub-issues | n/a | no | fine |
+| #17 | p2 `blocked` `needs-human` | no — `needs-human` excluded from every tier search and claim gate | no (registrar/DNS) | no | parked ✅ |
+| #21 | p3 `blocked` `needs-human` | no — same | no (repo settings) | no | parked ✅ |
+| #22 | p2 `blocked` `po-closure-proposed` | step-0 disagree strips `po-closure-proposed`; **`blocked` remains** | no (owner decision) | no | cycle-6 fix holds ✅ |
+| #25 | p3 | yes | yes — ingest guard, pure repo work | no | workable |
+| #29 | p3 | yes | yes — map popup edge cases | no | workable |
+| #30 | p2 `waiting` | yes, by design — it *is* the resume work | yes, once setup exists | **YES** | **banner added** ⚠️ |
+| #34 | p3 | yes | yes — e2e test split | no | workable |
+
+Reachable-and-undoable set: **empty** (third cycle running). Reachable-and-stale set: **#30, now
+banner-corrected**. One ordering check worth recording: #22's `blocked` could in principle be
+stripped by the merge-time unblock step if #30 ever merges — but the cycle-10 sweep
+(2026-09-20T07:38Z) resolves #22 first, and #30 cannot merge before the owner acts, so the
+ordering holds.
+
+**No hard invariant and no protocol step was changed this cycle. No issue filed, none closed, no
+label added or removed.**
 
 ## Cycle 6 delta (watermark 2026-09-19T01:38Z → 07:38Z): **zero owner movement; a second resume-path landmine found and defused**
 
