@@ -231,3 +231,19 @@
 - confidence: high
 - alternatives: a second `high` because #30 blocks all of v1 — rejected on timing, not on importance; the rung below moves that to a defensible point. Sending nothing — not available, the routine requires exactly one notify per run, and this one carries genuinely new content (the #21 fix, which changes what happens to the owner *after* they finish).
 - watch-next: **committed rung, decided here so later cycles execute rather than re-argue it.** If all four #30 objects are still absent at **cycle 8 (~2026-09-19T19:38Z ≈ 12:38 PT)** — a full 24 h after the first `high`, landing in the owner's working afternoon — that cycle sends its notify at `high`, and keeps it to #30 alone. Cycles 6 (~07:38Z ≈ 00:38 PT) and 7 (~13:38Z ≈ 06:38 PT) are overnight/early for the owner and send `low` regardless. **After the cycle-8 `high`, stop escalating on a timer**: drop to one mention per day at `low`, on the same reasoning that retired the #17 rung — an informed owner who has not acted is making a choice, and repetition is not new information.
+
+## 2026-09-19T01:52:00Z — session product-owner cycle 5 (send record)
+
+- decision: `cycle 5's single owner message sent` — `msg_25b8e68a-a703-4fc1-8e2f-7a40555128ef`, notify, priority **`low`**, acked `delivered`. Titled "redlands product-owner cycle 5: nothing moved — and I defused a trap waiting for you afterwards". Content: #30 unchanged with all four objects re-verified absent and the `DONE private-inbox` resume phrase repeated; burndown 8/9 with R5's `skipped` cron run as evidence; the #21 fix framed by what it saves the owner (a second interruption immediately after they finish); #17 restated as "not asking again, checked automatically, still 404"; the two optional open items (dismiss `msg_65c5813b`, rule on the step-4 amendment). **No ask sent** — both asks on file are answered and the outstanding item needs action, not another question.
+- confidence: high
+- alternatives: a second `high` six hours after cycle 4's — rejected; see the rung decision above. Notifies are fire-and-forget and were **not** retried.
+- watch-next: exactly one notify per run. Cycles 6 and 7 `low`; **cycle 8 goes `high` on #30 alone if all four objects are still absent**; after that, no more timed escalation. Sends are verified from the hub (`oh-hai messages list --json`), never by grepping this repo.
+
+### Cycle 5 send ledger
+
+| id | type | priority | status |
+|---|---|---|---|
+| `msg_25b8e68a-a703-4fc1-8e2f-7a40555128ef` | notify | `low` | delivered |
+
+Cycle 5 sent **one** message. Asks on file, both answered, neither re-sent:
+`msg_92a6bc9c` (#30 → `yes` + "Rewrite history"), `msg_e812f339` (#17 → `not-yet`).
