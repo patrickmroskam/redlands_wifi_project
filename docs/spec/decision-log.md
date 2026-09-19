@@ -326,3 +326,19 @@ Cycle 6 sent **one** message. Asks on file, both answered, neither re-sent:
 - confidence: high
 - alternatives: setting `INGEST_SCHEDULE=on` to close R5 — rejected again and re-recorded so it is not re-proposed: with the schedule on, the only intake is the **public** `ingest/` folder, the exact harm #30 exists to prevent. It is step 4 of `docs/setup/private-inbox.md` and belongs to the owner, *after* the inbox exists.
 - watch-next: R5 closes when the inbox exists and the cutover lands — not before.
+
+## 2026-09-19T13:48:00Z — session product-owner cycle 7 (send record)
+
+- decision: `cycle 7's single owner message sent` — `msg_2dd5fe22-d0d8-4bfd-ac0e-f97438c45d36`, notify, priority **`low`**, acked `delivered`. Titled "redlands product-owner cycle 7: same 10 minutes — and I cleared a trap on the issue you'd unblock first". Content: #30 unchanged with all four objects re-verified absent a fourth cycle and the `DONE private-inbox` resume phrase repeated; the `yes`/"Rewrite history" reply named as the approval rather than the setup; R5 evidenced by last night's `skipped` run; the #30 banner explained by what it saves them (a third interruption over settled decisions) **with its weaker confidence stated plainly to the owner, not just in the log**; #17 restated as parked-by-their-decision and still auto-checked; the three p3s parked ~46.5 h; the two optional tidy-ups. **No ask sent** — both asks on file are answered, and the outstanding item needs action, not another question.
+- confidence: high
+- alternatives: pulling cycle 8's `high` forward — rejected, the rung was committed at cycle 5 so later cycles execute rather than re-argue it, and this run lands at 06:38 PT; overstating the #30 banner as a third landmine — rejected, the honest framing is that the fix was free rather than that the catch was certain. Notifies are fire-and-forget and were **not** retried.
+- watch-next: exactly one notify per run, verified from the hub (`oh-hai messages list --json` → 1 message since 13:38Z), never by grepping this repo. **Cycle 8 (~2026-09-19T19:38Z) goes `high` on #30 alone if all four objects are still absent**; after that, no more timed escalation — one `low` per day.
+
+### Cycle 7 send ledger
+
+| id | type | priority | status |
+|---|---|---|---|
+| `msg_2dd5fe22-d0d8-4bfd-ac0e-f97438c45d36` | notify | `low` | delivered |
+
+Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answered, neither re-sent:
+`msg_92a6bc9c` (#30 → `yes` + "Rewrite history"), `msg_e812f339` (#17 → `not-yet`).
