@@ -384,3 +384,10 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high — the condition was decided at cycle 5 with the reasoning written down, and cycles 6 and 7 executed the `low` rungs without re-arguing it. This cycle executes the last rung the same way.
 - alternatives: holding at `low` because three `low`s in a row produced nothing — rejected, that re-argues a rung decided in advance, and the whole value of a pre-committed rung is that it does not get re-litigated at the moment it costs something; escalating further (a second ask) — rejected, `msg_92a6bc9c` is answered and the protocol forbids re-asking, and a junk ask (`msg_65c5813b`) is already cluttering the owner's queue.
 - watch-next: cycle 9 sends `low` and owes #17 its one dated re-raise; cycle 10 is the full rebuild, the #22 sweep, the #17 retitle, and the first cycle with budget to file the owner-approved history rewrite.
+
+## 2026-09-19T19:45:00Z — session product-owner cycle 8 (send record)
+
+- decision: `one OH HAI notify sent, priority high, about #30 alone` — `msg_d45a7eb7-0213-4210-a350-8f315fe4c2bf`, `delivered`. Verified against the hub before sending (`oh-hai messages list --json`, newest message was cycle 7's own `msg_2dd5fe22`) — never inferred from the repo. **Not retried.** No ask was sent: `msg_92a6bc9c` is answered and the protocol forbids re-asking, and the junk `msg_65c5813b` is already sitting in the owner's queue. Content: the doc link, the exact resume phrase `DONE private-inbox`, the five-cycle objective evidence (four absent objects), what it unblocks (R5 + the three p3s frozen 52.5 h), the `INGEST_SCHEDULE` anti-shortcut, and an explicit statement that this is the last timed escalation.
+- confidence: high
+- alternatives: folding #17's cycle-9 re-raise or the step-4 amendment into this message — rejected, the rung specified #30 **alone**, and a `high` that arrives carrying three asks spends its priority on none of them; #17's re-raise belongs to cycle 9 as scheduled.
+- watch-next: cycle 9 (~2026-09-20T01:38Z) sends `low`, carries #17's single dated re-raise, and must **not** escalate #30 again on any timer.

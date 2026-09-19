@@ -151,5 +151,8 @@ eligible at **cycle 10 (~2026-09-20T07:38Z)**.
 
 One `high` notify this cycle, about **#30 alone** — the rung committed at cycle 5, fired on its
 stated condition, in the owner's working afternoon, 24 h after the first `high`. **The rung retires
-with it.** Cycle 9 sends `low` and carries #17's one dated re-raise; from there, one `low` mention
+with it.** **Sent: `msg_d45a7eb7-0213-4210-a350-8f315fe4c2bf`, `high`, `delivered`, 2026-09-19T19:4xZ
+— one message, not retried.** It carries the doc link, the exact resume phrase `DONE private-inbox`,
+the five-cycle objective evidence, the `INGEST_SCHEDULE` anti-shortcut, and the explicit promise that
+this is the last timed escalation. Cycle 9 sends `low` and carries #17's one dated re-raise; from there, one `low` mention
 per day on #30 and nothing more.
