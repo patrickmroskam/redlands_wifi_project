@@ -38,11 +38,18 @@ is not a file in this repo or a GitHub Actions workflow — do ALL of the follow
 3. Send an OH HAI **ask** (`~/.local/nodejs/bin/oh-hai ask submit ...`) whose body is the
    full step list from the doc. Record the returned message id in the issue comment.
    Never retry a send; verify prior sends from the hub (`oh-hai messages list --json`).
-4. Disable the dev-team routine: `update_scheduled_task` with
-   `taskId: autonomy-dev-team-redlands-wifi-project`, `enabled: false`. Do not pick another issue. Exit.
+4. **Skip the blocked issue and continue with the next unblocked one.** Do not stop the
+   routine for it. **Only** when no unblocked p0-p3 issue remains at all, disable the
+   dev-team routine: `update_scheduled_task` with
+   `taskId: autonomy-dev-team-redlands-wifi-project`, `enabled: false`, and exit.
+   *(Amended 2026-09-20 by owner ruling. The previous rule halted the entire routine for any
+   live `waiting` issue, which parked three unblocked p3s — #25, #29, #34 — for ~70 h behind
+   one owner-only setup task (#30) that nothing in them depended on. A human gate on one
+   issue is not a reason to stop work on unrelated ones.)*
 Resume path: whichever actor (product-owner run, or a human-driven session) sees the
-human's `DONE <slug>` reply removes `waiting` from the issue and re-enables the dev-team
-routine (`enabled: true`). The product-owner routine checks for this at the start of every run.
+human's `DONE <slug>` reply removes `waiting` from the issue. If the routine was disabled
+because the backlog was genuinely empty of unblocked work, that actor also re-enables it
+(`enabled: true`). The product-owner routine checks for this at the start of every run.
 Do NOT pause for things that are already true: Pages is enabled, Actions is enabled,
 map tiles need no key, and the removal-request channel is GitHub Issues (no email needed).
 

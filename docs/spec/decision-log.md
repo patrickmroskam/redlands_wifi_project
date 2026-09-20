@@ -552,3 +552,10 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: medium — the reasoning is sound, but it is the owner's call and they have deferred the whole area; surfaced once, not queued as a chase.
 - alternatives: verifying the domain on the GitHub account — also closes the window and additionally reserves the name, but leaves a TXT record for the Cloudflare move to carry.
 - watch-next: do not re-raise. If the owner asks how to close the window, this is the recommendation.
+
+## 2026-09-20T14:12:00Z — owner ruling (interactive session)
+
+- decision: `OWNER RULED on the protocol step 4 amendment — APPLIED, and the dev-team routine re-enabled` — carried unruled since cycle 3. Step 4 now reads *"skip the blocked issue and continue with the next unblocked one; only when no unblocked p0–p3 issue remains, disable the routine and exit."* The old rule halted the whole routine for any live `waiting` issue, parking #25, #29 and #34 (~70 h) behind #30, an owner-only setup task none of them depend on. Amended in `constitution.md` and `autonomy-dev-team-redlands-wifi-project` set `enabled: true`.
+- confidence: high
+- alternatives: (a) amend but leave the routine off — offered and not chosen; (b) leave the rule as is — rejected by the owner. The PO deliberately never applied this itself across cycles 3–11: it is a hard invariant, and re-enabling a routine spends the owner's machine and compute, so it required exactly this ruling.
+- watch-next: expected resume order is **#25 → #29 → #34** (#30 `waiting`, #22/#21/#17 `blocked`, all correctly skipped). Dev-team's step-0 closure duty will pull #22's `addressed-in-#30` proposal first and should **objection** it — the rationale is genuinely unverifiable until option C ships — which strips `po-closure-proposed`. That is the intended adjudication, not a fault; #22 carries `blocked` independently, so it cannot be selected as work. The first close this produces also clears §4e budget for the long-deferred git-history-rewrite issue.
