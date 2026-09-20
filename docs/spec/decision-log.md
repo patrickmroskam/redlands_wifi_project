@@ -496,3 +496,38 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: (a) **sending an `ask` instead of a notify**, which the task file directs when a decision is needed — rejected, and this is the substantive call of the send: the only open decision (#22's closure) has a **safe default already in effect**, so an ask buys nothing the notify does not, while a second live ask would compete for attention with #30, the ~10-minute action that actually unblocks the project. Cycles 2 and 3 rejected competing asks on exactly this reasoning (#21, and the step-4 amendment), and it holds more strongly now that #30 is ten cycles unresolved. Routing #22 "to the human digest" is satisfied by the readiness report plus this notify; it does not require an ask. (b) `normal`/`high` priority — rejected, both escalation rungs are spent, the tripwire is latent, nothing is newly urgent, and cycle 8 promised its `high` was the last timed escalation; breaking that would spend the credibility the rung exists to protect. (c) Suppressing the #30 mention as a second in the same UTC day — rejected: cycle 9 landed 18:49 PT on 09-19 and this one 00:42 PT on 09-20, different days in the owner's timezone, and the constitution mandates exactly one notify per scheduled run regardless.
 - watch-next: cycle 11 (~2026-09-20T13:38Z) owes the two standing gates, both sweeps, and the re-verified #22 sweep (**re-verify live — do not inherit cycle 10's ineligibility result**). The history-rewrite filing is **not** due; it waits on any realized close. No timer remains on #17 or #30 — one `low` mention per day and the automated tripwire are all that is left.
+
+## 2026-09-20T13:43:00Z — session product-owner cycle 11 (resume check)
+
+- decision: `resume-check #30: NOT resumed (eighth consecutive)` — `ask await` on `msg_92a6bc9c` re-read unchanged: `yes` + comment "Rewrite history", which is an agreement to the plan, not the resume key `DONE private-inbox`. Verified against GitHub rather than read from intent: `redlands_wifi_inbox` (and the `-` spelling) → *Could not resolve to a Repository*; `repos/…/environments` → `total_count: 1`, only `github-pages`; `actions/secrets` → `0`; `actions/variables` → `0`. `waiting` kept on #30; dev-team routine left `enabled: false`.
+- confidence: high
+- alternatives: treating the answered ask as DONE and re-enabling dev-team — rejected on the same grounds as cycles 1–10: all four artefacts the work depends on demonstrably do not exist.
+- watch-next: same four checks every cycle; they are the gate, not the reply text.
+
+## 2026-09-20T13:43:00Z — session product-owner cycle 11
+
+- decision: `#22 closure proposal re-verified live: still NOT auto-close eligible` — `GET /repos/…/pulls/30` → 404 (#30 is an issue, not a merged PR); `gh issue view 30` → `state=OPEN`, `p2,waiting`; all 15 merged PRs re-scanned, none ships option C. `po-closure-proposed` kept, verdict not withdrawn, nothing written to `objections.md`; routed to the human digest as *awaiting human closure decision*. No new comment posted on #22 — cycle 10's `issuecomment-5748458979` already states this verbatim.
+- confidence: high
+- alternatives: (a) self-closing on the expired 48 h aging window — rejected, the verdict class gate fails; (b) re-commenting on #22 each cycle — rejected as public-issue noise, the durable record is this log plus the digest.
+- watch-next: re-verify live each cycle; only re-comment when the result changes.
+
+## 2026-09-20T13:43:00Z — session product-owner cycle 11
+
+- decision: `REVERSAL of a measurement, not of a ruling: the closure-objection count on #22 was being taken by substring match and returned 2, not 0` — both hits were the PO's own comments (cycle 6 explaining the disagree branch; cycle 9's own results table containing the literal row `| post-proposal closure-objection: count | 0 |`). True count is **0**, confirmed by opening and reading each hit. Had the number been trusted, the handshake's disagree branch would have stripped `po-closure-proposed` and recorded a veto in `objections.md`, barring a legitimate re-proposal once option C ships. The same instrument flagged #29 on *"wait for the running pan to finish"*, a Leaflet `moveend` code suggestion.
+- confidence: high
+- alternatives: keeping the mention-based grep and raising the threshold — rejected, the false-positive rate rises monotonically as the PO writes more prose about its own protocol onto the issues it greps; the fix must be structural (match comments whose body *begins* with `closure-objection:`, and exclude the PO's own authorship from counts of other actors' signals).
+- watch-next: standing task added; every action-gating check must match on structure, and every grep hit must be read before it is counted.
+
+## 2026-09-20T13:43:00Z — session product-owner cycle 11
+
+- decision: `git history rewrite stays unfiled — block re-derived from source, and it is still true twice over` — per cycle 10's expiry rule, §4e was re-read from the skill rather than copied from cycle 10's text: *"The budget is only issues actually closed this run… If you realized no closures this run, file no gap issues."* Cycle 11 realized zero closes (as have all eleven), so the budget block holds. The re-derivation also surfaced a second, independent reason: §4e budgets *release-criteria* gaps, and history retention sits under the ratified PRD's "Known consideration (**not a requirement**)", so this is not a release-criteria gap at all.
+- confidence: high
+- alternatives: filing it anyway on the strength of the owner's explicit "Rewrite history" — rejected; the authority to do the work is not authority to breach the backlog-growth budget, and the scope is safely recorded in three places. Both reasons must lapse, not just the budget.
+- watch-next: unblock is any realized close, no cycle attached.
+
+## 2026-09-20T13:43:00Z — session product-owner cycle 11
+
+- decision: `no escalation; #17 tripwire latent for an eighth run; §4h enumeration clean for a fourth` — tripwire: apex 404 with GitHub's own "Site not found" body, apex `A` still 185.199.108-111.153, challenge TXT still absent, `www` CNAME and `pages.cname` unchanged. §4h: `label:blocked -label:needs-human` → [22], `label:waiting -label:needs-human` → [30], neither carrying `needs-human`. Reachability/doability/staleness sweep clean for a seventh consecutive cycle against a provably unchanged corpus.
+- confidence: high
+- alternatives: a further escalation on #30 — rejected, both rungs are spent and retired; an informed owner who has not acted is choosing, and repetition is not new information.
+- watch-next: one `low` notify per day on #30 plus the automated tripwire; nothing else.

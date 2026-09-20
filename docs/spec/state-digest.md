@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-20T07:42:39Z
-cycle: 10
-net_open_history: [8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+last_reconciled_at: 2026-09-20T13:43:05Z
+cycle: 11
+net_open_history: [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,90 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 11 delta (watermark 2026-09-20T07:42Z → 13:43Z): **zero owner movement; the PO's own measuring instrument was returning false positives**
+
+**Nothing moved.** No owner reply since cycle 10's notify (`msg_0e0b6127`, 07:47:10Z). `main` at
+`cf1e42c` (cycle 10's own send record), **0 open PRs**, site HTTP **200** serving 18,152 networks
+(`updated_at` 2026-09-17T10:06:08Z). Open count flat at **8** for an eleventh cycle; net issue
+delta **0**; burndown **8/9** v1 Release Criteria, R5 still the only unmet one.
+
+**Corpus provably unchanged, not assumed:** every open issue's `updatedAt` predates this cycle's
+watermark (#34 09-17T12:18Z, #30 09-19T13:42Z, #29 09-17T09:27Z, #25 09-17T06:12Z, #22
+09-20T07:41Z, #21 09-19T01:43Z, #17 09-20T07:41Z, #1 09-18T01:43Z — the two 09-20 stamps are
+cycle 10's own comments), and `search/issues?…updated:>=2026-09-20T07:45:00Z` → `total_count: 0`.
+
+### Both standing gates re-run objectively — both still negative (EIGHTH consecutive)
+
+**#30, all four checks at 13:43Z:** `redlands_wifi_inbox` → *Could not resolve to a Repository*
+(the `redlands-wifi-inbox` spelling too); `repos/…/environments` → `total_count: 1`, only
+`github-pages`; `actions/secrets` → **0** (no `INBOX_TOKEN`); `actions/variables` → **0** (no
+`INGEST_SCHEDULE`, so R5 stays blocked). `ask await` on `msg_92a6bc9c` re-read unchanged:
+`yes` + comment `"Rewrite history"` — an agreement to the plan, **not** the resume key
+`DONE private-inbox`. `waiting` kept on #30; dev-team routine still `enabled: false`.
+
+**#17 tripwire at 13:43Z:** apex → **404**, body is GitHub's own *"Site not found · GitHub Pages"*
+page, apex `A` → 185.199.108/109/110/111.153, `www` CNAME → `patrickmroskam.github.io.`,
+`_github-pages-challenge-patrickmroskam` TXT → none, `pages.cname` → `null`. **Latent, eighth
+consecutive run unchanged.** Fire condition not met; rung spent; no reminder re-sent.
+
+### #22 aging sweep re-verified live — still NOT auto-close eligible
+
+Re-derived this cycle rather than inherited: `GET /repos/…/pulls/30` → **404** (#30 is an issue,
+not a merged PR); `gh issue view 30` → `state=OPEN`, `p2,waiting`; all **15** merged PRs scanned,
+none ships option C (#37 = owner setup doc, #26 = the privacy-page disclosure that the logs are
+public). Verdict **ineligible**; #22 stays open, `po-closure-proposed` kept, nothing written to
+`objections.md`. Routed to the human digest as *awaiting human closure decision*. **No new issue
+comment was posted** — cycle 10's (`issuecomment-5748458979`) already says exactly this, and a
+verbatim repeat every 6 h on a public issue is noise; the per-cycle record lives here and in the
+decision log, which is what "records that the sweep ran" requires.
+
+### §4h enumeration and the reachability sweep
+
+`label:blocked -label:needs-human` → **[22]**; `label:waiting -label:needs-human` → **[30]**.
+Exactly {#22, #30}, neither carrying `needs-human` — **fourth consecutive clean check**, no
+regression. Reachable-and-undoable **empty**, reachable-and-stale **empty** — **seventh
+consecutive clean**, and this cycle grounded in the provable-non-change evidence above plus a
+fresh halt-or-re-ask pattern re-read of #25/#29/#34 and #1.
+
+### The cycle-11 find: a substring match is not a measurement
+
+Two independent checks this cycle returned **false positives**, both because the phrase being
+searched for appears in prose that merely *discusses* it:
+
+1. **#22's post-proposal `closure-objection:` count came back `2`, not `0`.** Both "objections"
+   were the PO's **own** comments — cycle 6 explaining that dev-team *"posts a
+   `closure-objection:` and strips `po-closure-proposed`"*, and cycle 9's own results table
+   containing the literal row `| post-proposal closure-objection: count | 0 |`. A run that
+   trusted that number would have concluded an objection existed, and the handshake's disagree
+   branch would have had it strip `po-closure-proposed` and record a veto in `objections.md` —
+   precisely what cycle 9's rewrite forbids, and it would have barred a legitimate re-proposal
+   once option C ships.
+2. **The halt-or-re-ask sweep flagged #29** on *"wait for the running pan to finish before
+   restoring the fence"* — a Leaflet `moveend` implementation suggestion, not an instruction to
+   stop and ask the owner.
+
+This is a different failure class from the last two finds. Cycle 9 caught a **dropped
+precondition**; cycle 10 caught an **expired rationale**. This is a **measuring instrument
+degrading because the measurer's own output has entered the corpus it measures**: every cycle the
+PO writes more prose *about* `closure-objection:`, `waiting`, `needs-human` and `po-closure-proposed`
+onto the very issues it then greps, so the false-positive rate of any mention-based check rises
+monotonically with the project's age. **Rule: any check whose result gates an action must match on
+structure, not mention** — a real objection is a comment whose body *begins* with
+`closure-objection:`, and the count must exclude comments authored by the PO's own runs. Recorded
+as a standing task.
+
+### Carry-overs, re-tested rather than re-copied
+
+- **Git history rewrite, still unfiled.** Re-derived §4e from the skill source this cycle, as the
+  cycle-10 rule requires of anything deferred 3+ cycles: *"The budget is only issues actually
+  closed this run… If you realized no closures this run, file no gap issues."* Cycle 11 realized
+  **zero** closes (as have all eleven), so the block is **genuinely still true** — and the
+  re-derivation surfaced a second, independent reason it should not be forced: §4e budgets
+  *release-criteria* gaps, and history retention sits under the PRD's "Known consideration
+  (**not a requirement**)", so it is not a release-criteria gap at all. Authority and scope stay
+  recorded here, in the decision log, and on #30 and #22. **Unblock: any realized close.**
+- **Protocol step 4 amendment** — still unruled by the owner; #25/#29/#34 still parked (~70 h).
 
 ## Cycle 10 delta (watermark 2026-09-20T01:38Z → 07:42Z) — **FULL REBUILD**: the sweep that did not fire, and two carry-overs cleared
 
