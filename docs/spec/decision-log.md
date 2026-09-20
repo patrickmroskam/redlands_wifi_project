@@ -566,3 +566,17 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: relying on "READ FIRST: docs/spec/constitution.md" in the prompt to carry the amendment — rejected; a run following its own prompt top-down hits the explicit disable instruction first, and an explicit local instruction beats a referenced document.
 - watch-next: **a hard invariant lives in at least two places — the constitution AND every actor's task prompt that restates it.** When amending one, grep the scheduled-task SKILL.md files for the old text. This is the same compression failure the PO logged at cycle 9, one level up: the task prompt is a compression of the constitution, and it dropped the amendment.
+
+## 2026-09-20T16:25:00Z — owner completed #30 setup (interactive session)
+
+- decision: `#30 owner-side setup VERIFIED COMPLETE; waiting removed; dev-team unblocked` — verified objectively, not taken on the reply: `redlands_wifi_inbox` exists and is **private** (created 16:08:22Z, default `main`, README present); the `ingest` environment exists with exactly one deployment-branch policy (`branch` = `main`); `INBOX_TOKEN` present, set 16:16:57Z. All four parts of ask `msg_92a6bc9c` done correctly. `waiting` removed from #30, which is now the top workable issue (p2, oldest unblocked) for the re-enabled hourly dev-team routine.
+- confidence: high
+- alternatives: none — this is the documented resume path, and the objective gate is what decides it.
+- watch-next: after 11 cycles of zero closes, the project now has real work moving again. The first realized close also clears the §4e budget that has held the git-history-rewrite issue unfiled.
+
+## 2026-09-20T16:25:00Z — correction to the PO's own gate
+
+- decision: `REVERSAL — the standing #30 secret check queried the wrong scope and would have reported the owner's correct work as missing` — the check used `repos/…/actions/secrets` (repository-level), which still returns `total_count: 0`. The ask instructed an **environment** secret, which lives at `repos/…/environments/ingest/secrets`. Eight cycles reported "0 secrets" and happened to be right; the ninth would have contradicted a correctly-completed setup and sent the owner back to redo work they had already done.
+- confidence: high
+- alternatives: none — this is a straight defect in the check. Rule recorded: **a verification must query the same scope the instructions asked for.** This is the third instrument defect in three cycles (cycle 11's substring-vs-structure, the task-prompt copy of step 4, now scope mismatch) and they share a shape: the check drifted from the thing it was meant to check.
+- watch-next: `INGEST_SCHEDULE` is the mirror image and is still unset — it must be a **repository** variable, because the workflow's job-level `if` is evaluated before the environment resolves. Setting it as an environment variable would leave R5 silently broken in exactly its current way.
