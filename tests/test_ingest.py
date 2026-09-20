@@ -1329,16 +1329,19 @@ class UndecodableBytes(PipelineCase):
         self.assertEqual(code, 0, out)
         # Processed, so deleted (R4.9) — not kept as unparseable.
         self.assertEqual(self.inbox_files(), [])
+        # The two readable rows survive; the unreadable one is withheld rather than
+        # published, because its opt-out cannot be verified (UnreadableSsidIsWithheld).
         self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
-                         ["0d:00:00:00:00:01", "0d:00:00:00:00:02", "0d:00:00:00:00:03"])
+                         ["0d:00:00:00:00:01", "0d:00:00:00:00:03"])
 
-    def test_the_undecodable_byte_becomes_u_fffd_in_that_one_ssid(self):
+    def test_only_the_unreadable_row_is_lost_not_its_neighbours(self):
+        # The whole point of the change: a bad octet costs one row, not the file.
         self.put("wardrive.log", data=self.bad_ssid_log(
             "0e:00:00:00:00:01", "0e:00:00:00:00:02", bad_index=1))
         code, out = self.run_pipeline()
         self.assertEqual(code, 0, out)
-        self.assertEqual([n["ssid"] for n in self.read_db()["networks"]],
-                         ["Cafe", "Caf�"])
+        self.assertEqual([(n["bssid"], n["ssid"]) for n in self.read_db()["networks"]],
+                         [("0e:00:00:00:00:01", "Cafe")])
 
     def test_a_bom_prefixed_log_with_a_bad_byte_still_parses_and_keeps_its_columns(self):
         # The fix must not drop the utf-8-sig BOM strip: a leaked BOM would corrupt the
@@ -1347,8 +1350,10 @@ class UndecodableBytes(PipelineCase):
             "0f:00:00:00:00:01", "0f:00:00:00:00:02", bad_index=0))
         code, out = self.run_pipeline()
         self.assertEqual(code, 0, out)
+        # Row 0 carries the bad octet and is withheld; row 1 proves the BOM was stripped
+        # (a leaked BOM would corrupt the "MAC" column and reject the file outright).
         self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
-                         ["0f:00:00:00:00:01", "0f:00:00:00:00:02"])
+                         ["0f:00:00:00:00:02"])
 
     def test_a_file_that_is_not_a_wigle_log_is_still_kept_and_still_fails(self):
         # Leniency must not swallow genuine garbage: rejection moves from the decode to
@@ -1368,6 +1373,67 @@ class UndecodableBytes(PipelineCase):
         self.assertEqual(code, 1)
         self.assertEqual(self.inbox_files(), ["corrupt.log"])
         self.assertEqual(self.read_db()["count"], 0)
+
+
+class UnreadableSsidIsWithheld(PipelineCase):
+    """Decoding leniently means an SSID can arrive unreadable. The opt-out is the one
+    privacy filter that reads the END of a field, so a trailing bad octet would slip an
+    opted-out network onto the public map. Fail closed instead (#53)."""
+
+    @staticmethod
+    def log(*rows):
+        return HEADER.encode("utf-8") + b"".join(
+            r if isinstance(r, bytes) else r.encode("utf-8") for r in rows)
+
+    @staticmethod
+    def bad(mac, ssid_bytes, **kw):
+        line = row(mac, ssid="¿SSID¿", **kw).encode("utf-8")
+        return line.replace("¿SSID¿".encode("utf-8"), ssid_bytes)
+
+    def test_a_trailing_bad_octet_does_not_defeat_the_nomap_opt_out(self):
+        self.put("drive.log", data=self.log(
+            self.bad("cc:00:00:00:00:01", b"Smith House_nomap\xa5"),
+            row("cc:00:00:00:00:02")))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        # The opted-out address must NOT reach the public map.
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["cc:00:00:00:00:02"])
+
+    def test_a_corrupted_opt_out_suffix_is_also_withheld(self):
+        self.put("drive.log", data=self.log(self.bad("cc:00:00:00:00:03", b"Home_nom\xa5p")))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_db()["networks"], [])
+
+    def test_an_unreadable_ssid_withholds_that_address_across_the_whole_batch(self):
+        # The same address seen cleanly elsewhere must not sneak past the withheld row.
+        self.put("a.log", data=self.log(self.bad("cc:00:00:00:00:04", b"Smith_nomap\xa5")))
+        self.put("b.log", HEADER + row("cc:00:00:00:00:04", ssid="Smith"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_db()["networks"], [])
+
+    def test_it_is_reported_under_its_own_reason(self):
+        self.put("drive.log", data=self.log(self.bad("cc:00:00:00:00:05", b"Caf\xa5")))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("unreadable ssid", out)
+
+    def test_a_bad_octet_before_the_suffix_still_registers_the_opt_out(self):
+        # Pre-existing behaviour that must not regress: this one already dropped
+        # correctly, because the suffix itself survived at the end of the field.
+        self.put("drive.log", data=self.log(self.bad("cc:00:00:00:00:06", b"Caf\xe9_nomap")))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_db()["networks"], [])
+
+    def test_a_clean_log_is_untouched_by_the_new_branch(self):
+        self.put("drive.log", HEADER + row("cc:00:00:00:00:07") + row("cc:00:00:00:00:08"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(self.read_db()["networks"]), 2)
+        self.assertNotIn("unreadable ssid:  1", out)
 
 
 if __name__ == "__main__":
