@@ -6,6 +6,8 @@
   --green: #33ff66;
   --green-dim: #1fae47;
   --amber: #ffb000;
+  --cyan: #00d0ff;
+  --red: #ff3355;
   --text: #b8f5c8;
   --error: #ff5f56;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -137,6 +139,11 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 }
 .swatch-encrypted { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .swatch-open { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.swatch-bluetooth { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+.swatch-flock { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+/* An empty map says so in the panel rather than leaving a blank rectangle. */
+.empty-note { margin: 8px 0 0; color: var(--green-dim); font-size: 0.85rem; }
 
 .error {
   margin: 12px 0;

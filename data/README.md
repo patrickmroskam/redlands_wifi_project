@@ -2,7 +2,12 @@
 
 Files the site and the ingest read. All are committed; none is ever placed in `ingest/`.
 
-## `networks.json` — the database
+The pipeline writes three databases — `networks.json` (WiFi), `bluetooth.json` and
+`flock.json` — and each is read by its own page. They share the same fence, the same
+opt-out, the same removal denylist, and the same rule that a BSSID is never stored twice
+in one database.
+
+## `networks.json` — the WiFi database
 
 Written only by the ingest pipeline (`scripts/ingest.py`, run by the daily job).
 It is valid JSON with one network per line, so diffs stay readable. Shape:
@@ -37,6 +42,55 @@ It is valid JSON with one network per line, so diffs stay readable. Shape:
 - `auth` is the WiGLE `AuthMode` string. The map treats anything containing
   `WEP`, `WPA`, or `RSN` as encrypted and everything else as open.
 - No RSSI, altitude, accuracy, or raw log content is ever stored here.
+
+## `bluetooth.json` — Bluetooth devices
+
+Same writer, same shape, but the records live under `devices` and hold only
+`bssid`, `name`, `first_seen`, `lat` and `lon`. A BLE row's `AuthMode` is the
+constant `[BLE]` and its `Channel` is always `0`, so neither is published; `name`
+is the advertised device name and is usually an empty string.
+
+**Only stable addresses reach this file.** A Bluetooth device may advertise a random
+private address that it rotates every few minutes, specifically so that it cannot be
+followed from place to place — phones, watches and earbuds all do. Those addresses are
+useless as a dedupe key and publishing them would map people rather than devices, so
+they are dropped as `ble private`. The address type is not a column in a WiGLE CSV, so
+the pipeline reads the top two bits of the first octet (Bluetooth Core spec, Vol 6
+Part B, 1.3.2):
+
+| Top two bits | Address type | Published |
+|---|---|---|
+| `0b11` | static random | yes |
+| `0b10` | not a valid random type, so public | yes |
+| `0b01` | resolvable private (rotates) | no |
+| `0b00` | non-resolvable private (rotates) | no |
+
+A public address whose first octet happens to begin `0b00` or `0b01` is dropped with
+them. That is deliberate: the cost of being wrong that way is a missing marker, and the
+cost of being wrong the other way is a published person.
+
+## `flock.json` and `flock-rules.json` — Flock cameras
+
+`flock-rules.json` says what marks an observation as a Flock Safety camera:
+
+```json
+{ "ssid_patterns": ["flock safety"], "oui_prefixes": ["a4:da:22"] }
+```
+
+`ssid_patterns` are case-insensitive substrings of the SSID or device name;
+`oui_prefixes` are lower-case colon-separated MAC prefixes matched against the start of
+the canonical BSSID. **Both ship empty**, so `flock.json` stays empty until a rule is
+added — no rule has been confirmed against a real camera, and a guessed one would put a
+surveillance marker on somebody's home network.
+
+A matching row is written to `flock.json` *in addition to* the database its Type selects,
+so adding a rule never removes anything from the WiFi map. Records carry the usual
+network fields plus `matched_by` (for example `"oui:a4:da:22"`), which the map shows in
+the popup so every marker can be traced back to the rule that placed it.
+
+Deleting a rule stops new matches; records already in `flock.json` are removed by hand,
+the same way as a removal request (`docs/removals.md`). A missing rules file means "no
+rules" and is not an error; a malformed one stops the run.
 
 ## How the site groups networks (`assets/stats.js`)
 

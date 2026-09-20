@@ -1,0 +1,18 @@
+{
+  "_comment": [
+    "What marks an observed row as a Flock Safety camera. Both lists ship EMPTY on",
+    "purpose: no rule has been verified against a real observation yet, and guessing",
+    "one would put a surveillance-camera marker on a resident's access point.",
+    "",
+    "ssid_patterns: case-insensitive substrings matched against the SSID / device name.",
+    "oui_prefixes:  MAC address prefixes, lower case and colon-separated, matched",
+    "               against the start of the canonical BSSID (e.g. \"a4:da:22\").",
+    "",
+    "A matching row is published to data/flock.json IN ADDITION to the database its",
+    "Type selects, so adding a rule never changes what the main map means. Delete a",
+    "rule and the marker stops being re-added; existing records are removed by hand,",
+    "the same way as a removal request (docs/removals.md)."
+  ],
+  "ssid_patterns": [],
+  "oui_prefixes": []
+}

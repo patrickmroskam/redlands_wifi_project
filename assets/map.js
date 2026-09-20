@@ -2,11 +2,19 @@
 (function () {
   'use strict';
 
-  var DB_URL = 'data/networks.json';
+  // Every page shares this map: the fence, the canvas markers and the popup panning are
+  // the same everywhere, only the dataset differs. A page sets window.RWPMapConfig before
+  // loading this script to plot something other than the WiFi networks; the defaults below
+  // are the main map, so index.html needs no configuration at all.
+  var CONFIG = window.RWPMapConfig || {};
+  var DB_URL = CONFIG.dbUrl || 'data/networks.json';
+  // The JSON key holding the records: 'networks' for the WiFi map, 'devices' for the rest.
+  var RECORDS_KEY = CONFIG.recordsKey || 'networks';
+  var NOUN = CONFIG.noun || 'network';
   var BOUNDARY_URL = 'data/redlands-boundary.geojson';
   // Used only if the boundary file fails to load: bbox of ZCTA 92373 + 92374.
   var FALLBACK_BOUNDS = [[33.93438, -117.24996], [34.09923, -117.03414]];
-  var COLORS = { encrypted: '#33ff66', open: '#ffb000' };
+  var COLORS = CONFIG.colors || { encrypted: '#33ff66', open: '#ffb000' };
   // Keep auto-panned popups clear of the zoom control (top left); Leaflet's default elsewhere.
   var POPUP_OPTIONS = { autoPanPaddingTopLeft: [50, 10], autoPanPaddingBottomRight: [5, 5] };
   // Extra room on every side of the popup when the fence is loosened for it. Must cover the largest
@@ -45,17 +53,29 @@
     });
   }
 
-  function popupFor(net) {
-    var dl = document.createElement('dl');
-    dl.className = 'net-popup';
+  // [label, value, optional CSS class] per row, in display order.
+  function defaultPopupRows(net) {
     var ssid = typeof net.ssid === 'string' && net.ssid.trim() !== '' ? net.ssid : 'hidden';
-    var rows = [
+    return [
       ['SSID', ssid, 'ssid'],
       ['BSSID', net.bssid],
       ['Auth', net.auth || 'unknown'],
       ['Channel', net.channel],
       ['First seen', net.first_seen]
     ];
+  }
+  var popupRows = CONFIG.popupRows || defaultPopupRows;
+
+  // One colour per record. The WiFi map splits on encryption; other maps are single-colour.
+  function defaultKindOf(net) {
+    return isEncrypted(net.auth) ? 'encrypted' : 'open';
+  }
+  var kindOf = CONFIG.kindOf || defaultKindOf;
+
+  function popupFor(net) {
+    var dl = document.createElement('dl');
+    dl.className = 'net-popup';
+    var rows = popupRows(net);
     rows.forEach(function (row) {
       var dt = document.createElement('dt');
       dt.textContent = row[0];
@@ -234,14 +254,15 @@
   boundaryReady.then(function () {
     return fetchJson(DB_URL);
   }).then(function (db) {
-    if (!db || !Array.isArray(db.networks)) throw new Error('database is not in the expected format');
+    var records = db && db[RECORDS_KEY];
+    if (!records || !Array.isArray(records)) throw new Error('database is not in the expected format');
     var plotted = 0;
     var skipped = 0;
     var duplicates = 0;
     var seen = Object.create(null);
     var markers = L.layerGroup();
     var plottedNets = [];
-    db.networks.forEach(function (net) {
+    records.forEach(function (net) {
       var lat = toCoord(net && net.lat);
       var lon = toCoord(net && net.lon);
       if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) {
@@ -257,7 +278,7 @@
         }
         seen[key] = true;
       }
-      var kind = isEncrypted(net.auth) ? 'encrypted' : 'open';
+      var kind = kindOf(net);
       // The popup is built only when it opens; 18k detached popup trees would cost memory at load.
       var marker = L.circleMarker([lat, lon], {
         renderer: markerRenderer,
@@ -274,7 +295,7 @@
       plotted += 1;
     });
     markers.addTo(map);
-    statsEl.textContent = '> ' + plotted.toLocaleString('en-US') + ' network' + (plotted === 1 ? '' : 's') +
+    statsEl.textContent = '> ' + plotted.toLocaleString('en-US') + ' ' + NOUN + (plotted === 1 ? '' : 's') +
       ' mapped · last updated ' + formatUpdated(db.updated_at);
     // The breakdown counts exactly the networks on the map (#12). A bug there must not blank the map.
     try {
@@ -284,14 +305,14 @@
       window.RWPStats.fail();
     }
     if (skipped > 0) {
-      console.warn('Skipped ' + skipped + ' network record(s) with invalid coordinates.');
+      console.warn('Skipped ' + skipped + ' ' + NOUN + ' record(s) with invalid coordinates.');
     }
     if (duplicates > 0) {
-      console.warn('Skipped ' + duplicates + ' duplicate network record(s) (same BSSID).');
+      console.warn('Skipped ' + duplicates + ' duplicate ' + NOUN + ' record(s) (same BSSID).');
     }
   }).catch(function (err) {
     statsEl.textContent = '> database unavailable';
     if (window.RWPStats) window.RWPStats.fail();
-    showError('Could not load the network database (' + err.message + '). Please try again later.');
+    showError('Could not load the ' + NOUN + ' database (' + err.message + '). Please try again later.');
   });
 })();

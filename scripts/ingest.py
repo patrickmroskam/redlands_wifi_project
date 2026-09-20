@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
-"""Ingest raw WiGLE CSV wardrive logs into data/networks.json.
+"""Ingest raw WiGLE CSV wardrive logs into the published databases.
 
-Reads every candidate file in ingest/, keeps WiFi rows that fall inside the
-Redlands ZIP polygons (92373 / 92374), are not opted out (`_nomap` / `_optout`),
-are not on the removal denylist (data/removed.json) and are not already known
-(by BSSID), appends them to the database, then
-deletes the files it processed. Files it cannot parse are left in place,
-reported by name, and make the script exit 1. See docs/spec/PRD.md (R3, R4).
+Reads every candidate file in ingest/ and routes each row to one of three
+databases by its Type column:
+
+  WIFI -> data/networks.json    every WiFi network (the main map)
+  BLE  -> data/bluetooth.json   Bluetooth devices with a *stable* address
+  any  -> data/flock.json       rows matching data/flock-rules.json, additionally
+
+Every database applies the same filters: inside the Redlands ZIP polygons
+(92373 / 92374), not opted out (`_nomap` / `_optout`), not on the removal
+denylist (data/removed.json), and not already known (by BSSID, per database).
+Rows of any other type (GSM/LTE cell towers) are dropped. Processed files are
+deleted; files that cannot be parsed are left in place, reported by name, and
+make the script exit 1. See docs/spec/PRD.md (R3, R4).
 
 Python 3 standard library only.
 
 Usage:
   python3 scripts/ingest.py [--dry-run] [--ingest-dir DIR] [--db FILE] [--boundary FILE]
-                            [--denylist FILE]
+                            [--denylist FILE] [--ble-db FILE] [--flock-db FILE]
+                            [--flock-rules FILE]
 
 Exit codes: 0 ok; 1 some files could not be parsed (left in place) or could not
 be deleted; 2 fatal (nothing written or deleted).
@@ -29,6 +37,9 @@ import tempfile
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_INGEST_DIR = os.path.join(REPO_ROOT, "ingest")
 DEFAULT_DB = os.path.join(REPO_ROOT, "data", "networks.json")
+DEFAULT_BLE_DB = os.path.join(REPO_ROOT, "data", "bluetooth.json")
+DEFAULT_FLOCK_DB = os.path.join(REPO_ROOT, "data", "flock.json")
+DEFAULT_FLOCK_RULES = os.path.join(REPO_ROOT, "data", "flock-rules.json")
 DEFAULT_BOUNDARY = os.path.join(REPO_ROOT, "data", "redlands-boundary.geojson")
 DEFAULT_DENYLIST = os.path.join(REPO_ROOT, "data", "removed.json")
 
@@ -38,10 +49,20 @@ REQUIRED_COLUMNS = ("MAC", "SSID", "AuthMode", "FirstSeen", "Channel",
                     "CurrentLatitude", "CurrentLongitude", "Type")
 OPT_OUT_SUFFIXES = ("_nomap", "_optout")
 
+# Log Type values this pipeline publishes, and the database each one feeds. Any other
+# type (GSM, LTE, ...) is a cell tower: its id column is not a MAC and it is dropped.
+PUBLISHED_TYPES = {"WIFI": "networks", "BLE": "bluetooth"}
+# `flock` is additive: a matching row is published to its own database *as well as*
+# the one its Type selects, so the main map never changes meaning when a rule is added.
+FLOCK = "flock"
+# The JSON key holding the records, per database.
+RECORD_KEY = {"networks": "networks", "bluetooth": "devices", FLOCK: "devices"}
+
 # Drop reasons, in the order they are checked, with their summary labels.
 REASONS = (
     ("malformed", "malformed"),
     ("not_wifi", "not wifi"),
+    ("ble_private", "ble private"),
     ("removed", "removed"),
     ("bad_coords", "bad coords"),
     ("outside_area", "outside area"),
@@ -170,6 +191,107 @@ def parse_coord(value):
     return number if math.isfinite(number) else None
 
 
+def ble_address_is_stable(bssid):
+    """True when a BLE address identifies a device over time, rather than a person.
+
+    A Bluetooth LE device may advertise a *random private* address that it changes on
+    a timer — every ~15 minutes for a resolvable private address. Phones, watches and
+    earbuds all do this, by design, so that they cannot be tracked. Such an address is
+    useless as a dedupe key (the same handset returns as a new device on every pass)
+    and publishing it would map the people who walked past, not the devices that live
+    there. So only stable addresses are published.
+
+    The address type is not a column in a WiGLE CSV, but the top two bits of the first
+    octet carry it for random addresses (Bluetooth Core spec, Vol 6 Part B, 1.3.2):
+
+        0b11  static random     stable for the device's power cycle  -> publish
+        0b01  resolvable private    rotates on a timer               -> drop
+        0b00  non-resolvable private    rotates on a timer           -> drop
+        0b10  not a valid random type, so the address is public      -> publish
+
+    A *public* (vendor-assigned) address carries no such marker, so one whose first
+    octet happens to begin 0b00 or 0b01 is dropped along with the rotating ones. That
+    is the safe direction to be wrong in: the cost is a missing marker, not a published
+    person.
+    """
+    if bssid is None:
+        return False
+    return (int(bssid[:2], 16) >> 6) in (0b11, 0b10)
+
+
+class FlockRules:
+    """SSID substrings and MAC prefixes that mark a row as a Flock Safety camera.
+
+    Kept in data as `data/flock-rules.json` rather than in code so a rule can be added
+    without a code change, and so the file is the single auditable answer to "why is
+    this marker on the map?". Both lists ship empty: no rule has been verified against
+    a real observation yet, and guessing one would label a resident's access point as a
+    surveillance camera on a public map.
+    """
+
+    def __init__(self, ssid_patterns=(), oui_prefixes=()):
+        self.ssid_patterns = tuple(p.lower() for p in ssid_patterns)
+        self.oui_prefixes = tuple(oui_prefixes)
+
+    def __bool__(self):
+        return bool(self.ssid_patterns or self.oui_prefixes)
+
+    def match(self, row, bssid):
+        """Return the rule that matched (for the record's `matched_by`), or None."""
+        ssid = row["SSID"].strip().lower()
+        if ssid:
+            for pattern in self.ssid_patterns:
+                if pattern in ssid:
+                    return "ssid:" + pattern
+        if bssid:
+            for prefix in self.oui_prefixes:
+                if bssid.startswith(prefix):
+                    return "oui:" + prefix
+        return None
+
+
+def load_flock_rules(path):
+    """Read data/flock-rules.json. Absent means "no rules"; malformed is fatal.
+
+    Absence is a safe default — no rule matches, no camera is claimed — so a deleted
+    file must not stop the daily job. A file that exists but is wrong is a different
+    thing: it is a mis-edit, and running on a half-understood rule could mislabel
+    somebody's network, so it stops the run.
+    """
+    if not os.path.exists(path):
+        return FlockRules()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:
+        raise FatalError("cannot read flock rules {}: {}".format(path, exc))
+    if not isinstance(data, dict):
+        raise FatalError("flock rules {} is not an object".format(path))
+    problems = []
+    lists = {}
+    for key in ("ssid_patterns", "oui_prefixes"):
+        value = data.get(key, [])
+        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+            problems.append("{} must be a list of strings".format(key))
+            continue
+        lists[key] = value
+    for pattern in lists.get("ssid_patterns", []):
+        if not pattern.strip():
+            problems.append("ssid_patterns has a blank pattern")
+    prefixes = []
+    for prefix in lists.get("oui_prefixes", []):
+        text = prefix.strip().lower().replace("-", ":")
+        if not re.match(r"^[0-9a-f]{2}(:[0-9a-f]{2}){0,5}$", text):
+            problems.append("oui_prefix {} is not a MAC prefix like aa:bb:cc".format(
+                json.dumps(prefix, ensure_ascii=False)))
+        else:
+            prefixes.append(text)
+    if problems:
+        raise FatalError("flock rules {} needs a manual fix; {} problem(s): {}".format(
+            path, len(problems), _preview(problems)))
+    return FlockRules(lists.get("ssid_patterns", []), prefixes)
+
+
 def natural_key(name):
     parts = re.split(r"([0-9]+)", name)
     return [int(part) if i % 2 else part.lower() for i, part in enumerate(parts)]
@@ -241,28 +363,29 @@ def read_log(path):
 
 # --- database ------------------------------------------------------------------
 
-def load_db(path):
+def load_db(path, key="networks"):
     if not os.path.exists(path):
-        return {"updated_at": None, "count": 0, "networks": []}
+        return {"updated_at": None, "count": 0, key: []}
     try:
         with open(path, encoding="utf-8") as fh:
             db = json.load(fh)
     except (OSError, ValueError) as exc:
         raise FatalError("cannot read database {}: {}".format(path, exc))
-    if not isinstance(db, dict) or not isinstance(db.get("networks"), list):
-        raise FatalError("database {} has no 'networks' list".format(path))
-    if not all(isinstance(n, dict) for n in db["networks"]):
-        raise FatalError("database {} has a network entry that is not an object".format(path))
+    if not isinstance(db, dict) or not isinstance(db.get(key), list):
+        raise FatalError("database {} has no '{}' list".format(path, key))
+    if not all(isinstance(n, dict) for n in db[key]):
+        raise FatalError("database {} has a {} entry that is not an object".format(
+            path, key[:-1] if key.endswith("s") else key))
     return db
 
 
-def stored_bssids(db, path):
+def stored_bssids(db, path, key="networks"):
     """Canonical BSSIDs already in the database. Malformed or duplicate entries are fatal:
     the database is only ever hand-edited through a PR, and a broken one must be fixed by
     a human rather than republished (or grown) every day."""
     seen = {}
     malformed, duplicates = [], []
-    for index, net in enumerate(db["networks"]):
+    for index, net in enumerate(db[key]):
         raw = net.get("bssid")
         bssid = normalize_bssid(raw)
         if bssid is None:
@@ -273,7 +396,7 @@ def stored_bssids(db, path):
             seen[bssid] = index
     problems = []
     if malformed:
-        problems.append("{} network(s) with a malformed bssid: {}".format(
+        problems.append("{} record(s) with a malformed bssid: {}".format(
             len(malformed), _preview(malformed)))
     if duplicates:
         problems.append("{} duplicate bssid(s): {}".format(
@@ -347,21 +470,21 @@ def _preview(items, limit=10):
     return shown if len(items) <= limit else "{}, ... (+{} more)".format(shown, len(items) - limit)
 
 
-def save_db(path, db):
-    """Atomically write valid JSON with one network per line (compact, diff-friendly)."""
+def save_db(path, db, key="networks"):
+    """Atomically write valid JSON with one record per line (compact, diff-friendly)."""
     dump = lambda value: json.dumps(value, ensure_ascii=False)  # noqa: E731
-    networks = db["networks"]
+    records = db[key]
     parts = [
         "{\n",
         '  "updated_at": {},\n'.format(dump(db["updated_at"])),
-        '  "count": {},\n'.format(len(networks)),
+        '  "count": {},\n'.format(len(records)),
     ]
-    if networks:
-        parts.append('  "networks": [\n')
-        parts.append(",\n".join("    " + dump(n) for n in networks))
+    if records:
+        parts.append('  "{}": [\n'.format(key))
+        parts.append(",\n".join("    " + dump(n) for n in records))
         parts.append("\n  ]\n")
     else:
-        parts.append('  "networks": []\n')
+        parts.append('  "{}": []\n'.format(key))
     parts.append("}\n")
 
     try:
@@ -392,35 +515,25 @@ def is_malformed(row):
     if row is None or not row["MAC"].strip():
         return True
     # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
-    if row["Type"].strip().upper() != "WIFI":
+    if row["Type"].strip().upper() not in PUBLISHED_TYPES:
         return False
     return normalize_bssid(row["MAC"]) is None
 
 
-def classify(row, fence, known, removed=frozenset()):
-    """Return (reason, None, bssid) for a dropped row or (None, record, bssid) for a kept one.
-
-    bssid is the canonical address, or None when the row has none.
-    """
-    if is_malformed(row):
-        return "malformed", None, None
-    if row["Type"].strip().upper() != "WIFI":
-        return "not_wifi", None, None
-    bssid = normalize_bssid(row["MAC"])
-    if bssid in removed:
-        return "removed", None, bssid
-    lat = parse_coord(row["CurrentLatitude"])
-    lon = parse_coord(row["CurrentLongitude"])
-    if lat is None or lon is None or (lat == 0 and lon == 0):
-        return "bad_coords", None, bssid
-    if not fence.contains(lat=lat, lon=lon):
-        return "outside_area", None, bssid
-    ssid = row["SSID"]
-    if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
-        return "opt_out", None, bssid
-    if bssid in known:
-        return "duplicate", None, bssid
-    return None, {
+def build_record(dataset, row, ssid, bssid, lat, lon, matched_by):
+    """The published fields for one row. Never RSSI, altitude or accuracy (R4.12)."""
+    if dataset == "bluetooth":
+        # A BLE row's AuthMode is the constant "[BLE]" and its Channel is always 0, so
+        # neither is published. The SSID column carries the advertised device name,
+        # which is usually empty.
+        return {
+            "bssid": bssid,
+            "name": ssid,
+            "first_seen": normalize_first_seen(row["FirstSeen"]),
+            "lat": lat,
+            "lon": lon,
+        }
+    record = {
         "bssid": bssid,
         "ssid": ssid,
         "auth": row["AuthMode"].strip(),
@@ -428,28 +541,75 @@ def classify(row, fence, known, removed=frozenset()):
         "first_seen": normalize_first_seen(row["FirstSeen"]),
         "lat": lat,
         "lon": lon,
-    }, bssid
+    }
+    if dataset == FLOCK:
+        record["matched_by"] = matched_by
+    return record
 
 
-def check_data(db_path, denylist_path):
-    """Load and validate the database and the denylist. Returns (db, stored, removed).
+def classify(row, fence, known, removed=frozenset(), flock=None):
+    """Route one row to the databases it belongs in.
 
-    A denylisted BSSID that is still in the database is fatal: a removal was half-done
-    (or raced an ingest), and the network is still published."""
-    db = load_db(db_path)
-    stored = stored_bssids(db, db_path)
+    Returns (reason, entries, bssid). `entries` is a list of (dataset, record) pairs to
+    publish, and is empty for a dropped row — `reason` then says why. One row can produce
+    two entries: a Flock match is published to its own database *as well as* the one its
+    Type selects, so adding a rule never changes what the main map means.
+
+    `known` maps a dataset to the BSSIDs it already holds. bssid is the canonical
+    address, or None when the row has none.
+    """
+    if is_malformed(row):
+        return "malformed", [], None
+    dataset = PUBLISHED_TYPES.get(row["Type"].strip().upper())
+    if dataset is None:
+        return "not_wifi", [], None
+    bssid = normalize_bssid(row["MAC"])
+    if dataset == "bluetooth" and not ble_address_is_stable(bssid):
+        return "ble_private", [], bssid
+    if bssid in removed:
+        return "removed", [], bssid
+    lat = parse_coord(row["CurrentLatitude"])
+    lon = parse_coord(row["CurrentLongitude"])
+    if lat is None or lon is None or (lat == 0 and lon == 0):
+        return "bad_coords", [], bssid
+    if not fence.contains(lat=lat, lon=lon):
+        return "outside_area", [], bssid
+    ssid = row["SSID"]
+    if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
+        return "opt_out", [], bssid
+    matched_by = flock.match(row, bssid) if flock else None
+    targets = [dataset] + ([FLOCK] if matched_by else [])
+    entries = [(name, build_record(name, row, ssid, bssid, lat, lon, matched_by))
+               for name in targets if bssid not in known[name]]
+    if not entries:
+        return "duplicate", [], bssid
+    return None, entries, bssid
+
+
+def check_data(db_paths, denylist_path):
+    """Load and validate every database and the denylist. Returns (dbs, stored, removed).
+
+    `dbs` and `stored` are keyed by dataset. A denylisted BSSID that is still in any
+    database is fatal: a removal was half-done (or raced an ingest), and the device is
+    still published."""
     removed = load_denylist(denylist_path)
-    still_published = sorted(stored & removed)
-    if still_published:
-        raise FatalError(
-            "database {} still contains {} removed network(s) listed in {}: {}; "
-            "delete them from the database (docs/removals.md)".format(
-                db_path, len(still_published), denylist_path, _preview(still_published)))
-    return db, stored, removed
+    dbs, stored = {}, {}
+    for dataset, path in db_paths.items():
+        key = RECORD_KEY[dataset]
+        dbs[dataset] = load_db(path, key)
+        stored[dataset] = stored_bssids(dbs[dataset], path, key)
+        still_published = sorted(stored[dataset] & removed)
+        if still_published:
+            raise FatalError(
+                "database {} still contains {} removed record(s) listed in {}: {}; "
+                "delete them from the database (docs/removals.md)".format(
+                    path, len(still_published), denylist_path, _preview(still_published)))
+    return dbs, stored, removed
 
 
 def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
-        dry_run=False, now=None):
+        ble_db_path=DEFAULT_BLE_DB, flock_db_path=DEFAULT_FLOCK_DB,
+        flock_rules_path=DEFAULT_FLOCK_RULES, dry_run=False, now=None):
     """Run the pipeline and return a summary dict. Raises FatalError before any change."""
     try:
         with open(boundary_path, encoding="utf-8") as fh:
@@ -458,8 +618,12 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         raise FatalError("cannot load boundary {}: {}".format(boundary_path, exc))
     if not os.path.isdir(ingest_dir):
         raise FatalError("ingest directory {} does not exist".format(ingest_dir))
-    db, stored, removed = check_data(db_path, denylist_path)
-    known = set(stored)
+    db_paths = {"networks": db_path, "bluetooth": ble_db_path, FLOCK: flock_db_path}
+    dbs, stored, removed = check_data(db_paths, denylist_path)
+    flock_rules = load_flock_rules(flock_rules_path)
+    known = {dataset: set(bssids) for dataset, bssids in stored.items()}
+    # "already in the database" spans every database: it means published before this run.
+    stored_any = set().union(*stored.values()) if stored else set()
 
     summary = {
         "files_processed": [],
@@ -468,11 +632,13 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         "dropped": {reason: 0 for reason, _ in REASONS},
         "duplicate_stored": 0,
         "added": 0,
+        "added_by_dataset": {dataset: 0 for dataset in db_paths},
+        "flock_rules": bool(flock_rules),
         "opted_out_but_published": [],
         "not_deleted": [],
         "dry_run": dry_run,
     }
-    added = []
+    added = {dataset: [] for dataset in db_paths}
     opted_out = set()  # every BSSID seen with an opt-out SSID anywhere in this batch
     for name in candidate_files(ingest_dir):
         try:
@@ -491,38 +657,48 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         summary["files_processed"].append(name)
         for row in rows:
             summary["rows_read"] += 1
-            reason, record, bssid = classify(row, fence, known, removed)
+            reason, entries, bssid = classify(row, fence, known, removed, flock_rules)
             if reason:
                 summary["dropped"][reason] += 1
-                if reason == "duplicate" and bssid in stored:
+                if reason == "duplicate" and bssid in stored_any:
                     summary["duplicate_stored"] += 1
                 if reason == "opt_out":
                     opted_out.add(bssid)
-                    if bssid in stored and bssid not in summary["opted_out_but_published"]:
+                    if bssid in stored_any and bssid not in summary["opted_out_but_published"]:
                         summary["opted_out_but_published"].append(bssid)
             else:
-                known.add(bssid)
-                added.append(record)
+                for dataset, record in entries:
+                    known[dataset].add(bssid)
+                    added[dataset].append(record)
     # An opt-out anywhere in the batch wins over the same BSSID seen without the suffix
     # (in any file order): never publish it. Its kept row is recounted as an opt-out.
-    withheld = [r for r in added if r["bssid"] in opted_out]
-    if withheld:
-        added = [r for r in added if r["bssid"] not in opted_out]
-        summary["dropped"]["opt_out"] += len(withheld)
-    summary["added"] = len(added)
+    # Counted by address, not by record: a Flock match is held in two databases, but
+    # withholding it is still one row dropped.
+    withheld = set()
+    for dataset, records in added.items():
+        added[dataset] = [r for r in records if r["bssid"] not in opted_out]
+        withheld.update(r["bssid"] for r in records if r["bssid"] in opted_out)
+    summary["dropped"]["opt_out"] += len(withheld)
+    for dataset, records in added.items():
+        summary["added_by_dataset"][dataset] = len(records)
+    summary["added"] = sum(summary["added_by_dataset"].values())
 
     if dry_run:
         return summary
 
-    if added:
-        stamp = now or datetime.datetime.now(datetime.timezone.utc)
-        db["networks"].extend(added)
-        db["count"] = len(db["networks"])
+    stamp = now or datetime.datetime.now(datetime.timezone.utc)
+    for dataset, records in added.items():
+        if not records:
+            continue
+        key = RECORD_KEY[dataset]
+        db, path = dbs[dataset], db_paths[dataset]
+        db[key].extend(records)
+        db["count"] = len(db[key])
         db["updated_at"] = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
         try:
-            save_db(db_path, db)
+            save_db(path, db, key)
         except OSError as exc:
-            raise FatalError("cannot write database {}: {}".format(db_path, exc))
+            raise FatalError("cannot write database {}: {}".format(path, exc))
 
     for name in summary["files_processed"]:
         try:
@@ -548,6 +724,10 @@ def format_summary(summary):
             out.append("    {:<15}{}".format("in database:", stored))
             out.append("    {:<15}{}".format("in this batch:", summary["dropped"][reason] - stored))
     out.append(line("rows added:", summary["added"]))
+    for dataset in ("networks", "bluetooth", FLOCK):
+        out.append(reason_line(dataset + ":", summary["added_by_dataset"][dataset]))
+    if not summary["flock_rules"]:
+        out.append("  (no flock rules configured: data/flock-rules.json is empty)")
     if summary["opted_out_but_published"]:
         out.append("")
         out.append("already published but now opted out (remove by hand, see privacy policy):")
@@ -569,25 +749,35 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--ingest-dir", default=DEFAULT_INGEST_DIR)
     parser.add_argument("--db", default=DEFAULT_DB)
+    parser.add_argument("--ble-db", default=DEFAULT_BLE_DB,
+                        help="Bluetooth database (default: data/bluetooth.json)")
+    parser.add_argument("--flock-db", default=DEFAULT_FLOCK_DB,
+                        help="Flock camera database (default: data/flock.json)")
+    parser.add_argument("--flock-rules", default=DEFAULT_FLOCK_RULES,
+                        help="what marks a row as a Flock camera (default: data/flock-rules.json)")
     parser.add_argument("--boundary", default=DEFAULT_BOUNDARY)
     parser.add_argument("--denylist", default=DEFAULT_DENYLIST,
                         help="removed BSSIDs that are never added (default: data/removed.json)")
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would happen without writing or deleting")
     parser.add_argument("--check", action="store_true",
-                        help="only validate the database and the denylist, then exit")
+                        help="only validate the databases and the denylist, then exit")
     args = parser.parse_args(argv)
+    db_paths = {"networks": args.db, "bluetooth": args.ble_db, FLOCK: args.flock_db}
     if args.check:
         try:
-            check_data(args.db, args.denylist)
+            check_data(db_paths, args.denylist)
+            load_flock_rules(args.flock_rules)
         except FatalError as exc:
             print("error: {}".format(exc))
             return EXIT_FATAL
-        print("database and denylist are consistent.")
+        print("databases, denylist and flock rules are consistent.")
         return EXIT_OK
     try:
         summary = run(args.ingest_dir, args.db, args.boundary,
-                      denylist_path=args.denylist, dry_run=args.dry_run)
+                      denylist_path=args.denylist, ble_db_path=args.ble_db,
+                      flock_db_path=args.flock_db, flock_rules_path=args.flock_rules,
+                      dry_run=args.dry_run)
     except FatalError as exc:
         print("error: {}".format(exc))
         print("nothing was written or deleted.")

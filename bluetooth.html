@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Redlands Wifi Project</title>
-  <meta name="description" content="A map of WiFi networks observed by wardriving in Redlands, California (ZIP 92373 / 92374).">
+  <title>Bluetooth map — Redlands Wifi Project</title>
+  <meta name="description" content="A map of Bluetooth devices with stable addresses observed by wardriving in Redlands, California (ZIP 92373 / 92374).">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#050805">
@@ -15,10 +15,10 @@
 </head>
 <body>
   <div class="crt" aria-hidden="true"></div>
-  <header class="banner">
-    <p class="prompt" aria-hidden="true">root@redlands:~$ ./scan --zip 92373,92374</p>
-    <h1 class="banner-title">Redlands Wifi Project<span class="cursor" aria-hidden="true"></span></h1>
-    <p class="tagline">Passive wardriving map of WiFi networks in Redlands, CA</p>
+  <header class="banner banner-small">
+    <p class="prompt" aria-hidden="true">root@redlands:~$ ./scan --ble --zip 92373,92374</p>
+    <h1 class="banner-title">Bluetooth map<span class="cursor" aria-hidden="true"></span></h1>
+    <p class="tagline">Bluetooth devices with a stable address, in Redlands, CA</p>
   </header>
 
   <main>
@@ -26,43 +26,26 @@
       <h2 id="stats-heading" class="visually-hidden">Statistics</h2>
       <p id="stats" class="stats" aria-live="polite">&gt; loading database…</p>
       <ul class="legend" aria-label="Map legend">
-        <li><span class="swatch swatch-encrypted" aria-hidden="true"></span> encrypted (WEP / WPA)</li>
-        <li><span class="swatch swatch-open" aria-hidden="true"></span> open</li>
+        <li><span class="swatch swatch-bluetooth" aria-hidden="true"></span> Bluetooth device</li>
       </ul>
+      <p class="empty-note">
+        Phones, watches and earbuds broadcast an address that changes every few minutes,
+        precisely so that they cannot be followed around. Those are not mapped here, so this
+        map shows devices that stay put rather than people who passed by. See the
+        <a href="privacy.html#published">privacy policy</a>.
+      </p>
     </section>
 
     <div id="error" class="error" role="alert" hidden></div>
 
-    <section class="map-frame" aria-label="Map of observed networks">
+    <section class="map-frame" aria-label="Map of observed Bluetooth devices">
       <div id="map"></div>
-    </section>
-
-    <section class="breakdown" aria-labelledby="breakdown-heading">
-      <h2 id="breakdown-heading" class="section-title">Network breakdown</h2>
-      <div class="breakdown-grid">
-        <div class="breakdown-col" id="security-col">
-          <h3 class="col-title">Security</h3>
-          <p id="security-status" class="col-note" aria-live="polite">&gt; loading…</p>
-          <div id="security-chart" class="pie-wrap" hidden></div>
-        </div>
-        <div class="breakdown-col" id="list-col">
-          <h3 class="col-title">By category</h3>
-          <p id="list-status" class="col-note">&gt; loading…</p>
-          <div id="category-list" class="category-list" hidden></div>
-        </div>
-      </div>
     </section>
   </main>
 
   <footer class="footer">
-    <p class="credit">
-      Security research brought to you by
-      <a href="https://www.calicoders.com" target="_blank" rel="noopener noreferrer">CaliCoders LLC</a>,
-      a security first managed service provider based in Redlands, where our goal is to create a safer,
-      more secure internet for not only our clients but our community at large.
-    </p>
     <p>
-      <a href="bluetooth.html">Bluetooth devices</a>
+      <a href="index.html">WiFi map</a>
       <span aria-hidden="true">·</span>
       <a href="flock.html">Flock cameras</a>
       <span aria-hidden="true">·</span>
@@ -75,7 +58,7 @@
 
   <script src="assets/vendor/leaflet-1.9.4/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
-  <script src="assets/stats.js"></script>
+  <script src="assets/bluetooth-map-config.js"></script>
   <script src="assets/map.js"></script>
 </body>
 </html>

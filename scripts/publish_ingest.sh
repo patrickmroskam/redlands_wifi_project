@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run the ingest pipeline and publish its result (PRD R5.3, R5.4, R4.9, R4.10).
 #
-# Runs scripts/ingest.py on ingest/, then — if data/networks.json or ingest/ changed —
-# commits exactly those paths as one commit and pushes the current branch. Used by
+# Runs scripts/ingest.py on ingest/, then — if any published database or ingest/
+# changed — commits exactly those paths as one commit and pushes the current branch. Used by
 # .github/workflows/ingest.yml; safe to run locally in a scratch clone.
 #
 # Usage: scripts/publish_ingest.sh [--dry-run]
@@ -19,6 +19,11 @@
 set -uo pipefail
 
 DB=data/networks.json
+BLE_DB=data/bluetooth.json
+FLOCK_DB=data/flock.json
+# Every database the pipeline writes. A database missing from this list would be written
+# by the ingest and then silently left behind, dirtying the next run's tree.
+DBS=("$DB" "$BLE_DB" "$FLOCK_DB")
 INBOX=ingest
 
 dry_run=""
@@ -70,23 +75,39 @@ if [ -n "$dry_run" ]; then
   exit "$code"
 fi
 
-if [ -z "$(git status --porcelain -- "$DB" "$INBOX")" ]; then
+if [ -z "$(git status --porcelain -- "${DBS[@]}" "$INBOX")" ]; then
   echo "nothing changed: no commit"
   exit "$code"
 fi
 
-before=$(git show "HEAD:$DB" 2>/dev/null | jq '.networks | length' 2>/dev/null || echo 0)
+# The commit subject counts networks; the other databases are reported in the body so
+# one line still reads the way it always has.
+count_in() {  # count_in <ref-or-file> <json key>
+  case "$1" in
+    HEAD:*) git show "$1" 2>/dev/null | jq "$2 | length" 2>/dev/null || echo 0 ;;
+    *) jq "$2 | length" "$1" 2>/dev/null || echo 0 ;;
+  esac
+}
+before=$(count_in "HEAD:$DB" .networks)
 after=$(jq '.networks | length' "$DB") || { echo "::error::cannot read $DB"; exit 2; }
 added=$((after - before))
+ble_added=$(( $(count_in "$BLE_DB" .devices) - $(count_in "HEAD:$BLE_DB" .devices) ))
+flock_added=$(( $(count_in "$FLOCK_DB" .devices) - $(count_in "HEAD:$FLOCK_DB" .devices) ))
 
-# Only the database and deletions of tracked logs: an untracked file (e.g. one that
+# Only the databases and deletions of tracked logs: an untracked file (e.g. one that
 # failed to parse in a local run) is never published by this script.
-git add -- "$DB" && git add -u -- "$INBOX" || exit 2
+# A database with no records yet may not exist on disk; `git add` on a missing path is
+# fatal, and there is nothing to stage for it anyway.
+for db in "${DBS[@]}"; do
+  [ -e "$db" ] && { git add -- "$db" || exit 2; }
+done
+git add -u -- "$INBOX" || exit 2
 processed=$(git diff --cached --name-only --diff-filter=D -- "$INBOX" | wc -l | tr -d ' ')
 
 git -c user.name="github-actions[bot]" \
     -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-    commit --quiet -m "ingest: +$added networks, $processed files processed" || exit 2
+    commit --quiet -m "ingest: +$added networks, $processed files processed" \
+           -m "+$ble_added bluetooth devices, +$flock_added flock cameras" || exit 2
 
 branch=$(git branch --show-current)
 if [ -z "$branch" ]; then
@@ -102,7 +123,7 @@ if ! git push --quiet origin "HEAD:$branch"; then
       -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
       pull --quiet --rebase origin "$branch" || {
     git rebase --abort 2>/dev/null
-    echo "::error::main changed data/networks.json or a processed log during this run (rebase conflict); nothing was pushed — re-run the workflow"
+    echo "::error::main changed a published database or a processed log during this run (rebase conflict); nothing was pushed — re-run the workflow"
     exit 2
   }
   # A removal (data/removed.json) may have landed meanwhile without touching the

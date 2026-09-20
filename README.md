@@ -2,8 +2,11 @@
 
 Map WiFi networks in Redlands, CA — https://patrickmroskam.github.io/redlands_wifi_project/
 
-- `index.html`, `privacy.html`, `assets/` — the one-page site (static, no build step).
-- `data/networks.json` — the database the map reads. See [`data/README.md`](data/README.md).
+- `index.html`, `bluetooth.html`, `flock.html`, `privacy.html`, `assets/` — the site
+  (static, no build step). All three maps share `assets/map.js`; each page configures it
+  with a `window.RWPMapConfig` before loading it.
+- `data/networks.json`, `data/bluetooth.json`, `data/flock.json` — the databases the maps
+  read. See [`data/README.md`](data/README.md).
 - `ingest/` — inbox for raw wardrive logs. See [`ingest/README.md`](ingest/README.md).
 - `scripts/ingest.py` — the ingest pipeline (Python 3, standard library only).
 - `scripts/publish_ingest.sh` — runs the pipeline and commits + pushes its result (used by the daily job).
@@ -19,13 +22,36 @@ python3 scripts/ingest.py             # append new networks, delete processed fi
 ```
 
 For every file in `ingest/` (except `README.md` and dotfiles) it reads the WiGLE CSV
-rows. It drops a row that is malformed, is not `WIFI`, has missing or 0,0
-coordinates, falls outside ZIP 92373/92374, has an SSID ending in `_nomap` /
-`_optout`, or has a BSSID that is already in the database (or earlier in the same
-batch). The surviving rows are appended to `data/networks.json`. Then it deletes
-the files it processed and prints a summary with a count for each drop reason.
+rows and routes each one by its `Type` column:
 
-- `data/networks.json` is rewritten only when at least one network was added.
+| Type | Goes to | Notes |
+|---|---|---|
+| `WIFI` | `data/networks.json` | the main map |
+| `BLE` | `data/bluetooth.json` | only addresses that stay the same over time (see below) |
+| anything else | dropped | GSM/LTE rows carry a tower id, not a MAC |
+
+A row matching a rule in `data/flock-rules.json` is *also* written to
+`data/flock.json`, so adding a rule never changes what the main map shows.
+
+Every database gets the same filters: a row is dropped if it is malformed, has missing
+or 0,0 coordinates, falls outside ZIP 92373/92374, has an SSID ending in `_nomap` /
+`_optout`, is on the removal denylist, or has a BSSID already in that database (or
+earlier in the same batch). Then it deletes the files it processed and prints a summary
+with a count for each drop reason.
+
+- A database is rewritten only when at least one record was added to it.
+- **Bluetooth: only stable addresses are published.** Phones, watches and earbuds
+  advertise a *random private* address that rotates every few minutes so they cannot be
+  tracked. Such an address is useless as a dedupe key and publishing it would map the
+  people who passed by, so rows whose address type could be a rotating one are dropped
+  as `ble private`. The test is the top two bits of the first octet: `0b11` (static
+  random) and `0b10` (not a valid random type, so a public address) are published, `0b01`
+  and `0b00` are not. A public address that happens to start `0b00`/`0b01` is dropped
+  along with them — the safe direction to be wrong in.
+- **Flock cameras are rule-driven and the rules ship empty.** `data/flock-rules.json`
+  holds SSID substrings and MAC prefixes; nothing matches until one is added, and every
+  published record records which rule matched it. No rule has been confirmed against a
+  real camera, and a guessed one would mark a resident's access point as surveillance.
 - A file that is not a WiGLE CSV log is left in place and named in the output, and
   the script exits `1` after processing the others. It also exits `1` if a processed
   file could not be deleted.
@@ -47,9 +73,10 @@ the files it processed and prints a summary with a count for each drop reason.
 (**Run workflow**; tick *Dry run* to only see the report). It:
 
 1. runs the unit tests (a push made by the job does not trigger CI);
-2. runs `scripts/publish_ingest.sh`, which runs the pipeline and, only if
-   `data/networks.json` or `ingest/` changed, commits exactly those paths as
-   `ingest: +N networks, M files processed` and pushes to `main`;
+2. runs `scripts/publish_ingest.sh`, which runs the pipeline and, only if one of the
+   databases or `ingest/` changed, commits exactly those paths as
+   `ingest: +N networks, M files processed` (with the Bluetooth and Flock counts in the
+   commit body) and pushes to `main`;
 3. checks that GitHub Pages started a build for that commit, and requests one if not.
 
 The report appears in the run's summary panel. A red run means a file could not be

@@ -1,0 +1,9 @@
+{
+  "updated_at": "2026-09-20T12:00:00Z",
+  "count": 3,
+  "devices": [
+    {"bssid": "c1:00:00:00:00:01", "name": "Patio Speaker", "first_seen": "2026-09-19 23:32:05", "lat": 34.0556, "lon": -117.1825},
+    {"bssid": "84:70:d7:00:00:02", "name": "", "first_seen": "2026-09-19 23:32:06", "lat": 34.0560, "lon": -117.1830},
+    {"bssid": "c3:00:00:00:00:03", "name": "<img src=x onerror=\"window.__xss=1\">", "first_seen": "2026-09-19 23:32:07", "lat": 34.0565, "lon": -117.1835}
+  ]
+}

@@ -7,7 +7,7 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#050805">
   <title>Privacy policy — Redlands Wifi Project</title>
-  <meta name="description" content="What the Redlands Wifi Project publishes about WiFi networks, how to opt out, and how to ask for a removal.">
+  <meta name="description" content="What the Redlands Wifi Project publishes about WiFi networks and Bluetooth devices, how to opt out, and how to ask for a removal.">
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -15,15 +15,16 @@
   <header class="banner banner-small">
     <p class="prompt" aria-hidden="true">root@redlands:~$ cat privacy.txt</p>
     <h1 class="banner-title">Privacy policy<span class="cursor" aria-hidden="true"></span></h1>
-    <p class="tagline">Last updated: <time datetime="2026-09-17">September 17, 2026</time></p>
+    <p class="tagline">Last updated: <time datetime="2026-09-20">September 20, 2026</time></p>
   </header>
 
   <main class="prose">
     <p class="lede">
-      <strong>Short version:</strong> this site maps WiFi networks that announce themselves
-      over the air in Redlands, CA. It publishes what those networks broadcast to everyone
-      nearby, never who uses them. To keep your network off the map, add <code>_nomap</code>
-      to the end of its name. To remove a network that is already on the map,
+      <strong>Short version:</strong> this site maps WiFi networks — and now also Bluetooth
+      devices — that announce themselves over the air in Redlands, CA. It publishes what they
+      broadcast to everyone nearby, never who uses them. Devices that rotate their address to
+      avoid being followed, which is most phones and watches, are not mapped at all. To keep
+      your network off the map, add <code>_nomap</code> to the end of its name. To remove a network that is already on the map,
       <a href="https://github.com/patrickmroskam/redlands_wifi_project/issues/new" rel="noopener noreferrer">open an issue</a>.
     </p>
 
@@ -32,6 +33,7 @@
       <ol>
         <li><a href="#about">About this project</a></li>
         <li><a href="#published">What we publish</a></li>
+        <li><a href="#bluetooth">Bluetooth devices</a></li>
         <li><a href="#not-collected">What we don't collect</a></li>
         <li><a href="#how">How networks are observed</a></li>
         <li><a href="#where">Where we map</a></li>
@@ -55,7 +57,7 @@
 
     <section id="published" aria-labelledby="published-heading">
       <h2 id="published-heading">What we publish</h2>
-      <p>For each network, the map shows only these details:</p>
+      <p>For each WiFi network, the map shows only these details:</p>
       <dl class="fields">
         <dt>SSID</dt>
         <dd>The network name it broadcasts (shown as "hidden" if blank).</dd>
@@ -75,13 +77,48 @@
         When a network is heard again, its map entry is not changed. The map does not show how a
         network moves or changes over time.
       </p>
+      <p>
+        For each Bluetooth device, the map shows its advertised name (often blank), its address,
+        the approximate location, and when it was first seen — and nothing else. See
+        <a href="#bluetooth">Bluetooth devices</a> for which devices are mapped at all.
+      </p>
+    </section>
+
+    <section id="bluetooth" aria-labelledby="bluetooth-heading">
+      <h2 id="bluetooth-heading">Bluetooth devices</h2>
+      <p>
+        The scanner also hears Bluetooth Low Energy advertisements, the same messages your phone
+        uses to find headphones or a speaker. They are shown on a
+        <a href="bluetooth.html">separate map</a>.
+      </p>
+      <p>
+        <strong>Most of what it hears is deliberately not published.</strong> Phones, watches and
+        earbuds broadcast an address that they change every few minutes, precisely so that they
+        cannot be followed from place to place. Publishing those would amount to mapping the
+        people who walked or drove past, and the same handset would reappear as a brand new
+        device on every pass. So only addresses that stay the same over time are mapped — the
+        kind used by equipment that sits in one place. In the first scan that included Bluetooth,
+        that rule dropped 39 of 57 devices heard.
+      </p>
+      <p>
+        Where an address cannot be told apart with certainty, it is left off the map rather than
+        put on it.
+      </p>
+      <p>
+        Everything else on this page applies to Bluetooth devices exactly as it does to WiFi
+        networks: the same two ZIP codes, the same opt-out, the same removal requests, and the
+        same promise never to record signal strength, altitude, accuracy, or anything about the
+        people carrying a device.
+      </p>
     </section>
 
     <section id="not-collected" aria-labelledby="not-collected-heading">
       <h2 id="not-collected-heading">What we don't collect</h2>
       <ul role="list">
         <li>No personal information: no names, addresses, phone numbers, or emails.</li>
-        <li>Nothing about the people or devices using a network: no phones, laptops, or client addresses.</li>
+        <li>Nothing about the people or devices <em>using</em> a network: no phones, laptops, or
+          client addresses. The Bluetooth map is not an exception — it excludes the rotating
+          addresses that personal devices broadcast (see <a href="#bluetooth">Bluetooth devices</a>).</li>
         <li>No passwords and no network traffic. We never see what anyone sends or receives.</li>
         <li>The map does not show signal strength, altitude, or GPS accuracy. (The raw scan files
           do contain them; see <a href="#where">Where we map</a>.)</li>
@@ -97,8 +134,12 @@
         same way.
       </p>
       <p>
-        The scanner never connects to a network, never tries to log in or guess a password,
-        and never looks at anyone's traffic.
+        Bluetooth devices advertise themselves in much the same way, and the scanner listens for
+        those announcements without answering them.
+      </p>
+      <p>
+        The scanner never connects to a network or pairs with a device, never tries to log in or
+        guess a password, and never looks at anyone's traffic.
       </p>
     </section>
 
@@ -117,8 +158,9 @@
           this site, until an update processes them. Updates do not run on a schedule yet, so
           files can wait there for a while. A file that can't be read is kept until a person
           fixes it.</li>
-        <li>They contain everything the scanner heard: networks outside Redlands, networks that
-          opted out, signal strength, altitude, GPS accuracy, and the scanner's timestamped route.</li>
+        <li>They contain everything the scanner heard: networks and Bluetooth devices outside
+          Redlands, ones that opted out, every rotating address that the maps leave out, signal
+          strength, altitude, GPS accuracy, and the scanner's timestamped route.</li>
         <li>After an update deletes them, the repository's history still keeps a copy.</li>
       </ul>
     </section>
@@ -128,7 +170,8 @@
       <p>
         Add <code>_nomap</code> to the end of your network's name (SSID), for example
         <code>MyHomeWiFi_nomap</code>. While its name ends that way, the scanner's sightings of
-        it are skipped and not added to the map. (<code>_optout</code> works too, and uppercase
+        it are skipped and not added to the map. This works for a Bluetooth device's advertised
+        name too, where you can change it. (<code>_optout</code> works too, and uppercase
         or lowercase doesn't matter.)
       </p>
       <p>
@@ -189,7 +232,15 @@
   </main>
 
   <footer class="footer">
-    <p><a href="index.html">&lt; Back to the map</a></p>
+    <p>
+      <a href="index.html">WiFi map</a>
+      <span aria-hidden="true">·</span>
+      <a href="bluetooth.html">Bluetooth devices</a>
+      <span aria-hidden="true">·</span>
+      <a href="flock.html">Flock cameras</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/patrickmroskam/redlands_wifi_project" rel="noopener noreferrer">Source</a>
+    </p>
     <p class="fine">No accounts. No cookies. No analytics.</p>
   </footer>
 </body>
