@@ -51,6 +51,9 @@ NON_CANDIDATES = {"README.md", ".gitkeep"}
 REQUIRED_COLUMNS = ("MAC", "SSID", "AuthMode", "FirstSeen", "Channel",
                     "CurrentLatitude", "CurrentLongitude", "Type")
 OPT_OUT_SUFFIXES = ("_nomap", "_optout")
+# The replacement character a lenient decode leaves behind (see read_log). An SSID
+# holding one is an SSID we did not read, so its opt-out suffix cannot be trusted.
+REPLACEMENT = "\ufffd"
 
 # Log Type values this pipeline publishes, and the database each one feeds. Any other
 # type (GSM, LTE, ...) is a cell tower: its id column is not a MAC and it is dropped.
@@ -69,6 +72,7 @@ REASONS = (
     ("removed", "removed"),
     ("bad_coords", "bad coords"),
     ("outside_area", "outside area"),
+    ("unreadable_ssid", "unreadable ssid"),
     ("opt_out", "opt-out"),
     ("duplicate", "duplicate"),
 )
@@ -338,10 +342,18 @@ def read_log(path):
     """Return a list of dicts (one per non-blank data row; None for a malformed row)."""
     with open(path, "rb") as fh:
         raw = fh.read()
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise UnparseableFile("not UTF-8 text")
+    # Decode leniently: an 802.11 SSID is an arbitrary 32-octet string, not text, and
+    # the logger writes whatever bytes it saw over the air. A strict decode let one
+    # undecodable octet in one SSID reject every other row in the file — and because an
+    # unparseable file is deliberately kept (R4.10), the daily run then failed on it
+    # forever. Rejection instead falls to the header check below, which is the more
+    # accurate test of "is this a WiGLE log": a genuinely binary file has no WigleWifi
+    # header. A row we cannot read is then dropped rather than trusted — see classify's
+    # unreadable_ssid branch. Note the all-rows-malformed net below is NOT a general
+    # guard for a partly corrupt file: it needs *every* row to be malformed, and a
+    # single intact row disarms it, so a truncated log is processed for what survives
+    # and the rest is counted as malformed (#55).
+    text = raw.decode("utf-8-sig", errors="replace")
     # Split on newlines only: str.splitlines() would also break rows on
     # form feeds or U+2028 inside an SSID.
     lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
@@ -583,6 +595,18 @@ def classify(row, fence, known, removed=frozenset(), flock=None):
     #     address out of networks.json; a WIFI row with the same MAC is never tested.
     # The row is still dropped here and nothing out of area is stored, only withheld.
     ssid = row["SSID"]
+    # An SSID we could not decode is an SSID whose opt-out we cannot verify, so it is
+    # withheld rather than published. The opt-out is an `endswith` test and is the only
+    # privacy filter that reads the END of a field: every other one fails closed under a
+    # bad octet (a corrupt MAC is malformed, corrupt coords are bad_coords), but
+    # b"Smith House_nomap\xa5" decodes to "Smith House_nomap\ufffd", which ends with
+    # neither suffix and would publish the very network whose owner opted out. A
+    # corrupted suffix (b"Home_nom\xa5p") fails open the same way. This is read ahead of
+    # the opt-out for the reason given below: the caller registers it batch-wide, so a
+    # branch that returns first loses it. A genuine U+FFFD in an SSID is withheld too —
+    # rare, and the safe direction.
+    if REPLACEMENT in ssid:
+        return "unreadable_ssid", [], bssid
     if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
         return "opt_out", [], bssid
     if dataset == "bluetooth" and not ble_address_is_stable(bssid):
@@ -678,7 +702,10 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
                 summary["dropped"][reason] += 1
                 if reason == "duplicate" and bssid in stored_any:
                     summary["duplicate_stored"] += 1
-                if reason == "opt_out":
+                # "we must not publish this address" — a verified opt-out, or an SSID
+                # we could not read well enough to rule one out. Both withhold every
+                # other row for the same address in this batch (R4.5, R9.6).
+                if reason in ("opt_out", "unreadable_ssid"):
                     opted_out.add(bssid)
                     if bssid in stored_any and bssid not in summary["opted_out_but_published"]:
                         summary["opted_out_but_published"].append(bssid)
