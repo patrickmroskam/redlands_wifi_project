@@ -580,3 +580,57 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: none — this is a straight defect in the check. Rule recorded: **a verification must query the same scope the instructions asked for.** This is the third instrument defect in three cycles (cycle 11's substring-vs-structure, the task-prompt copy of step 4, now scope mismatch) and they share a shape: the check drifted from the thing it was meant to check.
 - watch-next: `INGEST_SCHEDULE` is the mirror image and is still unset — it must be a **repository** variable, because the workflow's job-level `if` is evaluated before the environment resolves. Setting it as an environment variable would leave R5 silently broken in exactly its current way.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `recorded-objection #22 — the project's first, and it arrived by the path that drops objections` — dev-team posted a structured `closure-objection:` at 16:05:13Z (`addressed-in-#30` names an open issue, not a merged PR). It did **not** appear in the labeled aging sweep, because dev-team left `po-closure-proposed` on; it surfaced only through the §3 delta comment scan. Appended to `docs/spec/objections.md`, which was empty until now.
+- confidence: high
+- alternatives: relying on the aging sweep to capture it — rejected, and this is the concrete case §4d's "mirror EVERY newly-detected objection, not just sweep-handled ones" was written for. Had the ledger missed it, the next delta run's cheap §1 read would have re-proposed the same withdrawn verdict.
+- watch-next: the ledger is no longer empty, so §1's O(objections) read now has a real entry to honor. Cycle 20's full-rebuild grep should confirm the ledger matches the log.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `#22 re-proposed as addressed-in-#43 — new evidence, not re-assertion` — the objection named its own unblocking condition ("a merged PR number that actually moves the raw-log inbox to a private repo, at which point the verdict must be re-pointed at that PR"). PR #43 is merged, verified by API (`merged: true`, `be05d65`), not inferred from `git log`. The `addressed-in-#30` verdict is withdrawn; `addressed-in-#43` posted (`issuecomment-5752198606`) with a fresh 48 h window. `po-closure-proposed` and `blocked` kept; no `needs-human`.
+- confidence: high
+- alternatives: (a) leaving the proposal withdrawn and closing nothing — rejected, it would strand a decided-and-shipped decision issue indefinitely and waste the checker's explicit instruction to re-propose; (b) closing it directly now — rejected, the maker never closes its own proposal, and the whole value of this exchange is that the handshake worked.
+- watch-next: dev-team checks this at its next run. If it concurs, this is the **PO's first realized close in 12 cycles**, which also clears the §4e budget holding the git-history-rewrite issue unfiled.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `the closure rationale states the history rewrite is UNFILED, in those words` — the proposal's carve-out says the rewrite is owner-authorized, **not filed as an issue**, deferred on budget, and carried in the readiness queue.
+- confidence: high
+- alternatives: writing "tracked separately" or "tracked as its own issue" — rejected as **false**. A near-identical false cross-reference was caught in review on PR #51 earlier today. A closure rationale is a factual claim about project state and is held to the same standard as the spec it defends.
+- watch-next: any future text about the history rewrite must say "unfiled" until an issue number exists.
+
+- decision: `#50 and #42 confirmed latent by measurement, not by the filer's hedge` — dev-team filed #50 at p3 with "may be inert if the scanner never writes those rows". Replayed all 48 historical logs out of git history (`0c10f06^`): **40,228 data rows, 100% `Type=WIFI`**, zero `BT`, zero `BLE`. #50 cannot fire on any corpus ever ingested; #42 is doubly latent (empty `flock-rules.json` *and* no BLE rows). Both stay p3, now on evidence.
+- confidence: high
+- alternatives: accepting the hedge and leaving the tier unexamined — rejected; "may be inert" is a question, and it was cheaply answerable. Raising either to p2 — rejected, nothing can trigger them.
+- watch-next: the ESP32 Marauder **can** emit BLE rows if the owner runs a BLE scan, so this is latent-today, not latent-forever. Re-measure when the first post-cutover log is ingested — which is also the first time R9's Bluetooth map will have any data at all.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `#48 labelled launch-blocker; every other R5 precondition verified already correct` — checked this cycle: inbox repo exists/private/`main` and holds `wardrive_0.log`; `ingest` environment exists with branch policy exactly `main`; `INBOX_TOKEN` present (16:16:57Z) but rejected **404** (run `35527858730`, 18:04Z); `INGEST_SCHEDULE` unset by design. The failure is isolated to the token's repository scope, exactly as the open ask describes.
+- confidence: high
+- alternatives: also raising p2 → p1 — rejected as cosmetic churn; #48 carries `waiting`, so no tier search reaches it, and it already sits above every other open issue (all p3). The `launch-blocker` label is the load-bearing signal and is accurate: #48 is the sole path to the only unmet Release Criterion.
+- watch-next: `INGEST_SCHEDULE=on` is **bot** work once the token lands (the `gh` token carries `repo`), not a second owner step. The owner's remaining work on v1 is exactly one action.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `git-history-rewrite issue still NOT filed — deferral re-tested, and given a committed trigger` — §4e budgets filing against **realized** closes. Realized closes by the PO this cycle: **0** (#22's re-proposal opens a window, it does not close anything; the four issues that closed were dev-team ship-and-close, not concurrences). Filing would make the PO a net contributor to divergence in the first cycle the backlog rose after 11 flat ones.
+- confidence: medium
+- alternatives: filing it anyway on the grounds that it is owner-authorized — rejected, but not casually: the counter-argument is that unfiled authorized work is invisible work. That is answered without breaking the budget by (a) dev-team's #22 comment naming the public-history residual on a live issue, and (b) an explicit standing entry in `docs/spec/readiness.md`. Visibility is preserved; the count is not grown.
+- watch-next: **committed trigger — file it in the first cycle that realizes a close**, which is plausibly cycle 13–14 via #22. This rationale was re-derived this cycle against the route actually available, per the cycle-10 task "a deferral's rationale expires — re-test it, don't re-copy it." It is now on its 9th cycle of deferral and that is the reason it carries a trigger rather than another deferral.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `R4.9 ratification routed as a notify line, not a second competing ask` — PR #51 amended R4.9 from "delete in the same commit" to "publish, then delete", which is weaker but keepable now that the inbox is a separate repository. It is flagged in-line in the spec as awaiting ratification.
+- confidence: medium
+- alternatives: sending an `oh-hai ask submit` for it — rejected. Ask `msg_f1c95c95` (#48) is open and unanswered, and it is the single thing standing between this project and v1. A second ask competes for the same attention on a non-blocking wording question that dev-team already described to the owner 90 minutes ago. The durable record is the readiness queue, which is what that artifact is for.
+- watch-next: if #48 resolves and R4.9 is still unratified, it becomes the next cycle's ask candidate with no competition.
+
+## 2026-09-20T19:45:00Z — session product-owner cycle 12
+
+- decision: `owner movement is observable in repo state, not only in the reply channel` — for eight cycles this project's digest reported "zero owner movement", read from the OH HAI hub. The owner in fact created the inbox repo at 16:08:22Z and the token at 16:16:57Z **without replying to anything**. A hub-only read would have reported a ninth silent cycle while the project's blocking dependency was being cleared.
+- confidence: high
+- alternatives: none — this is a defect in what the PO was watching. Fourth instrument defect in four cycles (substring-vs-structure, task-prompt copy, secret scope, now channel-vs-state); they share a shape: **the check drifted from the thing it was meant to check.**
+- watch-next: every cycle, check the objective repo/API state for the blocking item *before* concluding from the hub that nothing moved.

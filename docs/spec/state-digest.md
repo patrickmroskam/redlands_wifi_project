@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-20T13:43:05Z
-cycle: 11
-net_open_history: [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+last_reconciled_at: 2026-09-20T19:43:59Z
+cycle: 12
+net_open_history: [8, 8, 8, 11]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,85 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 12 delta (watermark 2026-09-20T13:43Z → 19:44Z): **the drought broke — four issues shipped, five residuals filed, and the objection ledger caught its first entry**
+
+**Eleven flat cycles ended.** Between 13:43Z and 19:44Z the dev-team merged **five PRs** and closed
+**four issues** — #25 (`45847bb`), #30 (**PR #43**, `be05d65`, + fix PR #46 `e621c25`), #40 (PR #49,
+`6662031`), #44 (PR #51, `b40acbc`) — and filed **five residuals**: #41, #42, #45, #48, #50.
+Net open **8 → 11**. This is the **first rise in 11 cycles**; `net_open_tripwire_k` is 3, so one rise
+does not trip it. All five residuals are dev-team/review inflow, which the PO does not control; the
+PO's own net contribution this cycle is **0 filed**.
+
+### The owner moved, and it was not visible in the ask thread
+
+The standing read of this project for eight cycles was "zero owner movement." **That is no longer
+true, and the hub did not say so.** The owner created the private inbox repo at **16:08:22Z** and
+the `INBOX_TOKEN` secret at **16:16:57Z** — both verified by API this cycle, neither announced. The
+cutover then shipped. Reading only `oh-hai messages list` would have reported another silent cycle.
+**Owner action is observable in repo state, not only in the reply channel; check both.**
+
+### #22: the first real maker-checker exchange in the project's history
+
+- **Objection recorded (first ever).** Dev-team posted a structured `closure-objection:` at
+  **16:05:13Z** — `addressed-in-#30` names an *open issue*, not a merged PR. It surfaced through the
+  §3 delta comment scan, **not** the labeled aging sweep (the label was never removed), which is
+  exactly the §4d path that would otherwise drop it. Appended to `docs/spec/objections.md`; the
+  ledger is no longer empty.
+- **Re-proposed on new evidence, not re-asserted.** The objection named its own unblocking
+  condition — a merged PR shipping option C. PR **#43 is merged** (`merged: true`,
+  `be05d65`; verified by API, not inferred from git log). Cycle 12 withdrew `addressed-in-#30` and
+  posted `addressed-in-#43` (`issuecomment-5752198606`), with both carve-outs the checker asked for
+  stated in the proposal: the public git history is **not** remediated, and the pipeline is **not**
+  live. A fresh 48 h window opens 2026-09-20T19:40Z.
+- **The cross-reference trap was not repeated.** The proposal says the history rewrite is
+  *owner-authorized and unfiled*. It does **not** say "tracked as its own issue" — that claim would
+  have been false, and a near-identical false cross-reference was caught in review on PR #51 earlier
+  today. A closure rationale is a factual claim; an unfiled item must be described as unfiled.
+
+### #50 and #42 are latent — measured, not assumed
+
+Dev-team filed #50 (`_nomap` opt-out lost on classic-`BT` rows) at p3 with the hedge *"may be inert
+if the scanner never writes those rows."* That hedge is now **resolved against real data**: all
+**48** historical wardrive logs were replayed out of git history (`0c10f06^`) and every one of
+**40,228** data rows carries `Type=WIFI`. Zero `BT`, **zero `BLE`**. So #50 cannot fire on any corpus
+this project has ingested, and #42 (BLE→Flock record shape) is **doubly** latent — empty
+`flock-rules.json` *and* no BLE rows. Both stay **p3**, now on evidence.
+*Caveat kept honest:* the rig is an ESP32 Marauder, whose firmware can emit BLE rows if the owner
+runs a BLE scan. Latent today ≠ impossible. Re-measure when a new log arrives.
+
+### #48 is the whole project — and the fix is one owner action, fully pre-verified
+
+Every other precondition for R5 was checked this cycle and is **already correct**:
+
+| Precondition | State |
+|---|---|
+| `redlands_wifi_inbox` exists, private, default `main` | ✅ created 16:08:22Z |
+| Inbox holds real work | ✅ `README.md`, `wardrive_0.log` |
+| `ingest` environment exists | ✅ |
+| Environment branch policy | ✅ `custom_branch_policies`, exactly `main` |
+| `INBOX_TOKEN` present | ✅ created 16:16:57Z |
+| `INBOX_TOKEN` **works** | ❌ **404** — run `35527858730`, step *Check out the private inbox*, 18:04Z |
+| `INGEST_SCHEDULE` | unset **by design**; repo `actions/variables` → `total_count: 0` |
+
+So the failure is isolated to the token's repository scope, precisely as the ask describes, and
+**nothing else is waiting behind it**. `INGEST_SCHEDULE` is a *bot* action (the `gh` token carries
+`repo`), not a second owner step. **#48 labelled `launch-blocker` this cycle** — it is the sole
+remaining path to the only unmet Release Criterion.
+
+### #17 tripwire — ninth consecutive run, latent
+
+19:3xZ: apex → **404** with GitHub's own *"Site not found"* body, apex `A` → 185.199.108/109/110/111.153,
+`www` CNAME → `patrickmroskam.github.io.`, challenge TXT → **absent**, `pages.cname` → `null`. Fire
+condition not met; both escalation rungs remain spent; no reminder re-sent.
+
+### Corrections to this digest's own rollups
+
+- **#17 was recorded as `p2`. It is `p3` live** — moved by the owner-ruling commit `08522d1`
+  (custom domain deferred post-v1). The cycle-10 rebuild text asserting "kept p2" was already stale
+  when written forward into cycle 11. Corrected below.
+- The **Automation / daily publish** section said `INGEST_SCHEDULE` was folded into #30's acceptance.
+  #30 is closed; that gate now lives on **#48**.
 
 ## Cycle 11 delta (watermark 2026-09-20T07:42Z → 13:43Z): **zero owner movement; the PO's own measuring instrument was returning false positives**
 
@@ -693,74 +772,119 @@ empty. The rule is being obeyed; only the stated reason was wrong. The consequen
 is now surfaced as an owner decision: the worker has been halted since 2026-09-17T15:05Z
 (~22.5 h) with three shippable issues parked behind two gates that have no ETA.
 
-## Rollups — rebuilt from live state at cycle 10 (2026-09-20T07:42Z)
+## Rollups — refreshed in place from live state at cycle 12 (2026-09-20T19:44Z)
 
-> Every section below was re-derived this cycle from `gh issue list`, live HTTP, and the
-> GitHub API. Counts are computed from current labels, not carried forward. Where a line had
-> been inherited stale from an earlier cycle, the correction is named inline.
+> Re-derived this cycle from `gh issue list`, the GitHub API, live HTTP, and a replay of the
+> 48 historical logs out of git history. Counts are computed from current labels, not carried
+> forward. Two inherited errors are corrected inline and named as corrections.
 
 ## Site & map (PRD R1, R2)
 
 - open: **1** (p0:0 p1:0 p2:0 p3:1 — #29), launch-blockers: 0, in-flight: 0
-- **Complete and live.** Re-verified 2026-09-20T07:41Z: `GET https://patrickmroskam.github.io/redlands_wifi_project/` → **200**, database serves **18,152** records with `updated_at` (2026-09-17T10:06:08Z) and `count` as top-level keys (**R2.5** ✅).
-- Shipped: #2 (scaffold + fenced map), #7 (retro polish + responsive), #11 (canvas renderer for ~18k markers), #12 (security pie), #13 (category list + counts), #20 (footer credit).
-- Residual: **#29 (p3)** — popup-pan edge cases. **Workable today; parked by protocol step 4, not by a dependency.**
-- *Rebuild correction:* the prior text carried two separate live-check timestamps from 2026-09-18 (01:39Z and 07:40Z) as if current. Superseded by the single 09-20 check above.
+- **Complete and live.** Re-verified 2026-09-20T19:3xZ: site → **200**, database serves **18,152**
+  records, `updated_at` 2026-09-17T10:06:08Z. That stamp is unchanged since the backfill and will
+  stay so until #48 lets the daily job run — it is the expected value, not a stale-data symptom.
+- Shipped: #2, #7, #11, #12, #13, #20, and **#39** (Bluetooth + Flock maps, R9, `94c87e4`).
+- Residual: **#29 (p3)** — popup-pan edge cases. Workable today.
 
 ## Ingest pipeline (PRD R3, R4)
 
-- open: **2** (p0:0 p1:0 p2:1 — #30; p3:1 — #25), launch-blockers: 0, in-flight: 0
-- **Pipeline complete:** #3 (parse/fence/dedupe/append/delete), #15 (canonical BSSID dedupe), #27 (`data/removed.json` denylist), #8 (backfill: +18,152 from 48 logs). 100 unit tests pass. `ingest/` re-checked this cycle → holds only `.gitkeep` + `README.md`, as the transient-inbox invariant requires.
-- **#30 (p2, `waiting`) is the project's single blocking issue** — the private raw-log inbox, owner-only setup. Four-check existence gate **all negative for a seventh consecutive cycle** (see the cycle-10 delta).
-- Residual: **#25 (p3)** — don't silently delete an all-malformed log. **Workable today; parked by protocol step 4.**
-- *Rebuild correction:* the prior text cited the **three**-check gate result from cycle 2 (07:39Z). That gate was superseded at cycle 4 by the four-check version; the count and the date are both refreshed above.
+- open: **3** (p0:0 p1:0 p2:0 p3:3 — #41, #42, #50), launch-blockers: 0, in-flight: 0
+- **Closed this cycle:** #25 (never delete an unparseable log, `45847bb`), #30 (private-inbox
+  cutover, PR #43 `be05d65` + PR #46 `e621c25`), #40 (opt-out read before the filters that
+  shadowed it, PR #49 `6662031`). Shipped earlier: #3, #15, #27, #8.
+- **156 unit tests green**; `ingest/` retired and empty, per the transient-inbox invariant.
+- Residuals, all **p3 on measured evidence**:
+  - **#41** — summary mis-attributes in-batch duplicates; partial multi-database write reports
+    "nothing written". Report accuracy only; published data unaffected.
+  - **#42** — a Flock record built from a BLE row carries `auth`/`channel` against R9.3.
+    **Doubly latent:** `flock-rules.json` is empty *and* no BLE row has ever been ingested.
+  - **#50** — `_nomap` opt-out lost on a classic-`BT` row. **Latent, measured:** all 48 historical
+    logs replayed from `0c10f06^` → **40,228 rows, 100% `Type=WIFI`**, zero `BT`, zero `BLE`.
+  - *Caveat:* the ESP32 Marauder can emit BLE rows if the owner runs a BLE scan. Re-measure on the
+    next real log; latent today is not latent forever.
 
 ## Automation / daily publish (PRD R5)
 
-- open: 0 tracked directly, launch-blockers: 0, in-flight: 0
-- **The one unmet v1 Release Criterion.** `.github/workflows/ingest.yml` exists and is correct, but its job carries `if: ${{ github.event_name != 'schedule' || vars.INGEST_SCHEDULE == 'on' }}` and that variable does not exist (`actions/variables` → `total_count: 0`), so every scheduled run is skipped.
-- **Empirical confirmation refreshed this cycle:** the last three `schedule` runs of `ingest.yml` (2026-09-17T14:44, 09-18T14:10, 09-19T13:43) all completed with conclusion **`skipped`**. The only successful runs are three `workflow_dispatch` runs from 09-17.
-- Owner: folded into **#30's** acceptance at cycle 1 — the flip must follow the inbox cutover so new logs never land in the public repo. **`INGEST_SCHEDULE` must not be set to `on` before then**; doing so would resume publishing raw logs into a public repo.
-- Harmless today: `ingest/` is empty, so nothing is queued behind the gate.
+- open: **2** (p0:0 p1:0 p2:1 — #48; p3:1 — #45), **launch-blockers: 1** (#48), in-flight: 0
+- **Still the one unmet v1 Release Criterion — but the shape of it changed completely this cycle.**
+  It is no longer "the owner has not started"; the owner has done most of it. Every precondition is
+  in place except one, and the one that fails is isolated:
+  inbox repo ✅ private, `main`, holds `wardrive_0.log` · `ingest` environment ✅ scoped to `main`
+  only · `INBOX_TOKEN` ✅ present (16:16:57Z) · **`INBOX_TOKEN` ❌ rejected 404** (run
+  `35527858730`, 18:04Z) · `INGEST_SCHEDULE` unset **by design**.
+- **#48 (`p2`, `waiting`, `launch-blocker`)** carries the whole criterion. Ask
+  `msg_f1c95c95-117b-4f4d-9fe0-a1f7e19674ed` is **open**; steps in `docs/setup/inbox-token-fix.md`.
+  Not re-sent this cycle — an open ask is not re-asked.
+- **`INGEST_SCHEDULE=on` is bot work, not a second owner step** (the `gh` token carries `repo`), and
+  it must stay unset until the token works, so a scheduled run cannot fail nightly in the owner's
+  inbox.
+- Residual: **#45 (p3)** — `pushed_sha` reported for a commit a dropped rebase never pushed.
+  Author rates reachability low; it needs a byte-identical database including the `updated_at` stamp.
+- *Rebuild correction:* this section previously folded the `INGEST_SCHEDULE` flip into **#30's**
+  acceptance. #30 is closed; the gate lives on **#48**.
 
 ## Privacy & security (PRD R6, R7)
 
 - open: **2** (p0:0 p1:0 p2:1 — #22; p3:1 — #21), launch-blockers: 0, in-flight: 0
-- **R4.12 re-verified against the live published database this cycle** — all 18,152 records carry exactly `bssid, ssid, auth, channel, first_seen, lat, lon`. No RSSI, altitude, accuracy or raw-log field is published. ✅
-- Shipped: #6 (privacy page), #14 (security audit — vendored Leaflet, `'self'`-only CSP, injection tests).
-- **#22 (p2)** carries an **open, ineligible** PO closure proposal (`addressed-in-#30`). Routed this cycle to the human digest as *awaiting human closure decision*; `po-closure-proposed` kept. The underlying exposure — raw GPS drive trails public in git history — is **live and unmitigated**.
-- **#21 (p3, `needs-human`)** — owner-only GitHub account settings (Dependabot alerts, private vulnerability reporting, SHA-pinning enforcement). Deliberately deferred behind the p1/p2 owner queue; no ask sent, by design (a third competing ask lowers the odds of all three).
+- **The exposure this theme existed for is now stopped going forward.** PR #43 moved raw logs to the
+  private inbox; `privacy.html` says so; the constitution invariant was amended and owner-ratified.
+- **#22 (p2)** — first true maker-checker exchange in the project. Objection recorded 16:05:13Z
+  (ledger entry 1), `addressed-in-#30` **withdrawn**, `addressed-in-#43` proposed 19:40Z on the
+  merged PR the objection itself named. Window shuts 2026-09-22T19:40Z.
+- **The public git history is still not remediated** — 48 pre-cutover logs remain in this repo's
+  history and in every pre-existing clone. Owner-authorized (`"Rewrite history"`, `msg_92a6bc9c`),
+  **not filed as an issue**, deferred on the §4e budget (0 realized closes), carried in
+  `docs/spec/readiness.md`. Stated as unfiled everywhere it appears — it is not tracked work.
+- **#21 (p3, `needs-human`)** — owner-only account settings. Still deliberately behind #48; a
+  competing ask lowers the odds of the one that matters.
+- Shipped this cycle in-theme: **#40** — three opt-out losses fixed, including a `_nomap` device
+  opting out over Bluetooth that was being published to the **main WiFi map**.
 
 ## Hosting / custom domain (OUT of v1 scope — mitigation is NOT)
 
-- open: **1** (p0:0 p1:0 p2:1 — #17), launch-blockers: 0, in-flight: 0
-- **#17 was retitled this cycle to the takeover mitigation alone.** The custom-domain *switch* is Out of Scope (v1) in the ratified PRD, the owner answered `not-yet` on 2026-09-18, and it is now tracked by **no issue at all** — deliberately, not by oversight.
-- **The exposure is live and independently re-resolved every cycle.** At 07:41Z (seventh consecutive unchanged check): apex `A` → 185.199.108–111.153, `www` CNAME → `patrickmroskam.github.io.`, challenge TXT → absent, apex → 404 from Pages, `repos/.../pages` → `cname: null`. The domain is unverified and unclaimed, so any GitHub user could claim it. **Nobody has.**
-- **Priority is `p2` and stays there.** Raised p2 → p1 at cycle 1 on severity; moved p1 → p2 at cycle 4 when the owner answered `not-yet`, because priority in this backlog encodes dev-team build order and no actor may build this at any tier. Cycle 10 re-examined and **kept p2** — `needs-human` makes the tier label inert here, and re-raising it would be a silent re-escalation against an owner decision whose rung is retired.
-- Escalation state: **both rungs spent.** Cycle 4 sent the one `high` on the takeover window; cycle 9 posted the single committed dated reminder. **No timer remains on #17** — only the automated tripwire.
+- open: **1** (p0:0 p1:0 p2:0 **p3:1** — #17), launch-blockers: 0, in-flight: 0
+- *Rebuild correction:* cycles 10 and 11 recorded #17 as **`p2`** and asserted it was "kept p2".
+  **It is `p3` and has been since commit `08522d1`** (owner ruling: custom domain deferred
+  post-v1). The inherited line was stale when it was written forward. `p3` is correct and stays.
+- Tripwire, **ninth consecutive latent reading** (19:3xZ): apex → 404 with GitHub's *"Site not
+  found"* body, apex `A` → 185.199.108–111.153, `www` CNAME → `patrickmroskam.github.io.`,
+  challenge TXT absent, `pages.cname` → `null`. Unclaimed by anyone.
+- Escalation: **both rungs spent.** No timer remains; only the automated tripwire.
 
 ## Tests / CI (PRD R8)
 
 - open: **1** (p0:0 p1:0 p2:0 p3:1 — #34), launch-blockers: 0, in-flight: 0
-- #4 shipped CI (Python 3.12 unit tests + Playwright chromium), SHA-pinned actions. **Re-verified this cycle: the last 3 `CI` runs are `completed/success`**; 0 open PRs.
-- Residual: **#34 (p3)** — split the >1,000-line `tests/e2e/site.spec.js`. **Workable today; parked by protocol step 4.**
+- CI green across this cycle's five merges; **0 open PRs** at cycle end.
+- Residual: **#34 (p3)** — split the >1,000-line `tests/e2e/site.spec.js`. Workable today.
+
+## Spec (PRD)
+
+- open: 0 — **#44 closed** (PR #51, `b40acbc`): the ratified PRD had described the retired public
+  `ingest/` inbox after the cutover. R3, R4.1, R4.9, R7.2, R8.3, the vision paragraph and three
+  done-criteria lines now match what runs.
+- **R4.9 is amended and awaiting owner ratification** — "delete in the same commit" became
+  "publish first, then delete", which is weaker but keepable across two repositories. Flagged
+  in-line in the spec. **Nothing is blocked on it**; it is a wording ratification, carried in the
+  readiness queue rather than burned as a competing ask.
 
 ## Tracking
 
-- **#1** — v1 tracking issue, never assigned, carries `tracking` and **no priority label**, so it never enters a dev-team tier search. Body corrected at cycle 1 (spec status → ratified; R5 last mile added as an explicit unticked line). Re-read and cleared at cycles 9 and 10: its R5 line correctly orders `INGEST_SCHEDULE=on` **after** the private-inbox cutover, so it is not a staleness trap.
+- **#1** — v1 tracking issue, `tracking`, no priority label, never assigned. Checkboxes ticked by
+  dev-team through this cycle.
 
-## Closure activity (project to date, refreshed at cycle 10)
+## Closure activity (project to date, refreshed at cycle 12)
 
-- **proposed: 1** (#22, `addressed-in-#30` — open and **ineligible**), **closed: 14**, **contested: 0**, **objections recorded: 0**.
-- All 14 closes were dev-team ship-and-close, predating the PO; the most recent was **#27 on 2026-09-17T14:29:43Z**. **The PO has realized zero closures across all 10 cycles.**
-- #22 is the first and only PO maker-checker proposal. Its 48 h aging window shut **2026-09-20T01:42:32Z** with 0 objections, but the verdict cannot execute: `addressed-in-#NNN` requires a merged PR and #30 is an open issue.
-- *Rebuild correction:* this section had been frozen since cycle 3 and still predicted "first eligible pass is cycle 5". That prediction was wrong twice over — the window shut at cycle 9/10, not 5, and eligibility was never reachable. Replaced with the verified state above.
+- **proposed: 1** (#22, `addressed-in-#43` — open, window shuts 2026-09-22T19:40Z),
+  **closed: 18**, **contested: 1**, **objections recorded: 1**.
+- **closed** rose 14 → **18**: #25, #30, #40, #44, all dev-team ship-and-close.
+- **The PO has still realized zero closures in 12 cycles** — but the reason changed. For 11 cycles
+  it was "nothing could close"; now #22 has an eligible verdict pointed at a merged PR and a live
+  48 h window. The first realized PO close is reachable at cycle 13–14 if the checker concurs.
 
-## Consequence of zero realized closures
+## Convergence
 
-§4e budgets *filing* against realized closes, so with 0 closes the PO may file **no new gap
-issues**. One piece of owner-approved work is queued behind exactly this: the **git history
-rewrite**. It is not blocked on judgement or authority — only on a close that has not
-happened in 10 cycles, because the only issues that could close are blocked on the owner.
-This is the backlog's single structural dependency and it is worth naming plainly: **the
-project is one ~10-minute owner action away from moving, and has been for ~64.6 h.**
+- `net_open_history: [8, 8, 8, 11]` — first rise in 11 cycles, **k=3 not tripped**.
+- The rise is **healthy inflow, not divergence**: 4 closed, 5 filed, every filed item a
+  review-found defect on code that shipped the same day, and 3 of the 5 measured latent.
+- **PO net filing this cycle: 0.** The §4e budget was 0 realized closes and was respected.
