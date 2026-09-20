@@ -30,7 +30,10 @@ the files it processed and prints a summary with a count for each drop reason.
   the script exits `1` after processing the others. It also exits `1` if a processed
   file could not be deleted.
 - Rows are split one line at a time on commas, since Marauder logs are not CSV-quoted.
-  A malformed row is dropped without affecting the rest of the file.
+  A malformed row is dropped without affecting the rest of the file — unless *every*
+  data row in a file is malformed, which means the file is not being read correctly
+  (a logger format change, say). That file is treated as unparseable: it stays in
+  `ingest/`, it is named in the output, and the script exits `1`.
 - The script never removes a network that is already published. If a stored network
   now broadcasts a `_nomap` / `_optout` SSID, the summary lists its BSSID so it can
   be removed by hand.
