@@ -99,7 +99,16 @@ _FIRST_SEEN = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(
 
 
 class FatalError(Exception):
-    """Configuration or I/O problem: stop before changing anything."""
+    """Configuration or I/O problem: stop before changing anything.
+
+    `written` names the databases already replaced on disk when the error was raised.
+    It is empty for all but one error: a run publishes to three databases and swaps them
+    in one at a time, so a failure part-way through that is the only path on which a
+    fatal error leaves the tree changed. The message an operator reads has to say so."""
+
+    def __init__(self, message, written=()):
+        super().__init__(message)
+        self.written = list(written)
 
 
 class UnparseableFile(Exception):
@@ -485,8 +494,14 @@ def _preview(items, limit=10):
     return shown if len(items) <= limit else "{}, ... (+{} more)".format(shown, len(items) - limit)
 
 
-def save_db(path, db, key="networks"):
-    """Atomically write valid JSON with one record per line (compact, diff-friendly)."""
+def stage_db(path, db, key="networks"):
+    """Write `db` to a temp file beside `path`; return a handle for commit_db.
+
+    Nothing at `path` changes yet. This is the half that fails on a full disk or a
+    read-only tree, split out so a run that publishes to several databases can finish
+    all of its writing before it swaps any of them in. Throw a handle away with
+    discard_db.
+    """
     dump = lambda value: json.dumps(value, ensure_ascii=False)  # noqa: E731
     records = db[key]
     parts = [
@@ -512,11 +527,46 @@ def save_db(path, db, key="networks"):
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write("".join(parts))
         os.chmod(tmp, mode)  # mkstemp creates 0600; keep the file world-readable
+    except BaseException:
+        _discard(tmp)
+        raise
+    return tmp, path
+
+
+def _discard(tmp):
+    """Remove a staged temp file, best effort.
+
+    Deliberately swallows OSError. Every caller runs this while another exception is in
+    flight, and on a tree that has just refused a write the remove can refuse too — which
+    would replace a FatalError with a bare OSError that main() does not catch. That exits
+    1, and publish_ingest.sh treats 1 as soft and commits. A leaked temp file cannot be
+    published (publish stages an explicit list of data/*.json paths), so losing the
+    cleanup is always the cheaper failure.
+    """
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+
+
+def commit_db(staged):
+    """Swap a staged write into place. On failure `path` is left as it was."""
+    tmp, path = staged
+    try:
         os.replace(tmp, path)
     except BaseException:
-        if os.path.exists(tmp):
-            os.remove(tmp)
+        _discard(tmp)
         raise
+
+
+def discard_db(staged):
+    """Drop a staged write without touching its database."""
+    _discard(staged[0])
+
+
+def save_db(path, db, key="networks"):
+    """Atomically write valid JSON with one record per line (compact, diff-friendly)."""
+    commit_db(stage_db(path, db, key))
 
 
 # --- pipeline ------------------------------------------------------------------
@@ -565,26 +615,31 @@ def build_record(dataset, row, ssid, bssid, lat, lon, matched_by):
 def classify(row, fence, known, removed=frozenset(), flock=None):
     """Route one row to the databases it belongs in.
 
-    Returns (reason, entries, bssid). `entries` is a list of (dataset, record) pairs to
-    publish, and is empty for a dropped row — `reason` then says why. One row can produce
-    two entries: a Flock match is published to its own database *as well as* the one its
-    Type selects, so adding a rule never changes what the main map means.
+    Returns (reason, entries, bssid, targets). `entries` is a list of (dataset, record)
+    pairs to publish, and is empty for a dropped row — `reason` then says why. One row can
+    produce two entries: a Flock match is published to its own database *as well as* the
+    one its Type selects, so adding a rule never changes what the main map means.
+
+    `targets` names the databases this row belongs in, whether or not they already hold
+    it, and is empty for a row dropped before routing. It is what tells a duplicate that
+    repeats a stored address apart from one that repeats an address added earlier in the
+    same batch: `entries` cannot, because a duplicate has none.
 
     `known` maps a dataset to the BSSIDs it already holds. bssid is the canonical
     address, or None when the row has none.
     """
     if is_malformed(row):
-        return "malformed", [], None
+        return "malformed", [], None, ()
     dataset = PUBLISHED_TYPES.get(row["Type"].strip().upper())
     if dataset is None:
-        return "not_wifi", [], None
+        return "not_wifi", [], None, ()
     bssid = normalize_bssid(row["MAC"])
     # A removal request outranks everything, including the opt-out: the address is
     # already off the map for good, and reporting it as an opt-out would list it under
     # "already published but now opted out" and send the operator after a removal that
     # is done. It is address-scoped, so it holds for every row and every dataset.
     if bssid in removed:
-        return "removed", [], bssid
+        return "removed", [], bssid, ()
     # Then read the opt-out, ahead of every remaining drop. The caller registers it
     # batch-wide from this reason, so any branch that returns first silently loses it
     # and the same address is published from a row without the suffix (R4.5, R9.6).
@@ -606,24 +661,24 @@ def classify(row, fence, known, removed=frozenset(), flock=None):
     # branch that returns first loses it. A genuine U+FFFD in an SSID is withheld too —
     # rare, and the safe direction.
     if REPLACEMENT in ssid:
-        return "unreadable_ssid", [], bssid
+        return "unreadable_ssid", [], bssid, ()
     if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
-        return "opt_out", [], bssid
+        return "opt_out", [], bssid, ()
     if dataset == "bluetooth" and not ble_address_is_stable(bssid):
-        return "ble_private", [], bssid
+        return "ble_private", [], bssid, ()
     lat = parse_coord(row["CurrentLatitude"])
     lon = parse_coord(row["CurrentLongitude"])
     if lat is None or lon is None or (lat == 0 and lon == 0):
-        return "bad_coords", [], bssid
+        return "bad_coords", [], bssid, ()
     if not fence.contains(lat=lat, lon=lon):
-        return "outside_area", [], bssid
+        return "outside_area", [], bssid, ()
     matched_by = flock.match(row, bssid) if flock else None
     targets = [dataset] + ([FLOCK] if matched_by else [])
     entries = [(name, build_record(name, row, ssid, bssid, lat, lon, matched_by))
                for name in targets if bssid not in known[name]]
     if not entries:
-        return "duplicate", [], bssid
-    return None, entries, bssid
+        return "duplicate", [], bssid, targets
+    return None, entries, bssid, targets
 
 
 def check_data(db_paths, denylist_path):
@@ -650,7 +705,13 @@ def check_data(db_paths, denylist_path):
 def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         ble_db_path=DEFAULT_BLE_DB, flock_db_path=DEFAULT_FLOCK_DB,
         flock_rules_path=DEFAULT_FLOCK_RULES, dry_run=False, now=None):
-    """Run the pipeline and return a summary dict. Raises FatalError before any change."""
+    """Run the pipeline and return a summary dict.
+
+    Raises FatalError before any change, except on one path: the databases are swapped
+    in one at a time, so a rename that fails after an earlier one succeeded raises with
+    `written` naming what did change. The inbox is only emptied once every swap is done,
+    so a re-run finishes the job either way.
+    """
     try:
         with open(boundary_path, encoding="utf-8") as fh:
             fence = Fence(json.load(fh))
@@ -662,7 +723,9 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
     dbs, stored, removed = check_data(db_paths, denylist_path)
     flock_rules = load_flock_rules(flock_rules_path)
     known = {dataset: set(bssids) for dataset, bssids in stored.items()}
-    # "already in the database" spans every database: it means published before this run.
+    # For the opt-out report, "already published" spans every database: the address is
+    # on a map somewhere, and the operator has to go take it off whichever one holds it.
+    # The duplicate breakdown below is NOT read this way — see there.
     stored_any = set().union(*stored.values()) if stored else set()
 
     summary = {
@@ -697,10 +760,20 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         summary["files_processed"].append(name)
         for row in rows:
             summary["rows_read"] += 1
-            reason, entries, bssid = classify(row, fence, known, removed, flock_rules)
+            reason, entries, bssid, targets = classify(
+                row, fence, known, removed, flock_rules)
             if reason:
                 summary["dropped"][reason] += 1
-                if reason == "duplicate" and bssid in stored_any:
+                # Split the duplicates into "we already published this" and "this batch
+                # said it twice", which is how the operator spots a re-ingest of old
+                # logs. Dedupe is per-dataset, so the test has to be per-dataset too:
+                # against `stored` (the pre-run contents) for the databases this row
+                # routes to, not against every database. Testing the union called an
+                # in-batch repeat of a WIFI row "already in the database" whenever some
+                # other database — bluetooth.json, flock.json — happened to hold the
+                # same address, which is exactly backwards.
+                if reason == "duplicate" and any(
+                        bssid in stored[target] for target in targets):
                     summary["duplicate_stored"] += 1
                 # "we must not publish this address" — a verified opt-out, or an SSID
                 # we could not read well enough to rule one out. Both withhold every
@@ -730,18 +803,41 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         return summary
 
     stamp = now or datetime.datetime.now(datetime.timezone.utc)
-    for dataset, records in added.items():
-        if not records:
-            continue
-        key = RECORD_KEY[dataset]
-        db, path = dbs[dataset], db_paths[dataset]
-        db[key].extend(records)
-        db["count"] = len(db[key])
-        db["updated_at"] = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
-        try:
-            save_db(path, db, key)
-        except OSError as exc:
-            raise FatalError("cannot write database {}: {}".format(path, exc))
+    # Write every database out before swapping any of them in. save_db is atomic per
+    # file but there are three files now, and writing them in sequence meant a failure
+    # on the second left the first already replaced while the run still reported that
+    # nothing had been written. Staging first moves the failure an operator actually
+    # meets — a full disk, a read-only tree — to a point where nothing has changed.
+    staged, committed = [], 0
+    try:
+        for dataset, records in added.items():
+            if not records:
+                continue
+            key = RECORD_KEY[dataset]
+            db, path = dbs[dataset], db_paths[dataset]
+            db[key].extend(records)
+            db["count"] = len(db[key])
+            db["updated_at"] = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+            try:
+                staged.append(stage_db(path, db, key))
+            except OSError as exc:
+                raise FatalError("cannot write database {}: {}".format(path, exc))
+        # Three renames still are not one atomic step. If a later one fails, report
+        # which databases did change instead of claiming that none did.
+        for pending in staged:
+            try:
+                commit_db(pending)
+            except OSError as exc:
+                raise FatalError("cannot write database {}: {}".format(pending[1], exc),
+                                 written=[db_file for _, db_file in staged[:committed]])
+            committed += 1
+    except BaseException:
+        # However this ended, leave no temp file behind: these sit in `data/`, which is
+        # a git checkout the publish step commits from. commit_db already cleans up its
+        # own failure, and discard_db is a no-op on a file that is gone.
+        for pending in staged[committed:]:
+            discard_db(pending)
+        raise
 
     for name in summary["files_processed"]:
         try:
@@ -823,7 +919,16 @@ def main(argv=None):
                       dry_run=args.dry_run)
     except FatalError as exc:
         print("error: {}".format(exc))
-        print("nothing was written or deleted.")
+        if exc.written:
+            # Not "published": under scripts/publish_ingest.sh a fatal exit commits
+            # nothing, and the runner's checkout is thrown away. What is true either way
+            # is that these files changed on disk, which the blanket message below denied.
+            print("{} database(s) changed on disk before the failure: {}".format(
+                len(exc.written), ", ".join(os.path.relpath(p) for p in exc.written)))
+            print("nothing was published and the inbox was not touched, "
+                  "so re-running finishes the job.")
+        else:
+            print("nothing was written or deleted.")
         return EXIT_FATAL
     print(format_summary(summary))
     if summary["unparseable"] or summary["not_deleted"]:

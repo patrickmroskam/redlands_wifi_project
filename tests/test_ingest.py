@@ -89,6 +89,20 @@ class PipelineCase(unittest.TestCase):
                 "ssid_patterns": ssid_patterns or [],
                 "oui_prefixes": oui_prefixes or []}))
 
+    def snapshot_dbs(self):
+        """The exact bytes of every database, to prove a failed run changed none of them."""
+        out = {}
+        for path in (self.db, self.ble_db, self.flock_db):
+            with open(path, encoding="utf-8") as fh:
+                out[path] = fh.read()
+        return out
+
+    def write_ble(self, devices, updated_at="2026-09-16T00:00:00Z"):
+        with open(self.ble_db, "w", encoding="utf-8") as fh:
+            json.dump({"updated_at": updated_at, "count": len(devices),
+                       "devices": devices}, fh, indent=2)
+            fh.write("\n")
+
     def read_ble(self):
         with open(self.ble_db, encoding="utf-8") as fh:
             return json.load(fh)
@@ -331,6 +345,11 @@ class BssidDedupe(PipelineCase):
         return {"bssid": bssid, "ssid": ssid, "auth": "[OPEN]", "channel": 1,
                 "first_seen": "2024-01-01 00:00:00", "lat": 34.05, "lon": -117.18}
 
+    def device(self, bssid, name="Stored"):
+        """A bluetooth.json record of the shape the pipeline really writes."""
+        return {"bssid": bssid, "name": name, "first_seen": "2024-01-01 00:00:00",
+                "lat": 34.05, "lon": -117.18}
+
     def test_normalize_accepts_every_supported_spelling(self):
         for raw in ("aa:bb:cc:0d:0e:0f", "AA:BB:CC:0D:0E:0F", "aa-bb-cc-0d-0e-0f",
                     "AA-BB-CC-0D-0E-0F", "aabb.cc0d.0e0f", "AABB.CC0D.0E0F",
@@ -386,6 +405,54 @@ class BssidDedupe(PipelineCase):
                          [("aa:bb:cc:00:00:22", "day one"), ("aa:bb:cc:00:00:23", "new")])
         self.assertIn("in database:   1", out)
         self.assertEqual(self.inbox_files(), [])
+
+    def test_a_batch_repeat_is_not_blamed_on_another_database_holding_it(self):
+        # Dedupe is per-dataset, so the breakdown has to be too. This address sits in
+        # bluetooth.json and has never been in networks.json, so the second WIFI row
+        # repeats the first one *inside this batch*. Counting against the union of all
+        # three databases reported it as "already in the database" — backwards, and
+        # this is the line an operator reads to spot a re-ingest of old logs.
+        self.write_ble([self.device("43:00:00:00:00:01")])
+        self.put("a.log", HEADER + row("43:00:00:00:00:01", ssid="first")
+                 + row("43:00:00:00:00:01", ssid="again"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual([n["ssid"] for n in self.read_db()["networks"]], ["first"])
+        self.assertIn("duplicate:       1", out)
+        self.assertIn("in database:   0", out)
+        self.assertIn("in this batch: 1", out)
+
+    def test_a_re_ingest_is_still_counted_when_another_database_holds_it_too(self):
+        # The control for the test above: same two databases, but networks.json already
+        # holds the address, so this really is a re-ingest and must be counted as one.
+        self.write_ble([self.device("43:00:00:00:00:02")])
+        self.write_db([self.net("43:00:00:00:00:02")])
+        self.put("a.log", HEADER + row("43:00:00:00:00:02", ssid="again"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("duplicate:       1", out)
+        self.assertIn("in database:   1", out)
+        self.assertIn("in this batch: 0", out)
+
+    def test_a_camera_already_on_the_main_map_counts_as_stored(self):
+        # A Flock match routes one row to two databases. It is a re-ingest as soon as
+        # either of them published the address before this run — here networks.json did
+        # and flock.json did not, so the row adds nothing new on the second pass.
+        self.write_flock_rules(ssid_patterns=["flock"])
+        self.write_db([self.net("43:00:00:00:00:03", ssid="Flock 1")])
+        self.put("a.log", HEADER + row("43:00:00:00:00:03", ssid="Flock 1"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        # Only flock.json gains a record: networks.json already held the address.
+        self.assertEqual([c["bssid"] for c in self.read_flock()["devices"]],
+                         ["43:00:00:00:00:03"])
+        self.assertEqual(self.read_db()["count"], 1)
+        self.put("b.log", HEADER + row("43:00:00:00:00:03", ssid="Flock 1"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("duplicate:       1", out)
+        self.assertIn("in database:   1", out)
+        self.assertIn("in this batch: 0", out)
 
     def test_malformed_macs_are_dropped_as_malformed(self):
         self.put("a.log", HEADER + row("aa:bb:cc:dd:ee") + row("zz:bb:cc:dd:ee:ff")
@@ -1000,19 +1067,124 @@ class FilesAndExitCodes(PipelineCase):
 
     def test_database_write_failure_deletes_nothing(self):
         self.put("a.log", HEADER + row("10:00:00:00:00:01"))
-        original = ingest.save_db
+        original = ingest.stage_db
 
         def boom(*_a, **_k):
             raise OSError("disk full")
 
-        ingest.save_db = boom
+        ingest.stage_db = boom
         try:
             code, out = self.run_pipeline()
         finally:
-            ingest.save_db = original
+            ingest.stage_db = original
         self.assertEqual(code, 2)
         self.assertEqual(self.inbox_files(), ["a.log"])
         self.assertIn("disk full", out)
+        self.assertIn("nothing was written or deleted", out)
+
+    def test_a_write_failure_on_one_database_leaves_all_of_them_untouched(self):
+        # Every database is staged before any is swapped in, so the failure an operator
+        # actually meets (a full disk, a read-only tree) still changes nothing at all —
+        # which is what "nothing was written or deleted" promises. Writing them one by
+        # one meant networks.json was already replaced when bluetooth.json failed.
+        before = self.snapshot_dbs()
+        self.put("a.log", HEADER + row("11:00:00:00:00:01") + ble_row(STATIC_RANDOM))
+        original = ingest.stage_db
+
+        def boom(path, *a, **k):
+            if path == self.ble_db:
+                raise OSError("disk full")
+            return original(path, *a, **k)
+
+        ingest.stage_db = boom
+        try:
+            code, out = self.run_pipeline()
+        finally:
+            ingest.stage_db = original
+        self.assertEqual(code, 2)
+        self.assertIn("nothing was written or deleted", out)
+        self.assertEqual(self.snapshot_dbs(), before)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+        # No temp file is left behind for the database that did stage successfully.
+        self.assertEqual([n for n in os.listdir(self.tmp) if n.startswith(".networks-")], [])
+
+    def test_a_swap_that_fails_part_way_names_the_databases_it_changed(self):
+        # Three renames cannot be made one atomic step. When a later one fails the run
+        # must say which databases did change: the blanket "nothing was written" sent
+        # the operator away from a networks.json that had already grown.
+        self.put("a.log", HEADER + row("12:00:00:00:00:01") + ble_row(STATIC_RANDOM))
+        order = []
+        code, out = self.fail_commit_on(self.ble_db, order=order)
+        # These tests only mean what they say if networks is committed before bluetooth.
+        self.assertEqual(order, [self.db, self.ble_db])
+        self.assertEqual(code, 2)
+        self.assertNotIn("nothing was written", out)
+        self.assertIn("1 database(s) changed on disk", out)
+        self.assertIn(os.path.relpath(self.db), out)
+        self.assertNotIn(os.path.relpath(self.ble_db), out.split("changed on disk", 1)[1])
+        # The database that never got swapped in leaves no temp file behind either.
+        self.assertEqual([n for n in os.listdir(self.tmp) if n.startswith(".networks-")], [])
+        # The report matches the tree: networks.json grew, bluetooth.json did not.
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["12:00:00:00:00:01"])
+        self.assertEqual(self.read_ble()["devices"], [])
+        # The inbox is untouched, so a re-run finishes the job without double-adding.
+        self.assertEqual(self.inbox_files(), ["a.log"])
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertEqual([d["bssid"] for d in self.read_ble()["devices"]], [STATIC_RANDOM])
+        self.assertEqual(self.inbox_files(), [])
+
+    def fail_commit_on(self, target, order=None, on_discard=None):
+        """Run the pipeline with the swap into `target` failing. Returns (code, out)."""
+        original = ingest.commit_db
+
+        def boom(staged):
+            if order is not None:
+                order.append(staged[1])
+            if staged[1] == target:
+                raise OSError("disk full")
+            return original(staged)
+
+        real_remove = ingest.os.remove
+
+        def remove(path, *a, **k):
+            if on_discard is not None and os.path.basename(path).startswith(".networks-"):
+                raise on_discard
+            return real_remove(path, *a, **k)
+
+        ingest.commit_db = boom
+        ingest.os.remove = remove
+        try:
+            return self.run_pipeline()
+        finally:
+            ingest.commit_db = original
+            ingest.os.remove = real_remove
+
+    def test_a_swap_that_fails_on_the_first_database_still_says_nothing_was_written(self):
+        # written=[] must read as the blanket message, not as an empty "0 database(s)"
+        # line: at that point nothing on disk had changed and the old wording is true.
+        before = self.snapshot_dbs()
+        self.put("a.log", HEADER + row("13:00:00:00:00:01") + ble_row(STATIC_RANDOM))
+        code, out = self.fail_commit_on(self.db)
+        self.assertEqual(code, 2)
+        self.assertIn("nothing was written or deleted", out)
+        self.assertNotIn("changed on disk", out)
+        self.assertEqual(self.snapshot_dbs(), before)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+        self.assertEqual([n for n in os.listdir(self.tmp) if n.startswith(".networks-")], [])
+
+    def test_a_cleanup_that_fails_does_not_swallow_the_error_that_caused_it(self):
+        # A tree that has just refused a rename can refuse the tidy-up remove too. If
+        # that second error replaces the FatalError, main() never sees it: the process
+        # dies with a traceback and exit 1, which publish_ingest.sh treats as soft and
+        # commits from. Losing the temp file is always the cheaper failure.
+        self.put("a.log", HEADER + row("14:00:00:00:00:01") + ble_row(STATIC_RANDOM))
+        code, out = self.fail_commit_on(self.ble_db, on_discard=OSError("read-only"))
+        self.assertEqual(code, 2, out)
+        self.assertIn("1 database(s) changed on disk", out)
+        self.assertNotIn("read-only", out)
 
     def test_delete_failure_is_reported_with_exit_1_after_saving(self):
         self.put("a.log", HEADER + row("16:00:00:00:00:01"))
