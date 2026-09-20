@@ -1039,10 +1039,6 @@ class PointInPolygon(unittest.TestCase):
             self.fence({"type": "Point", "coordinates": [0, 0]})
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 # A BLE row: the Marauder writes the device name in the SSID column, "[BLE]" as the
 # auth mode and 0 as the channel, exactly like the real logs.
 def ble_row(mac, name="", seen="2026-9-19 23:32:05", lat=IN_TOWN[0], lon=IN_TOWN[1]):
@@ -1234,3 +1230,7 @@ class CommittedDataFiles(unittest.TestCase):
     def test_committed_flock_rules_load(self):
         rules = ingest.load_flock_rules(os.path.join(REPO, "data", "flock-rules.json"))
         self.assertIsInstance(rules, ingest.FlockRules)
+
+
+if __name__ == "__main__":
+    unittest.main()
