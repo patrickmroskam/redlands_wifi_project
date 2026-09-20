@@ -745,7 +745,7 @@ test('footer credits CaliCoders LLC above the privacy link (#20)', async ({ page
   await expect(credit).toBeVisible();
   await expect(credit).toHaveText(
     'Security research brought to you by CaliCoders LLC, a security first managed service provider ' +
-    'based in Redlands, where our goal is to create a safer, more secure network for not only our ' +
+    'based in Redlands, where our goal is to create a safer, more secure internet for not only our ' +
     'clients but our community at large.', { useInnerText: true });
 
   // Only the company name is a link, and it is a plain outbound link (R1.6).
@@ -766,10 +766,13 @@ test('footer credits CaliCoders LLC above the privacy link (#20)', async ({ page
   expect(order).toBe(true);
 });
 
-test('privacy page links back to the map', async ({ page }) => {
+test('privacy page links back to every map', async ({ page }) => {
   await page.goto('/privacy.html');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Privacy policy');
-  await expect(page.getByRole('link', { name: /back to the map/i })).toHaveAttribute('href', 'index.html');
+  const footer = page.locator('footer');
+  await expect(footer.getByRole('link', { name: 'WiFi map' })).toHaveAttribute('href', 'index.html');
+  await expect(footer.getByRole('link', { name: 'Bluetooth devices' })).toHaveAttribute('href', 'bluetooth.html');
+  await expect(footer.getByRole('link', { name: 'Flock cameras' })).toHaveAttribute('href', 'flock.html');
 });
 
 test('privacy page covers every required section (R6)', async ({ page }) => {

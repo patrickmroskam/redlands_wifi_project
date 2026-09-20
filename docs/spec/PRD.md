@@ -92,6 +92,19 @@ This repo is public; nothing sensitive may land in it.
 - R8.2 — THE SYSTEM SHALL include a browser smoke test (Playwright) that loads `index.html`, waits for the map, and asserts at least one marker renders from a fixture database.
 - R8.3 — THE SYSTEM SHALL keep test fixtures separate from `ingest/` (fixtures are never deleted by the pipeline).
 
+### R9. Device maps (Bluetooth and Flock cameras)
+*Added 2026-09-20 by owner request, after new wardriving hardware began logging BLE rows.
+Supersedes the "Bluetooth / BLE / cell records (WIFI only)" line in Out of Scope, which is
+struck through below. Mapping only — no stats, breakdown, or per-device pages.*
+- R9.1 — THE SYSTEM SHALL serve a Bluetooth map at `bluetooth.html` and a Flock camera map at `flock.html`, in the same retro theme, fenced to the same ZIP polygons as the main map.
+- R9.2 — WHERE a BLE observation's address may be a rotating private address (resolvable or non-resolvable) THE SYSTEM SHALL NOT publish it, so the map records devices rather than the people who passed by.
+- R9.3 — THE SYSTEM SHALL publish a BLE device with only: address, advertised name, approximate location, and first seen — never RSSI, altitude, accuracy, auth mode, or channel.
+- R9.4 — THE SYSTEM SHALL mark an observation as a Flock camera only when it matches a rule in `data/flock-rules.json`, and SHALL record on each published camera which rule matched it.
+- R9.5 — WHERE a row matches a Flock rule THE SYSTEM SHALL publish it to `data/flock.json` in addition to the database its Type selects, never instead of it.
+- R9.6 — THE SYSTEM SHALL apply the same fence, `_nomap` / `_optout` opt-out, removal denylist, and BSSID dedupe to every database.
+- R9.7 — THE SYSTEM SHALL link the two device maps, the privacy policy, and the source repository from the footer of every page.
+- R9.8 — THE SYSTEM SHALL disclose in the privacy policy what the Bluetooth map publishes and which observations it deliberately leaves out.
+
 ## Release Criteria (v1 Definition of Done)
 - [x] R1 — one page, HTML/CSS banner, retro theme, responsive, privacy link
 - [x] R2 — map shows every network from the database, fenced to 92373/92374, popups + legend + stats
@@ -101,12 +114,13 @@ This repo is public; nothing sensitive may land in it.
 - [x] R6 — privacy policy page modeled on wigle.net
 - [x] R7 — no secrets; raw logs never persist outside `ingest/`
 - [x] R8 — unit tests + Playwright smoke test green in CI
+- [x] R9 — Bluetooth and Flock maps, rotating BLE addresses excluded, rule-driven cameras, footer links, privacy disclosure
 - [x] The initial batch of wardrive logs pushed on 2026-09-16 has been ingested and the live site shows them
 
 ## Out of Scope (v1)
 - User accounts, login, or a web upload form
 - Any area outside ZIP codes 92373 and 92374
-- Bluetooth / BLE / cell records (WIFI only)
+- ~~Bluetooth / BLE / cell records (WIFI only)~~ — **superseded 2026-09-20 by owner request: see R9.** Cell (GSM/LTE) records remain out of scope.
 - Updating an existing record when re-observed (signal trails, last-seen, RSSI heatmaps)
 - Search, filtering, or per-network detail pages
 - Custom domain, CDN, or any hosting other than GitHub Pages

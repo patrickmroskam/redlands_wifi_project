@@ -44,6 +44,11 @@ class PublishCase(unittest.TestCase):
             shutil.copy2(os.path.join(REPO, rel), dest)
         self.write(os.path.join("data", "networks.json"), json.dumps(
             {"updated_at": "2026-09-16T00:00:00Z", "count": 0, "networks": []}) + "\n")
+        # The real repo commits the Bluetooth and Flock databases too, so the publish
+        # script must stage all three.
+        for name in ("bluetooth.json", "flock.json"):
+            self.write(os.path.join("data", name), json.dumps(
+                {"updated_at": None, "count": 0, "devices": []}) + "\n")
         self.commit_all("seed")
         git(self.work, "remote", "add", "origin", self.remote)
         git(self.work, "push", "--quiet", "origin", "main")
@@ -114,6 +119,36 @@ class Publishes(PublishCase):
         self.assertIn("rows added:        2", self.read(self.summary))
         author = git(self.remote, "log", "-1", "--format=%an", "main")
         self.assertEqual(author, "github-actions[bot]")
+
+    def test_bluetooth_devices_are_committed_and_pushed_too(self):
+        # Without this the daily job would write data/bluetooth.json, never stage it, and
+        # leave the next run's tree dirty.
+        ble = ("C1:00:00:00:00:01,Speaker,[BLE],2026-9-19 23:32:05,0,-70,"
+               "34.0556,-117.1825,368.00,3.25,BLE\n")
+        rotating = ("70:09:71:00:00:01,,[BLE],2026-9-19 23:32:05,0,-70,"
+                    "34.0556,-117.1825,368.00,3.25,BLE\n")
+        self.add_log("mixed.log", HEADER + ble + rotating)
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        db = json.loads(self.remote_file("data/bluetooth.json"))
+        self.assertEqual([d["bssid"] for d in db["devices"]], ["c1:00:00:00:00:01"])
+        changed = git(self.remote, "show", "--name-only", "--format=", "main").splitlines()
+        self.assertIn("data/bluetooth.json", changed)
+        # The subject line still counts networks; the devices go in the body.
+        self.assertEqual(self.remote_log()[0], "ingest: +0 networks, 1 files processed")
+        body = git(self.remote, "log", "-1", "--format=%b", "main")
+        self.assertIn("+1 bluetooth devices", body)
+        self.assertEqual(self.remote_ls("ingest"), ["ingest/README.md"])
+
+    def test_a_run_that_finds_nothing_leaves_every_database_untouched(self):
+        self.add_log("far.log", HEADER + OUT_OF_TOWN_ROW)
+        before = {name: self.remote_file("data/" + name)
+                  for name in ("networks.json", "bluetooth.json", "flock.json")}
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for name, text in before.items():
+            self.assertEqual(self.remote_file("data/" + name), text, name)
+        self.assertEqual(git(self.work, "status", "--porcelain"), "")
 
     def test_one_commit_touches_only_the_database_and_the_inbox(self):
         self.add_log("wardrive_1.log")

@@ -50,6 +50,14 @@ class PipelineCase(unittest.TestCase):
         self.write_db([])
         self.denylist = os.path.join(self.tmp, "removed.json")
         self.write_denylist([])
+        self.ble_db = os.path.join(self.tmp, "bluetooth.json")
+        self.flock_db = os.path.join(self.tmp, "flock.json")
+        self.flock_rules = os.path.join(self.tmp, "flock-rules.json")
+        self.write_flock_rules()
+        # The repo commits both files, so the site never fetches a missing database.
+        for path in (self.ble_db, self.flock_db):
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"updated_at": None, "count": 0, "devices": []}, fh)
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -75,10 +83,25 @@ class PipelineCase(unittest.TestCase):
             fh.write(data if data is not None else text.encode("utf-8"))
         return path
 
+    def write_flock_rules(self, ssid_patterns=None, oui_prefixes=None, raw=None):
+        with open(self.flock_rules, "w", encoding="utf-8") as fh:
+            fh.write(raw if raw is not None else json.dumps({
+                "ssid_patterns": ssid_patterns or [],
+                "oui_prefixes": oui_prefixes or []}))
+
+    def read_ble(self):
+        with open(self.ble_db, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def read_flock(self):
+        with open(self.flock_db, encoding="utf-8") as fh:
+            return json.load(fh)
+
     def run_pipeline(self, *extra, boundary=BOUNDARY):
         out = io.StringIO()
         argv = ["--ingest-dir", self.inbox, "--db", self.db, "--boundary", boundary,
-                "--denylist", self.denylist, *extra]
+                "--denylist", self.denylist, "--ble-db", self.ble_db,
+                "--flock-db", self.flock_db, "--flock-rules", self.flock_rules, *extra]
         with redirect_stdout(out):
             code = ingest.main(argv)
         return code, out.getvalue()
@@ -181,8 +204,9 @@ class DropReasons(PipelineCase):
         self.assertIn("outside area:    1", out)
 
     def test_not_wifi(self):
-        out = self.assert_dropped(row("03:00:00:00:00:01", typ="BLE")
-                                  + row("03:00:00:00:00:02", typ="GSM"), "not_wifi")
+        # Cell rows only: a BLE row is routed to the Bluetooth map, not dropped here.
+        out = self.assert_dropped(row("03:00:00:00:00:01", typ="GSM")
+                                  + row("03:00:00:00:00:02", typ="LTE"), "not_wifi")
         self.assertIn("not wifi:        2", out)
 
     def test_opt_out_suffixes_case_insensitive(self):
@@ -454,7 +478,7 @@ class BssidDedupe(PipelineCase):
         del missing["bssid"]
         self.assert_fatal_and_untouched(
             [self.net("aa:bb:cc:00:00:43"), self.net("not-a-mac"), missing, self.net(None)],
-            '3 network(s) with a malformed bssid: #1 "not-a-mac", #2 null, #3 null')
+            '3 record(s) with a malformed bssid: #1 "not-a-mac", #2 null, #3 null')
 
     def test_fatal_report_is_capped(self):
         self.assert_fatal_and_untouched(
@@ -591,14 +615,14 @@ class Denylist(PipelineCase):
         self.write_denylist([self.entry("aa:bb:cc:00:00:68")])
         code, out = self.run_pipeline("--check")
         self.assertEqual(code, 2, out)
-        self.assertIn("still contains 1 removed network(s)", out)
+        self.assertIn("still contains 1 removed record(s)", out)
         self.assertEqual(self.inbox_files(), ["a.log"])
 
     def test_removed_network_still_in_the_database_is_fatal(self):
         self.write_db([{"bssid": "AA-BB-CC-00-00-67", "ssid": "Gone", "auth": "",
                         "channel": 1, "first_seen": "", "lat": 34.05, "lon": -117.18}])
         self.write_denylist([self.entry("aa:bb:cc:00:00:67")])
-        self.assert_fatal_and_untouched("still contains 1 removed network(s)",
+        self.assert_fatal_and_untouched("still contains 1 removed record(s)",
                                         "aa:bb:cc:00:00:67", "docs/removals.md")
 
 
@@ -868,7 +892,7 @@ class FilesAndExitCodes(PipelineCase):
         self.assertIn("rows added:        0", out)
 
     def test_dry_run_writes_and_deletes_nothing_but_reports_counts(self):
-        self.put("a.log", HEADER + row("0d:00:00:00:00:01") + row("0d:00:00:00:00:02", typ="BLE"))
+        self.put("a.log", HEADER + row("0d:00:00:00:00:01") + row("0d:00:00:00:00:02", typ="GSM"))
         with open(self.db, "rb") as fh:
             before = fh.read()
         code, out = self.run_pipeline("--dry-run")
@@ -958,7 +982,7 @@ class FilesAndExitCodes(PipelineCase):
         self.assertIn("a.log: read-only", out)
 
     def test_dry_run_counts_match_a_real_run(self):
-        text = HEADER + row("17:00:00:00:00:01") + row("17:00:00:00:00:02", typ="BLE") + row("")
+        text = HEADER + row("17:00:00:00:00:01") + row("17:00:00:00:00:02", typ="GSM") + row("")
         self.put("a.log", text)
         _, dry = self.run_pipeline("--dry-run")
         _, real = self.run_pipeline()
@@ -1017,3 +1041,196 @@ class PointInPolygon(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# A BLE row: the Marauder writes the device name in the SSID column, "[BLE]" as the
+# auth mode and 0 as the channel, exactly like the real logs.
+def ble_row(mac, name="", seen="2026-9-19 23:32:05", lat=IN_TOWN[0], lon=IN_TOWN[1]):
+    return row(mac, ssid=name, auth="[BLE]", seen=seen, channel="0", lat=lat, lon=lon, typ="BLE")
+
+
+# Addresses whose first octet fixes the BLE address type (top two bits).
+STATIC_RANDOM = "c1:00:00:00:00:01"      # 0b11 -> stable
+PUBLIC_ADDR = "84:70:d7:00:00:01"        # 0b10 -> not a valid random type, so public
+RESOLVABLE = "70:09:71:00:00:01"         # 0b01 -> rotates
+NON_RESOLVABLE = "05:dd:76:00:00:01"     # 0b00 -> rotates
+
+
+class BluetoothDatabase(PipelineCase):
+    def test_stable_addresses_are_published_and_rotating_ones_are_dropped(self):
+        self.put("a.log", HEADER + ble_row(STATIC_RANDOM) + ble_row(PUBLIC_ADDR)
+                 + ble_row(RESOLVABLE) + ble_row(NON_RESOLVABLE))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([d["bssid"] for d in self.read_ble()["devices"]],
+                         [STATIC_RANDOM, PUBLIC_ADDR])
+        self.assertIn("ble private:     2", out)
+        self.assertIn("  bluetooth:       2", out)
+
+    def test_ble_rows_never_reach_the_wifi_database(self):
+        self.put("a.log", HEADER + ble_row(STATIC_RANDOM) + row("20:00:00:00:00:01"))
+        self.run_pipeline()
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["20:00:00:00:00:01"])
+        self.assertEqual([d["bssid"] for d in self.read_ble()["devices"]], [STATIC_RANDOM])
+
+    def test_published_device_carries_no_rssi_altitude_accuracy_auth_or_channel(self):
+        self.put("a.log", HEADER + ble_row(STATIC_RANDOM, name="Speaker"))
+        self.run_pipeline()
+        device = self.read_ble()["devices"][0]
+        self.assertEqual(set(device), {"bssid", "name", "first_seen", "lat", "lon"})
+        self.assertEqual(device["name"], "Speaker")
+        self.assertEqual(device["first_seen"], "2026-09-19 23:32:05")
+
+    def test_cell_rows_are_still_not_wifi_rather_than_bluetooth(self):
+        self.put("a.log", HEADER + row("310-410-1234", typ="GSM") + row("21:00:00:00:00:01"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertIn("not wifi:        1", out)
+        self.assertEqual(self.read_ble()["count"], 0)
+
+    def test_a_ble_row_with_a_broken_mac_is_malformed(self):
+        self.put("a.log", HEADER + ble_row("not-a-mac") + ble_row(STATIC_RANDOM))
+        code, out = self.run_pipeline()
+        self.assertIn("malformed:       1", out)
+        self.assertEqual(self.read_ble()["count"], 1)
+
+    def test_fence_opt_out_and_denylist_apply_to_bluetooth(self):
+        self.write_denylist([{"bssid": "c2:00:00:00:00:02", "date": "2026-09-20", "issue": 1}])
+        self.put("a.log", HEADER
+                 + ble_row("c3:00:00:00:00:03", lat=OUT_OF_TOWN[0], lon=OUT_OF_TOWN[1])
+                 + ble_row("c4:00:00:00:00:04", name="Beacon_nomap")
+                 + ble_row("c2:00:00:00:00:02")
+                 + ble_row(STATIC_RANDOM))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([d["bssid"] for d in self.read_ble()["devices"]], [STATIC_RANDOM])
+        self.assertIn("outside area:    1", out)
+        self.assertIn("opt-out:         1", out)
+        self.assertIn("removed:         1", out)
+
+    def test_same_device_is_never_added_twice_across_runs(self):
+        self.put("a.log", HEADER + ble_row(STATIC_RANDOM))
+        self.run_pipeline()
+        self.put("b.log", HEADER + ble_row(STATIC_RANDOM.upper().replace(":", "-")))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_ble()["count"], 1)
+        self.assertIn("in database:   1", out)
+
+    def test_wifi_and_bluetooth_may_share_a_bssid_without_colliding(self):
+        # A dual-radio device can answer to the same address on both. Each database
+        # dedupes on its own, so neither suppresses the other.
+        self.put("a.log", HEADER + row(STATIC_RANDOM) + ble_row(STATIC_RANDOM))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertEqual(self.read_ble()["count"], 1)
+
+    def test_empty_run_leaves_the_bluetooth_database_untouched(self):
+        self.put("a.log", HEADER + row("22:00:00:00:00:01"))
+        before = open(self.ble_db, encoding="utf-8").read() if os.path.exists(self.ble_db) else None
+        self.run_pipeline()
+        after = open(self.ble_db, encoding="utf-8").read() if os.path.exists(self.ble_db) else None
+        self.assertEqual(before, after)
+
+
+class FlockDatabase(PipelineCase):
+    def test_no_rules_means_no_cameras(self):
+        self.put("a.log", HEADER + row("30:00:00:00:00:01", ssid="Flock Safety 123"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_flock()["count"], 0)
+        self.assertIn("no flock rules configured", out)
+
+    def test_ssid_rule_matches_case_insensitively_and_records_the_rule(self):
+        self.write_flock_rules(ssid_patterns=["flock safety"])
+        self.put("a.log", HEADER + row("31:00:00:00:00:01", ssid="FLOCK SAFETY 4417"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        camera = self.read_flock()["devices"][0]
+        self.assertEqual(camera["bssid"], "31:00:00:00:00:01")
+        self.assertEqual(camera["matched_by"], "ssid:flock safety")
+        self.assertIn("  flock:           1", out)
+
+    def test_oui_rule_matches_the_address_prefix(self):
+        self.write_flock_rules(oui_prefixes=["A4:DA:22"])
+        self.put("a.log", HEADER + row("a4:da:22:00:00:01") + row("a4:da:23:00:00:02"))
+        self.run_pipeline()
+        cameras = self.read_flock()["devices"]
+        self.assertEqual([c["bssid"] for c in cameras], ["a4:da:22:00:00:01"])
+        self.assertEqual(cameras[0]["matched_by"], "oui:a4:da:22")
+
+    def test_a_camera_is_published_to_both_maps_not_moved_between_them(self):
+        # Adding a rule must never remove a network from the main map.
+        self.write_flock_rules(ssid_patterns=["flock"])
+        self.put("a.log", HEADER + row("32:00:00:00:00:01", ssid="Flock 1"))
+        self.run_pipeline()
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["32:00:00:00:00:01"])
+        self.assertEqual([c["bssid"] for c in self.read_flock()["devices"]], ["32:00:00:00:00:01"])
+
+    def test_a_matching_ble_device_is_a_camera_too(self):
+        self.write_flock_rules(oui_prefixes=["c1:00:00"])
+        self.put("a.log", HEADER + ble_row(STATIC_RANDOM, name="cam"))
+        self.run_pipeline()
+        self.assertEqual(self.read_ble()["count"], 1)
+        self.assertEqual(self.read_flock()["count"], 1)
+
+    def test_a_rotating_ble_address_is_never_a_camera(self):
+        # The privacy filter runs before the flock rules: a rule cannot re-admit a
+        # rotating address by matching its prefix.
+        self.write_flock_rules(oui_prefixes=["70:09:71"])
+        self.put("a.log", HEADER + ble_row(RESOLVABLE))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_flock()["count"], 0)
+        self.assertIn("ble private:     1", out)
+
+    def test_opt_out_and_denylist_still_win_over_a_flock_rule(self):
+        self.write_flock_rules(ssid_patterns=["flock"])
+        self.write_denylist([{"bssid": "33:00:00:00:00:02", "date": "2026-09-20", "issue": 1}])
+        self.put("a.log", HEADER + row("33:00:00:00:00:01", ssid="Flock_nomap")
+                 + row("33:00:00:00:00:02", ssid="Flock 2"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_flock()["count"], 0)
+
+    def test_missing_rules_file_is_not_fatal(self):
+        os.remove(self.flock_rules)
+        self.put("a.log", HEADER + row("34:00:00:00:00:01"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertIn("no flock rules configured", out)
+
+    def test_malformed_rules_file_is_fatal_and_nothing_is_written_or_deleted(self):
+        for raw in ('{"ssid_patterns": "flock"}', '{"oui_prefixes": ["zz:zz:zz"]}',
+                    "[]", "{ not json"):
+            with self.subTest(raw=raw):
+                self.write_flock_rules(raw=raw)
+                self.put("a.log", HEADER + row("35:00:00:00:00:01"))
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 2)
+                self.assertIn("nothing was written or deleted", out)
+                self.assertEqual(self.inbox_files(), ["a.log"])
+                self.assertEqual(self.read_db()["count"], 0)
+
+    def test_check_flag_validates_the_rules_file(self):
+        self.write_flock_rules(raw='{"ssid_patterns": [""]}')
+        code, out = self.run_pipeline("--check")
+        self.assertEqual(code, 2)
+        self.assertIn("blank pattern", out)
+
+
+class CommittedDataFiles(unittest.TestCase):
+    """The files the site actually serves must stay loadable by the pipeline."""
+
+    def test_committed_bluetooth_and_flock_databases_are_valid(self):
+        for name, key in (("bluetooth.json", "devices"), ("flock.json", "devices")):
+            path = os.path.join(REPO, "data", name)
+            with self.subTest(name=name):
+                db = ingest.load_db(path, key)
+                ingest.stored_bssids(db, path, key)
+
+    def test_committed_flock_rules_load(self):
+        rules = ingest.load_flock_rules(os.path.join(REPO, "data", "flock-rules.json"))
+        self.assertIsInstance(rules, ingest.FlockRules)
