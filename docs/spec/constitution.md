@@ -21,11 +21,11 @@
 - Never close on an `obsolete` / `low-ROI` verdict without dev-team or human adjudication.
 - **This repo is PUBLIC.** Never commit secrets, `.env` files, API keys, or tokens. A leaked `.env` was purged on 2026-09-16; do not reintroduce one.
 - **GitHub Pages settings are fixed:** build_type `legacy`, source `main` branch, path `/` (site served from the repo root at https://patrickmroskam.github.io/redlands_wifi_project/). Do not change Pages settings or move the site out of the repo root without human sign-off — doing so would require a human step.
-- **`ingest/` is a transient inbox.** Never store fixtures, code, or the database there; the pipeline deletes what it processes. Never delete a file it could not parse.
+- **The raw-log inbox is transient.** Never store fixtures, code, or the database there; the pipeline deletes what it processes. Never delete a file it could not parse. Since #30 the inbox is the PRIVATE repo `patrickmroskam/redlands_wifi_inbox`; this repo's `ingest/` is retired and kept empty.
 - **Everything outside ZIP 92373 / 92374 is dropped, never stored** in `data/networks.json`.
 - **Dedupe key is the BSSID (MAC).** An existing record is never overwritten by a re-observation.
 - **No accounts, cookies, analytics, or third-party trackers** on the site.
-- Never push the raw wardrive logs anywhere except `ingest/` in this repo.
+- **Never push the raw wardrive logs anywhere public.** They go only to the private inbox repo `patrickmroskam/redlands_wifi_inbox` (owner ruling on #22, option C; ratified in the `private-inbox` ask). Raw logs show the drive route, so a log in this public repo is a privacy incident, not a tidiness problem. The 48 logs pushed before the cutover remain in this repo's git history; rewriting that history is its own issue and its own review.
 
 ## Human-in-the-loop protocol (HARD — every actor follows it)
 The owner asked to be involved only when something genuinely needs them, and then with
@@ -58,7 +58,8 @@ map tiles need no key, and the removal-request channel is GitHub Issues (no emai
 - base_branch: main
 - spec_path: docs/spec/PRD.md
 - site_url: https://patrickmroskam.github.io/redlands_wifi_project/
-- ingest_dir: ingest/
+- ingest_dir: the private repo `patrickmroskam/redlands_wifi_inbox` (checked out to `inbox/` by the ingest job; `ingest/` in this repo is retired)
+- inbox_repo: patrickmroskam/redlands_wifi_inbox   # private; key is INBOX_TOKEN in the `ingest` environment, which allows only `main`
 - database_path: data/networks.json
 - boundary_path: data/redlands-boundary.geojson   # ZCTA polygons for 92373 + 92374 (US Census)
 - e2e_command: npx playwright test               # browser smoke test (R8.2); set up by the scaffold issue

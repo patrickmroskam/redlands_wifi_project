@@ -107,10 +107,16 @@ Without `data:`, panning quickly logs CSP violations.
 - `data/networks.json` holds only `bssid`, `ssid`, `auth`, `channel`,
   `first_seen`, `lat`, and `lon` for networks inside ZIP 92373/92374. It never
   holds RSSI, altitude, accuracy, or raw log lines (PRD R4.12).
-- **Raw logs are public.** Files in `ingest/` are served by Pages until the daily
-  job deletes them, and they stay in the public git history after that. They
-  include out-of-area rows, RSSI, and the timestamped drive path. This is an open
-  owner decision (#22).
+- **Raw logs were public; new ones are not (F9, resolved 2026-09-20, #30).** Raw
+  scan files include out-of-area rows, RSSI, and the timestamped drive path. The
+  owner chose option C on #22: logs now go to the private repo
+  `patrickmroskam/redlands_wifi_inbox`, and the daily job reads them from there with
+  `INBOX_TOKEN` — an environment secret in the `ingest` environment, which allows only
+  `main`, so no pull-request run can reach it. The job publishes only the filtered
+  databases and deletes the processed logs in the inbox.
+  **Residual risk:** the 48 logs pushed before the cutover are still in this repo's git
+  history, and anyone who cloned it keeps a copy. Emptying `ingest/` did not remove them.
+  Rewriting history would, but it is destructive and is tracked as its own issue.
 
 ## Audit record (2026-09-17, #14)
 
@@ -124,5 +130,5 @@ Without `data:`, panning quickly logs CSP violations.
 | F6 | No dependency update automation | Fixed: `.github/dependabot.yml` |
 | F7 | Some security settings off | Owner task, #21 |
 | F8 | Workflow permissions and pinning | OK; PRD R5.5 wording lags `pages: write` |
-| F9 | Raw logs public (Pages and history) | Owner decision, #22 |
+| F9 | Raw logs public (Pages and history) | Fixed forward, #30: new logs go to a private inbox repo. History of the first 48 unchanged (separate issue) |
 | F10 | Secret scan | Clean |

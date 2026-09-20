@@ -5,3 +5,8 @@ dist/
 .DS_Store
 test-results/
 playwright-report/
+
+# A checkout of the private wardrive-log inbox (CI only). Never commit raw logs here.
+# No trailing slash on purpose: `/inbox/` only matches a directory that already
+# exists, so it would not cover the path before the checkout step creates it.
+/inbox

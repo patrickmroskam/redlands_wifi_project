@@ -1,25 +1,30 @@
-# ingest/ — drop wardrive files here
+# ingest/ — retired, leave it empty
 
-This folder is the inbox for raw wardrive logs (WiGLE CSV 1.4 files from the ESP32
-Marauder, usually named `wardrive_N.log`).
+Raw wardrive logs **no longer go here.** This repository is public, and a raw log shows
+your drive route, so since issue #30 the logs go to a **private** repo instead.
 
-## How to add new files (3 steps)
+## Where new logs go now
 
-1. Copy your new `wardrive_*.log` files into this `ingest/` folder.
-2. Commit them:
-   ```bash
-   git add ingest && git commit -m "ingest: add wardrive logs"
-   ```
-3. Push:
-   ```bash
-   git push
-   ```
+Put your `wardrive_*.log` files in the top folder of the private inbox:
 
-That's it. Once a day (or when the "Ingest wardrive logs" workflow is run manually from
-the Actions tab) the pipeline reads every file here, keeps only networks inside ZIP
-codes 92373 / 92374 that aren't already in the database, adds them to
-`data/networks.json`, and **deletes the processed files from this folder**.
+**https://github.com/patrickmroskam/redlands_wifi_inbox**
 
-Files that can't be parsed are left here, named in the run's summary, and the run
+The easy way: open
+<https://github.com/patrickmroskam/redlands_wifi_inbox/upload/main>, drag the files onto
+the page, and click **Commit changes**. Pushing with git works too.
+
+Once a day (or when the "Ingest wardrive logs" workflow is run manually from the Actions
+tab) the pipeline reads every file there, keeps only networks inside ZIP codes
+92373 / 92374 that aren't already in the database, adds them to `data/networks.json`
+here, and **deletes the processed files from the private inbox**.
+
+Files that can't be parsed are left in the inbox, named in the run's summary, and the run
 is marked failed (red) in the Actions tab so you notice.
-Do not put anything else in this folder.
+
+## Why this folder still exists
+
+The first 48 logs were processed here before the switch, and they are still in this
+repository's **git history**. Emptying the folder did not remove them; only a history
+rewrite would, and that is tracked separately because it is destructive.
+
+Do not put anything in this folder.

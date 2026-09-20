@@ -7,7 +7,8 @@ Map WiFi networks in Redlands, CA — https://patrickmroskam.github.io/redlands_
   with a `window.RWPMapConfig` before loading it.
 - `data/networks.json`, `data/bluetooth.json`, `data/flock.json` — the databases the maps
   read. See [`data/README.md`](data/README.md).
-- `ingest/` — inbox for raw wardrive logs. See [`ingest/README.md`](ingest/README.md).
+- `ingest/` — retired. Raw logs now go to the **private** inbox repo
+  `patrickmroskam/redlands_wifi_inbox`. See [`ingest/README.md`](ingest/README.md).
 - `scripts/ingest.py` — the ingest pipeline (Python 3, standard library only).
 - `scripts/publish_ingest.sh` — runs the pipeline and commits + pushes its result (used by the daily job).
 - `assets/vendor/` — Leaflet 1.9.4, vendored so the CSP allows only this site's own scripts.
@@ -19,9 +20,10 @@ Map WiFi networks in Redlands, CA — https://patrickmroskam.github.io/redlands_
 ```bash
 python3 scripts/ingest.py --dry-run   # report only: writes and deletes nothing
 python3 scripts/ingest.py             # append new networks, delete processed files
+python3 scripts/ingest.py --ingest-dir path/to/inbox   # read logs from somewhere else
 ```
 
-For every file in `ingest/` (except `README.md` and dotfiles) it reads the WiGLE CSV
+For every file in the inbox (except `README.md` and dotfiles) it reads the WiGLE CSV
 rows and routes each one by its `Type` column:
 
 | Type | Goes to | Notes |
@@ -59,7 +61,7 @@ with a count for each drop reason.
   A malformed row is dropped without affecting the rest of the file — unless *every*
   data row in a file is malformed, which means the file is not being read correctly
   (a logger format change, say). That file is treated as unparseable: it stays in
-  `ingest/`, it is named in the output, and the script exits `1`.
+  the inbox, it is named in the output, and the script exits `1`.
 - The script never removes a network that is already published. If a stored network
   now broadcasts a `_nomap` / `_optout` SSID, the summary lists its BSSID so it can
   be removed by hand.
@@ -73,14 +75,24 @@ with a count for each drop reason.
 (**Run workflow**; tick *Dry run* to only see the report). It:
 
 1. runs the unit tests (a push made by the job does not trigger CI);
-2. runs `scripts/publish_ingest.sh`, which runs the pipeline and, only if one of the
-   databases or `ingest/` changed, commits exactly those paths as
+2. checks out the **private** inbox repo into `inbox/` (gitignored) using `INBOX_TOKEN`,
+   an environment secret in the `ingest` environment, which allows only `main` — so no
+   pull-request run can ever reach the key;
+3. runs `scripts/publish_ingest.sh`, which runs the pipeline over `inbox/` and, only if
+   one of the databases changed, commits exactly those paths as
    `ingest: +N networks, M files processed` (with the Bluetooth and Flock counts in the
    commit body) and pushes to `main`;
-3. checks that GitHub Pages started a build for that commit, and requests one if not.
+4. deletes the processed logs **in the inbox repo**, in a second commit pushed there.
+   The database is published first on purpose: if the run dies in between, the logs stay
+   in the inbox and the next run re-reads them, which the BSSID dedupe makes a no-op;
+5. checks that GitHub Pages started a build for that commit, and requests one if not.
+
+Scheduled runs stay off until the repository variable `INGEST_SCHEDULE` is `on`. It must
+be a *repository* variable, not an environment one: the job's `if:` is evaluated before
+the `ingest` environment resolves, so an environment variable would always read empty.
 
 The report appears in the run's summary panel. A red run means a file could not be
-parsed (the good files were still published; the bad one stays in `ingest/`) or a
+parsed (the good files were still published; the bad one stays in the inbox) or a
 fatal error (nothing was published). Networks that opted out after being published
 show up as warnings and need a removal PR. GitHub pauses scheduled workflows after 60
 days without repo activity; if that happens, re-enable the workflow from the Actions tab.
