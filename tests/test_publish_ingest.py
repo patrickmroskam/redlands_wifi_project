@@ -83,6 +83,10 @@ class PublishCase(unittest.TestCase):
     def publish(self, *args):
         env = dict(os.environ, GITHUB_STEP_SUMMARY=self.summary,
                    GITHUB_OUTPUT=self.output)
+        # The daily job declares INBOX_DIR at job level, so it is set for every step of
+        # that workflow — including the one that runs these tests. Inheriting it pointed
+        # the script at an inbox inside each throwaway repo, which does not exist.
+        env.pop("INBOX_DIR", None)
         return subprocess.run(["bash", "scripts/publish_ingest.sh", *args], cwd=self.work,
                               env=env, capture_output=True, text=True)
 
@@ -544,6 +548,25 @@ class WorkflowWiring(unittest.TestCase):
         self.assertEqual(ignored.returncode, 0,
                          "ingest.yml checks the private inbox out to {!r}, which "
                          ".gitignore does not cover".format(path))
+
+
+class AmbientEnvironment(PublishCase):
+    def test_an_inherited_inbox_dir_does_not_reach_the_default_layout(self):
+        """The suite must not change behaviour because the ambient env has INBOX_DIR.
+
+        `.github/workflows/ingest.yml` sets INBOX_DIR at job level for its own checkout,
+        and the unit-test step inherits it. When these tests inherited it too, every
+        legacy same-repo test looked for an inbox inside its throwaway repo and the whole
+        publish suite failed — but only inside that one workflow, so ci.yml stayed green.
+        """
+        self.add_log("wardrive_1.log")
+        os.environ["INBOX_DIR"] = "inbox"
+        self.addCleanup(os.environ.pop, "INBOX_DIR", None)
+
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(self.remote_file("data/networks.json"))["count"], 2)
+        self.assertEqual(self.remote_ls("ingest"), ["ingest/README.md"])
 
 
 if __name__ == "__main__":
