@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Ingest raw WiGLE CSV wardrive logs into the published databases.
 
-Reads every candidate file in ingest/ and routes each row to one of three
-databases by its Type column:
+Reads every candidate file in the directory given by --ingest-dir (default
+ingest/) and routes each row to one of three databases by its Type column:
 
   WIFI -> data/networks.json    every WiFi network (the main map)
   BLE  -> data/bluetooth.json   Bluetooth devices with a *stable* address
@@ -13,7 +13,10 @@ Every database applies the same filters: inside the Redlands ZIP polygons
 denylist (data/removed.json), and not already known (by BSSID, per database).
 Rows of any other type (GSM/LTE cell towers) are dropped. Processed files are
 deleted; files that cannot be parsed are left in place, reported by name, and
-make the script exit 1. See docs/spec/PRD.md (R3, R4).
+make the script exit 1. In CI scripts/publish_ingest.sh passes $INBOX_DIR as
+--ingest-dir: a checkout of the private inbox repo, which is where raw logs live
+since issue #30. This script never reads $INBOX_DIR itself.
+See docs/spec/PRD.md (R3, R4).
 
 Python 3 standard library only.
 
