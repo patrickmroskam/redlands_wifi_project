@@ -68,7 +68,9 @@ jobs:
           python-version: '3.12'
 
       # A GITHUB_TOKEN push does not trigger CI, so gate the data change here. This runs
-      # before the inbox is fetched, so the tests never see a raw log.
+      # before the inbox is fetched, so the tests never see a raw log. Note this step
+      # inherits the job-level INBOX_DIR; the publish tests deliberately drop it, which
+      # `test_an_inherited_inbox_dir_does_not_reach_the_default_layout` pins.
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -v
 
