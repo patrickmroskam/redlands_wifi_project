@@ -6,6 +6,7 @@ Nothing touches this repo's real ingest/ folder or data/.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -312,8 +313,6 @@ class Warnings(PublishCase):
                       result.stdout)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class SeparateInboxCase(PublishCase):
@@ -477,3 +476,75 @@ class SeparateInbox(SeparateInboxCase):
         result = self.publish()
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("::error::", result.stdout)
+
+
+class NestedInbox(SeparateInbox):
+    """The layout CI actually uses: the inbox is checked out INSIDE the site worktree.
+
+    Re-runs every SeparateInbox test with the inbox at `work/inbox`, ignored by the site
+    repo, so the `separate_inbox` detection and the `/inbox/` ignore rule are exercised
+    in the shape production runs in — not just the side-by-side shape.
+    """
+
+    def setUp(self):
+        super().setUp()
+        nested = os.path.join(self.work, "inbox")
+        shutil.move(self.inbox, nested)
+        self.inbox = nested
+        with open(os.path.join(self.work, ".gitignore"), "w", encoding="utf-8") as fh:
+            fh.write("/inbox/\n")
+        self.commit_all("ignore the inbox checkout")
+        git(self.work, "push", "--quiet", "origin", "main")
+
+    def test_the_ignored_inbox_is_never_added_to_the_site_repo(self):
+        self.add_inbox_log("wardrive_1.log")
+        self.assertEqual(self.publish().returncode, 0)
+        self.assertEqual([p for p in self.site_ls() if p.startswith("inbox/")], [])
+        self.assertEqual(git(self.work, "status", "--porcelain", "--", "inbox"), "")
+
+
+class InboxMisconfigured(SeparateInboxCase):
+    def test_an_ignored_plain_directory_is_refused_instead_of_failing_opaquely(self):
+        # `rev-parse --show-toplevel` walks up, so a non-repo inbox nested in the site
+        # repo looks like the legacy ingest/ layout. It must be named, not guessed at.
+        nested = os.path.join(self.work, "inbox")
+        os.makedirs(nested)
+        shutil.copy(SAMPLE_LOG, os.path.join(nested, "wardrive_1.log"))
+        with open(os.path.join(self.work, ".gitignore"), "w", encoding="utf-8") as fh:
+            fh.write("/inbox/\n")
+        self.commit_all("ignore the inbox checkout")
+        self.inbox = nested
+
+        head = self.remote_head()
+        result = self.publish()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("::error::", result.stdout)
+        self.assertIn("misconfigured", result.stdout)
+        self.assertEqual(self.remote_head(), head)
+        # The logs are still there: the run refused before ingest.py could eat them.
+        self.assertTrue(os.path.exists(os.path.join(nested, "wardrive_1.log")))
+
+
+@unittest.skipUnless(HAVE_TOOLS, "needs git")
+class WorkflowWiring(unittest.TestCase):
+    def test_the_workflow_inbox_path_is_gitignored(self):
+        """The checkout path in ingest.yml and the ignore rule must stay in step.
+
+        Keeping the owner's raw logs out of this public repo rests first on the explicit
+        staging allowlist; this ignore rule is the backstop. A rename of INBOX_DIR that
+        forgot .gitignore would remove the backstop silently.
+        """
+        workflow = os.path.join(REPO, ".github", "workflows", "ingest.yml")
+        with open(workflow, encoding="utf-8") as fh:
+            text = fh.read()
+        match = re.search(r"^\s*INBOX_DIR:\s*(\S+)\s*$", text, re.MULTILINE)
+        self.assertIsNotNone(match, "ingest.yml no longer declares INBOX_DIR")
+        path = match.group(1).strip("\"'")
+        ignored = subprocess.run(["git", "check-ignore", "-q", path], cwd=REPO)
+        self.assertEqual(ignored.returncode, 0,
+                         "ingest.yml checks the private inbox out to {!r}, which "
+                         ".gitignore does not cover".format(path))
+
+
+if __name__ == "__main__":
+    unittest.main()

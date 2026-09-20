@@ -22,6 +22,9 @@
 #
 # Optional environment (set by GitHub Actions):
 #   INBOX_DIR            where the raw logs are (default: ingest/)
+#
+# Both repos are assumed to start with a clean index — true for a CI checkout. A
+# deletion staged before the script runs is not counted as processed work.
 #   GITHUB_STEP_SUMMARY  the ingest report is appended here
 #   GITHUB_OUTPUT        receives pushed_sha=<sha> after a push
 set -uo pipefail
@@ -59,6 +62,16 @@ inbox_root=$(git -C "$INBOX" rev-parse --show-toplevel 2>/dev/null) || {
 # this repo's commit, the way it always has.
 separate_inbox=""
 [ "$inbox_root" != "$root" ] && separate_inbox=1
+
+# `rev-parse --show-toplevel` walks UP, so a plain directory nested in this repo reports
+# this repo's root and would be mistaken for the legacy ingest/ layout. The giveaway is
+# that it is ignored here: a real inbox checkout is its own repo, and ingest/ is tracked.
+# Without this the logs are deleted, `git add -u` dies on an unmatched pathspec, and the
+# run fails with no annotation saying why.
+if [ -z "$separate_inbox" ] && git check-ignore -q "$INBOX" 2>/dev/null; then
+  echo "::error::$INBOX is ignored by this repository and is not a git repository of its own — the inbox checkout is missing or misconfigured"
+  exit 2
+fi
 
 report=$(mktemp)
 trap 'rm -f "$report"' EXIT
@@ -101,8 +114,13 @@ fi
 
 # Tracked logs the ingest removed. Read from inside the inbox so this works whether the
 # inbox is this repo or a separate checkout. Untracked files (e.g. one that failed to
-# parse in a local run) are never counted and never published.
-processed=$(git -C "$INBOX" ls-files --deleted -- . | wc -l | tr -d ' ')
+# parse in a local run) are never counted and never published. The list is kept, NUL
+# separated, so the deletion commit stages exactly these files rather than whatever else
+# happens to be dirty — and so a newline in a file name cannot inflate the count.
+deleted_logs=$(mktemp)
+trap 'rm -f "$report" "$deleted_logs"' EXIT
+git -C "$INBOX" ls-files -z --deleted -- . >"$deleted_logs"
+processed=$(tr -cd '\0' <"$deleted_logs" | wc -c | tr -d ' ')
 
 if [ -z "$(git status --porcelain -- "${DBS[@]}")" ] && [ "$processed" -eq 0 ]; then
   echo "nothing changed: no commit"
@@ -171,14 +189,23 @@ if [ -n "$(git diff --cached --name-only)" ]; then
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "pushed_sha=$sha" >>"$GITHUB_OUTPUT"
   fi
-else
+elif [ "$processed" -gt 0 ]; then
   echo "no database change to publish; only the processed logs are being deleted"
+else
+  # The gate above saw a change under data/ that staging could not pick up — a deleted
+  # or retyped database. Never report that as a quiet success.
+  echo "::error::a published database changed in a way this script cannot stage:"
+  git status --porcelain -- "${DBS[@]}"
+  exit 2
 fi
 
 # The database is public now, so the logs can go. A failure from here on is loud but not
 # lossy: the logs simply stay in the inbox and the next run re-reads them.
 if [ -n "$separate_inbox" ] && [ "$processed" -gt 0 ]; then
-  git -C "$INBOX" add -u -- . || { echo "::error::could not stage the processed logs in the inbox"; exit 2; }
+  # Only the logs the pipeline consumed — never a blanket `add -u`, which would sweep up
+  # any other change in the inbox and push it unreviewed.
+  xargs -0 git -C "$INBOX" add -- <"$deleted_logs" ||
+    { echo "::error::could not stage the processed logs in the inbox"; exit 2; }
   git -C "$INBOX" -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" \
       commit --quiet -m "ingest: $processed files processed" || {
     echo "::error::could not commit the processed logs in the inbox"
