@@ -4,6 +4,7 @@
 // WiFi map. Fixtures live in tests/fixtures/ — never in ingest/ (R8.3).
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const { installHooks } = require('./helpers');
 
 const FIXTURE_BLE = path.join(__dirname, '..', 'fixtures', 'bluetooth-3.json');
 const FIXTURE_FLOCK = path.join(__dirname, '..', 'fixtures', 'flock-2.json');
@@ -16,17 +17,7 @@ const PAGES = [
     fixture: FIXTURE_FLOCK, count: 2, kind: 'camera', noun: 'camera' },
 ];
 
-test.beforeEach(async ({ page }) => {
-  await page.route(/tile\.openstreetmap\.org/, (route) => route.abort());
-  page.cspViolations = [];
-  page.on('console', (msg) => {
-    if (/Content Security Policy/i.test(msg.text())) page.cspViolations.push(msg.text());
-  });
-});
-
-test.afterEach(async ({ page }) => {
-  expect(page.cspViolations).toEqual([]);
-});
+installHooks();
 
 async function markerCount(page) {
   return page.evaluate(() => window.__rwp.markers.length);

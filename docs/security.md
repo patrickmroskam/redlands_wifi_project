@@ -13,7 +13,7 @@ text inside `data/networks.json`, which comes from whatever WiFi networks broadc
   a DOM node and pass that instead (see `popupFor` in `assets/map.js`).
 - **Every new text surface gets an injection test.** Put an HTML payload in
   `tests/fixtures/networks-xss.json` and assert it shows as literal text
-  (`tests/e2e/site.spec.js`, "render HTML payloads as text"). The stats and list
+  (`tests/e2e/security.spec.js`, "render HTML payloads as text"). The stats and list
   columns planned in #12 and #13 need this.
 - **No new origins.** Scripts and styles come only from this site. The one
   allowed external host is the OpenStreetMap tile server, for images.
