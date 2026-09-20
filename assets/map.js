@@ -176,15 +176,66 @@
       map.unproject(map.project(fenceBounds.getSouthEast(), zoom).add(slack), zoom)));
   });
 
+  // Anything that measures the map while it is moving measures a position the map is about to
+  // leave (#29). A drag counts: Leaflet stops the running pan at the top of its own dragstart
+  // handler, so "no pan animation" alone would read a finger-driven map as settled. Both flags are
+  // private; if a future Leaflet drops them the map reads as still and the behaviour is what it
+  // was before this guard, not something worse.
+  function moving() {
+    if (map._panAnim && map._panAnim._inProgress) return true;
+    return !!(map.dragging && map.dragging.moving && map.dragging.moving());
+  }
+
+  // Run fn once the map has stopped moving. Polled rather than hung off moveend, because Leaflet
+  // fires moveend from inside the dragstart that is about to move the map again: work resumed there
+  // would start a pan that fights the finger for a quarter of a second. Give up after a couple of
+  // seconds and run fn anyway — the fence restore below must happen even if the map somehow never
+  // settles (a backgrounded tab freezes an animation mid-flight).
+  function whenStill(fn) {
+    var deadline = Date.now() + 2000;
+    (function check() {
+      if (!moving() || Date.now() > deadline) return fn();
+      setTimeout(check, 30);
+    })();
+  }
+
+  // Deferred work is about the view the map was heading for. Once the reader takes the wheel, that
+  // view is no longer the one they want, so anything still pending is dropped.
+  var takeovers = 0;
+  map.on('dragstart zoomstart', function () { takeovers += 1; });
+
   // Switching markers closes one popup and opens the next in the same tick. Restore the fence only
   // once no popup is open, or its snap-back would pan the new popup out of view again. If a popup
   // reopened before the check, the fence stays loose until that popup closes, which restores it.
   var openPopups = 0;
-  map.on('popupopen', function () { openPopups += 1; });
+  map.on('popupopen', function (e) {
+    openPopups += 1;
+    // Leaflet decides whether this popup needs auto-panning into view before it fires popupopen,
+    // and it measures against wherever the map is sitting at that instant. Open a popup while the
+    // fence's restore pan is still running — a tap on one marker moments after closing another —
+    // and it measures a position the map is leaving, so the pan it asks for (or skips) is wrong and
+    // the rest of that pan carries the popup off the map edge (#29). Measuring again on a still map
+    // fixes it. This runs after most opens, because a popup's own auto-pan is itself a pan in
+    // flight here; that case re-measures a popup that already fits, and _adjustPan does nothing.
+    if (!moving()) return;
+    var popup = e.popup;
+    var seen = takeovers;
+    whenStill(function () {
+      if (takeovers !== seen) return;
+      if (map.hasLayer(popup) && popup._adjustPan) popup._adjustPan();
+    });
+  });
   map.on('popupclose', function () {
     openPopups -= 1;
     setTimeout(function () {
-      if (fenceBounds && openPopups === 0) map.setMaxBounds(fenceBounds);
+      if (!fenceBounds || openPopups !== 0) return;
+      // Restoring the fence pans the map back inside it. Doing that while the popup's own auto-pan
+      // is still running cuts that animation off and starts a second one from wherever it had got
+      // to: one close, two visible pans (#29). Let the first one land. Unlike the re-measure above
+      // this is not dropped when the reader takes over — the fence is not a nicety.
+      whenStill(function () {
+        if (fenceBounds && openPopups === 0) map.setMaxBounds(fenceBounds);
+      });
     }, 0);
   });
 
