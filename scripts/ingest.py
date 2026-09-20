@@ -564,19 +564,32 @@ def classify(row, fence, known, removed=frozenset(), flock=None):
     if dataset is None:
         return "not_wifi", [], None
     bssid = normalize_bssid(row["MAC"])
-    if dataset == "bluetooth" and not ble_address_is_stable(bssid):
-        return "ble_private", [], bssid
+    # A removal request outranks everything, including the opt-out: the address is
+    # already off the map for good, and reporting it as an opt-out would list it under
+    # "already published but now opted out" and send the operator after a removal that
+    # is done. It is address-scoped, so it holds for every row and every dataset.
     if bssid in removed:
         return "removed", [], bssid
+    # Then read the opt-out, ahead of every remaining drop. The caller registers it
+    # batch-wide from this reason, so any branch that returns first silently loses it
+    # and the same address is published from a row without the suffix (R4.5, R9.6).
+    # Three branches used to shadow it:
+    #   bad_coords / outside_area — a drive's first rows run on a stale or absent fix,
+    #     so the suffix row is the one most likely to be dropped before it is read;
+    #   ble_private — that test is per-dataset (BLE rows only), so it does NOT keep the
+    #     address out of networks.json; a WIFI row with the same MAC is never tested.
+    # The row is still dropped here and nothing out of area is stored, only withheld.
+    ssid = row["SSID"]
+    if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
+        return "opt_out", [], bssid
+    if dataset == "bluetooth" and not ble_address_is_stable(bssid):
+        return "ble_private", [], bssid
     lat = parse_coord(row["CurrentLatitude"])
     lon = parse_coord(row["CurrentLongitude"])
     if lat is None or lon is None or (lat == 0 and lon == 0):
         return "bad_coords", [], bssid
     if not fence.contains(lat=lat, lon=lon):
         return "outside_area", [], bssid
-    ssid = row["SSID"]
-    if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
-        return "opt_out", [], bssid
     matched_by = flock.match(row, bssid) if flock else None
     targets = [dataset] + ([FLOCK] if matched_by else [])
     entries = [(name, build_record(name, row, ssid, bssid, lat, lon, matched_by))

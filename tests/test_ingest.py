@@ -446,6 +446,56 @@ class BssidDedupe(PipelineCase):
         self.run_pipeline()
         self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["aa:bb:cc:00:00:53"])
 
+    def assert_opt_out_survives(self, bssid, suffix="_nomap", **bad_fix):
+        """The suffix row is dropped by an earlier check; the clean row must still lose."""
+        suffix_row = row(bssid, ssid="Home" + suffix, **bad_fix)
+        clean_row = row(bssid, ssid="Home")
+        for suffix_first in (True, False):
+            with self.subTest(suffix_row_first=suffix_first):
+                self.write_db([])
+                first, second = ((suffix_row, clean_row) if suffix_first
+                                 else (clean_row, suffix_row))
+                self.put("wardrive_1.log", HEADER + first)
+                self.put("wardrive_2.log", HEADER + second)
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.read_db()["networks"], [], out)
+                self.assertEqual(self.read_ble()["devices"], [], out)
+                self.assertEqual(self.read_flock()["devices"], [], out)
+                self.assertIn("rows added:        0", out)
+                self.assertIn("opt-out:         2", out)
+
+    def test_opt_out_is_registered_when_its_row_is_outside_the_area(self):
+        # The first rows of a drive run on a stale fix, so the row carrying the
+        # suffix is exactly the one most likely to be dropped before it is read.
+        self.assert_opt_out_survives("aa:bb:cc:00:00:54",
+                                     lat=OUT_OF_TOWN[0], lon=OUT_OF_TOWN[1])
+
+    def test_opt_out_is_registered_when_its_row_has_no_fix(self):
+        # 0,0 is how a Marauder log spells "no GPS lock yet". Both suffixes, since the
+        # reordered branch is the only place either one is read.
+        self.assert_opt_out_survives("aa:bb:cc:00:00:55", lat="0", lon="0")
+        self.assert_opt_out_survives("aa:bb:cc:00:00:56", suffix="_optout",
+                                     lat="0", lon="0")
+
+    def test_opt_out_of_a_published_network_is_flagged_even_with_a_bad_fix(self):
+        # The manual-removal flag is the operator's only signal that a network already
+        # on the map has opted out, so it must not depend on that row having a fix.
+        published = {"bssid": "aa:bb:cc:00:00:57", "ssid": "Home", "auth": "[WPA2_PSK]",
+                     "channel": 6, "first_seen": "2025-03-21 23:08:20",
+                     "lat": 34.0556, "lon": -117.1825}
+        for label, bad_fix in (("no fix", {"lat": "0", "lon": "0"}),
+                               ("out of area", {"lat": OUT_OF_TOWN[0],
+                                                "lon": OUT_OF_TOWN[1]})):
+            with self.subTest(bad_fix=label):
+                self.write_db([dict(published)])
+                self.put("a.log", HEADER + row(published["bssid"], ssid="Home_nomap",
+                                               **bad_fix))
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 0, out)
+                self.assertIn("already published but now opted out", out)
+                self.assertIn(published["bssid"], out)
+
     def assert_fatal_and_untouched(self, networks, *expected):
         self.write_db(networks)
         with open(self.db, "rb") as fh:
@@ -1103,6 +1153,30 @@ class BluetoothDatabase(PipelineCase):
         self.assertIn("outside area:    1", out)
         self.assertIn("opt-out:         1", out)
         self.assertIn("removed:         1", out)
+
+    def test_an_opt_out_on_a_private_ble_row_still_withholds_the_wifi_record(self):
+        # `ble_private` only tests BLE rows, so it never kept this address out of
+        # networks.json — the opt-out has to be read before it, not after.
+        for order in (lambda a, b: a + b, lambda a, b: b + a):
+            with self.subTest():
+                self.write_db([])
+                self.put("a.log", HEADER + order(
+                    ble_row(RESOLVABLE, name="Home_nomap"),
+                    row(RESOLVABLE, ssid="Home")))
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.read_db()["networks"], [], out)
+                self.assertEqual(self.read_ble()["devices"], [], out)
+
+    def test_an_opt_out_on_a_wifi_row_withholds_the_bluetooth_record_too(self):
+        # One address, two databases: the opt-out is keyed on the address, so it
+        # withholds every record it produced, not just the one that carried it.
+        self.put("a.log", HEADER + row(STATIC_RANDOM, ssid="Beacon_nomap")
+                 + ble_row(STATIC_RANDOM, name="Beacon"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_ble()["devices"], [], out)
+        self.assertEqual(self.read_db()["networks"], [], out)
 
     def test_same_device_is_never_added_twice_across_runs(self):
         self.put("a.log", HEADER + ble_row(STATIC_RANDOM))

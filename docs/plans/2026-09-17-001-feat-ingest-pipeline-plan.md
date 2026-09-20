@@ -55,6 +55,15 @@ look like `[WPA2_PSK]` and `[OPEN]`.
   duplicate. Each dropped row is counted once, under the first reason that applies. The
   duplicate check comes last, so "first occurrence in the batch" means the first occurrence
   that passes every other filter.
+  *(Amended 2026-09-20, #40. The order is now: malformed → not wifi → removed → **opt-out**
+  → ble private → bad coords → outside area → duplicate. Registering the batch-wide
+  opt-out needs only the address and the SSID, so any branch ahead of it silently lost the
+  opt-out and the same address was published from a row without the suffix — `bad coords`
+  and `outside area` because a drive's first rows run on a stale or absent fix, and
+  `ble private` because that test is per-dataset and never kept the address out of
+  `networks.json`. Only `removed` still outranks the opt-out: it is address-scoped, so the
+  address is already off the map, and reporting it as an opt-out would send the operator
+  after a removal that is done. See `scripts/ingest.py:classify`.)*
 - **Files are processed in natural sort order** (`wardrive_2` before `wardrive_10`), which
   makes "first occurrence" deterministic.
 - **BSSIDs are normalized to lowercase** for storage and comparison (matches
