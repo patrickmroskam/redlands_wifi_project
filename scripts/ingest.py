@@ -383,19 +383,30 @@ def save_db(path, db):
 
 # --- pipeline ------------------------------------------------------------------
 
+def is_malformed(row):
+    """True when a row carries no usable BSSID — classify()'s `malformed` verdict.
+
+    run() shares this predicate so the file-level "every row is malformed" test can
+    never drift from the per-row one.
+    """
+    if row is None or not row["MAC"].strip():
+        return True
+    # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
+    if row["Type"].strip().upper() != "WIFI":
+        return False
+    return normalize_bssid(row["MAC"]) is None
+
+
 def classify(row, fence, known, removed=frozenset()):
     """Return (reason, None, bssid) for a dropped row or (None, record, bssid) for a kept one.
 
     bssid is the canonical address, or None when the row has none.
     """
-    if row is None or not row["MAC"].strip():
+    if is_malformed(row):
         return "malformed", None, None
-    # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
     if row["Type"].strip().upper() != "WIFI":
         return "not_wifi", None, None
     bssid = normalize_bssid(row["MAC"])
-    if bssid is None:
-        return "malformed", None, None
     if bssid in removed:
         return "removed", None, bssid
     lat = parse_coord(row["CurrentLatitude"])
@@ -468,6 +479,14 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
             rows = read_log(os.path.join(ingest_dir, name))
         except (UnparseableFile, OSError) as exc:
             summary["unparseable"].append((name, str(exc)))
+            continue
+        # A file whose every data row is malformed is not a log we are reading
+        # correctly — most likely the logger changed how it writes the MAC column.
+        # Dropping all of its rows and deleting it would lose the data with an exit 0,
+        # so treat the whole file as unparseable instead (R4.10).
+        if rows and all(is_malformed(row) for row in rows):
+            summary["unparseable"].append(
+                (name, "every data row is malformed ({} row(s))".format(len(rows))))
             continue
         summary["files_processed"].append(name)
         for row in rows:

@@ -782,6 +782,54 @@ class FilesAndExitCodes(PipelineCase):
         self.assertEqual(self.inbox_files(), ["a.log", "b.log"])
         self.assertIn("missing column header line", out)
 
+    def test_file_whose_every_row_is_malformed_is_kept_and_reported_with_exit_1(self):
+        # A logger update that changed the MAC separator would drop every row as
+        # malformed; the file must not be deleted on an exit 0 (#25, R4.10).
+        text = (row("aa.bb.cc.dd.ee.01") + row("aa.bb.cc.dd.ee.02")
+                + row("aa.bb.cc.dd.ee.03"))
+        self.put("broken.log", HEADER + text)
+        self.put("good.log", HEADER + row("0c:00:00:00:00:01"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.inbox_files(), ["broken.log"])
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["0c:00:00:00:00:01"])
+        self.assertIn("broken.log: every data row is malformed (3 row(s))", out)
+        # The kept file's rows are not counted: it was never processed.
+        self.assertIn("rows read:         1", out)
+        self.assertIn("malformed:       0", out)
+        self.assertIn("files processed:   1", out)
+
+    def test_one_good_row_keeps_the_file_processable(self):
+        # The rule is "every row", not "most rows": a single usable row still ships.
+        self.put("a.log", HEADER + row("nonsense") + row("0d:00:00:00:00:01")
+                 + row("also-nonsense"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.inbox_files(), [])
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertIn("malformed:       2", out)
+
+    def test_all_rows_malformed_is_not_triggered_by_non_wifi_rows(self):
+        # Cell rows are `not wifi`, not malformed, so a cell-only log is still a log
+        # we read correctly: process it and delete it.
+        self.put("a.log", HEADER + row("310-410-1234", typ="GSM")
+                 + row("310-410-5678", typ="LTE"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.inbox_files(), [])
+        self.assertIn("not wifi:        2", out)
+        self.assertIn("malformed:       0", out)
+
+    def test_all_rows_malformed_file_is_reported_even_when_it_is_the_only_file(self):
+        self.put("a.log", HEADER + row(""))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+        self.assertEqual(self.read_db()["count"], 0)
+        self.assertIn("could not parse 1 file(s) (left in place):", out)
+        self.assertIn("every data row is malformed (1 row(s))", out)
+
     def test_header_only_file_is_processed_and_deleted(self):
         self.put("a.log", HEADER)
         code, _ = self.run_pipeline()

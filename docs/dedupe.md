@@ -8,7 +8,7 @@ changed when it is seen again (PRD R4.6 and R4.7; see also the constitution).
 
 | Where | What happens |
 |---|---|
-| Incoming rows (`scripts/ingest.py`) | The `MAC` column is normalized to `xx:xx:xx:xx:xx:xx` (lower case). The pipeline accepts `aa:bb:…`, `AA-BB-…`, `aabb.ccdd.eeff`, and `aabbccddeeff`. Anything else is dropped as **malformed**: a wrong length, non-hex characters, or mixed separators. |
+| Incoming rows (`scripts/ingest.py`) | The `MAC` column is normalized to `xx:xx:xx:xx:xx:xx` (lower case). The pipeline accepts `aa:bb:…`, `AA-BB-…`, `aabb.ccdd.eeff`, and `aabbccddeeff`. Anything else is dropped as **malformed**: a wrong length, non-hex characters, or mixed separators. If *every* data row in a file is malformed the file is treated as unparseable instead — left in `ingest/`, reported by name, exit 1 — so a logger format change cannot silently delete a log. |
 | Row already in the database (any spelling) | Dropped as a **duplicate** and counted under `in database`. The stored record is never touched. |
 | Same BSSID seen again in the same batch | The first surviving row wins. Files are read in natural order (`wardrive_2` before `wardrive_10`) and rows in file order. The later rows are counted under `in this batch`. |
 | Same BSSID seen with an opt-out SSID (`_nomap` / `_optout`) anywhere in the batch | **The opt-out wins**, whatever the file order: the network is not published, even when other rows show it without the suffix. Those rows are counted as opt-outs. |
