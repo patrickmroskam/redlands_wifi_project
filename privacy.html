@@ -154,14 +154,19 @@
         To be transparent about the raw scan files:
       </p>
       <ul role="list">
-        <li>They are uploaded to the project's public repository, and can be downloaded from
-          this site, until an update processes them. Updates do not run on a schedule yet, so
-          files can wait there for a while. A file that can't be read is kept until a person
-          fixes it.</li>
         <li>They contain everything the scanner heard: networks and Bluetooth devices outside
           Redlands, ones that opted out, every rotating address that the maps leave out, signal
           strength, altitude, GPS accuracy, and the scanner's timestamped route.</li>
-        <li>After an update deletes them, the repository's history still keeps a copy.</li>
+        <li><strong>New scan files are private.</strong> They are uploaded to a separate
+          private repository that only the project owner can read. The daily update reads them
+          from there, publishes only the filtered map data, and deletes the file it processed.
+          A file that can't be read is kept, privately, until a person fixes it. Raw scan files
+          are no longer downloadable from this site.</li>
+        <li><strong>The first batch is still public.</strong> Before this changed, 48 scan
+          files were uploaded to the public repository. They have been deleted from it, but
+          the repository's history still keeps a copy, and anyone who copied the repository
+          before then still has theirs. Removing them from history is destructive and has not
+          been done.</li>
       </ul>
     </section>
 

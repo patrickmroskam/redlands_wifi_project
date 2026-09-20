@@ -1,12 +1,16 @@
-# Daily ingest: ingest/ logs -> data/networks.json, committed to main (PRD R5).
+# Daily ingest: raw logs from the PRIVATE inbox repo -> data/networks.json, committed to
+# main (PRD R5). Raw logs are never public (issue #30 / docs/setup/private-inbox.md).
 # The logic lives in scripts/publish_ingest.sh (unit-tested); this file only wires it up.
 name: Ingest wardrive logs
 
 on:
   schedule:
     # 10:00 UTC = 03:00 PDT / 02:00 PST. Scheduled runs are skipped until the
-    # repo variable INGEST_SCHEDULE is 'on' (set by the backfill, #8). GitHub pauses
-    # schedules after 60 days without repo activity; re-enable from the Actions tab.
+    # repo variable INGEST_SCHEDULE is 'on'. It must be a REPOSITORY variable, not an
+    # environment one: the job-level `if` below is evaluated before the `ingest`
+    # environment is resolved, so an environment variable would always read as empty.
+    # GitHub pauses schedules after 60 days without repo activity; re-enable from the
+    # Actions tab.
     - cron: '0 10 * * *'
   workflow_dispatch:
     inputs:
@@ -27,13 +31,22 @@ jobs:
     name: ingest
     if: ${{ github.event_name != 'schedule' || vars.INGEST_SCHEDULE == 'on' }}
     runs-on: ubuntu-latest
+    # INBOX_TOKEN lives in this environment, whose deployment-branch rule allows only
+    # `main`. That is what keeps the inbox key away from pull-request runs — no
+    # `pull_request` trigger above can reach it, on any branch. Because the rule applies
+    # to every run of this job, the workflow (including a dry run) only runs on main.
+    environment: ingest
     timeout-minutes: 15
     permissions:
-      contents: write   # commit the database + deleted logs to main
+      contents: write   # commit the database to main
       pages: write      # only to request a Pages build if the push didn't start one
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      INBOX_REPO: patrickmroskam/redlands_wifi_inbox
+      INBOX_DIR: inbox
     steps:
+      # Defence in depth: the environment's branch rule already stops this, but a rule
+      # can be relaxed by accident and a real run must never publish from a branch.
       - name: Refuse to publish from a branch other than main
         if: ${{ github.ref != 'refs/heads/main' && env.DRY_RUN != 'true' }}
         run: |
@@ -51,22 +64,40 @@ jobs:
         with:
           python-version: '3.12'
 
-      # A GITHUB_TOKEN push does not trigger CI, so gate the data change here.
+      # A GITHUB_TOKEN push does not trigger CI, so gate the data change here. This runs
+      # before the inbox is fetched, so the tests never see a raw log.
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -v
+
+      # The private inbox holds the owner's raw logs. It is checked out inside the
+      # workspace because actions/checkout requires that; `inbox/` is in .gitignore, so
+      # nothing here can ever be committed to this public repo.
+      - name: Check out the private inbox
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.INBOX_REPO }}
+          token: ${{ secrets.INBOX_TOKEN }}
+          path: ${{ env.INBOX_DIR }}
+          persist-credentials: false
 
       - name: Ingest and publish
         id: publish
         env:
           GH_TOKEN: ${{ github.token }}
+          INBOX_TOKEN: ${{ secrets.INBOX_TOKEN }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
             scripts/publish_ingest.sh --dry-run
           else
-            # Push credentials exist only for this step, and only for a real run.
+            # Push credentials exist only for this step, and only for a real run. Each
+            # repo gets its own header: the site token cannot reach the inbox, and the
+            # inbox key cannot reach the site.
             auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
             echo "::add-mask::$auth"
             git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $auth"
+            inbox_auth=$(printf 'x-access-token:%s' "$INBOX_TOKEN" | base64 -w0)
+            echo "::add-mask::$inbox_auth"
+            git -C "$INBOX_DIR" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $inbox_auth"
             scripts/publish_ingest.sh
           fi
 

@@ -783,7 +783,10 @@ test('privacy page covers every required section (R6)', async ({ page }) => {
     '#published': [/SSID/, /BSSID/, /Auth mode/, /Channel/, /Approximate location/, /First seen/],
     '#not-collected': [/No personal information/i],
     '#how': [/beacon/i, /never connects/i],
-    '#where': [/92373/, /92374/, /thrown away/i, /opted out/i, /history/i],
+    // /private repository/ and /first batch/ are the #30 cutover: new scan files are
+    // private, and the page must keep saying the first 48 are still in public history.
+    '#where': [/92373/, /92374/, /thrown away/i, /opted out/i, /history/i,
+               /private repository/i, /first batch is still public/i],
     '#opt-out': [/_nomap/, /_optout/, /uppercase\s+or\s+lowercase/i, /not remembered/i],
     '#removal': [/do not need to email/i, /Issues are public/i, /removal is remembered/i, /never add it back/i],
     '#visitors': [/No cookies/i, /No analytics/i, /No accounts/i],

@@ -314,3 +314,166 @@ class Warnings(PublishCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SeparateInboxCase(PublishCase):
+    """The production layout (issue #30): raw logs live in a private inbox REPO.
+
+    The site repo publishes the databases; the inbox repo is where the processed logs
+    are deleted. No raw log may ever reach the site repo.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.inbox_remote = os.path.join(self.tmp, "inbox.git")
+        self.inbox = os.path.join(self.tmp, "inbox")
+        git(self.tmp, "init", "--quiet", "--bare", "-b", "main", self.inbox_remote)
+        git(self.tmp, "init", "--quiet", "-b", "main", self.inbox)
+        with open(os.path.join(self.inbox, "README.md"), "w", encoding="utf-8") as fh:
+            fh.write("# raw wardrive logs\n")
+        self.commit_all("seed inbox", cwd=self.inbox)
+        git(self.inbox, "remote", "add", "origin", self.inbox_remote)
+        git(self.inbox, "push", "--quiet", "origin", "main")
+
+    # helpers -----------------------------------------------------------
+    def add_inbox_log(self, name, text=None):
+        dest = os.path.join(self.inbox, name)
+        if text is None:
+            shutil.copy(SAMPLE_LOG, dest)
+        else:
+            with open(dest, "w", encoding="utf-8") as fh:
+                fh.write(text)
+        self.commit_all("add " + name, cwd=self.inbox)
+        git(self.inbox, "push", "--quiet", "origin", "main")
+
+    def publish(self, *args):
+        env = dict(os.environ, GITHUB_STEP_SUMMARY=self.summary,
+                   GITHUB_OUTPUT=self.output, INBOX_DIR=self.inbox)
+        return subprocess.run(["bash", "scripts/publish_ingest.sh", *args], cwd=self.work,
+                              env=env, capture_output=True, text=True)
+
+    def inbox_ls(self):
+        return git(self.inbox_remote, "ls-tree", "--name-only", "-r", "main").splitlines()
+
+    def inbox_log(self):
+        return git(self.inbox_remote, "log", "--format=%s", "main").splitlines()
+
+    def site_ls(self):
+        return git(self.remote, "ls-tree", "--name-only", "-r", "main").splitlines()
+
+
+class SeparateInbox(SeparateInboxCase):
+    def test_database_is_published_here_and_the_log_is_deleted_there(self):
+        self.add_inbox_log("wardrive_1.log")
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        db = json.loads(self.remote_file("data/networks.json"))
+        self.assertEqual(db["count"], 2)
+        self.assertEqual(self.remote_log()[0], "ingest: +2 networks, 1 files processed")
+        self.assertIn("pushed_sha=" + self.remote_head(), self.read(self.output))
+
+        self.assertEqual(self.inbox_ls(), ["README.md"])
+        self.assertEqual(self.inbox_log()[0], "ingest: 1 files processed")
+        self.assertEqual(git(self.inbox_remote, "log", "-1", "--format=%an", "main"),
+                         "github-actions[bot]")
+
+    def test_no_raw_log_ever_reaches_the_public_repo(self):
+        # The whole point of #30. The site commit must touch the databases only.
+        self.add_inbox_log("wardrive_1.log")
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse([p for p in self.site_ls() if p.endswith(".log")],
+                         "a raw log was published to the public repo")
+        touched = git(self.remote, "show", "--name-only", "--format=", "main").split()
+        self.assertTrue(touched)
+        self.assertEqual([p for p in touched if not p.startswith("data/")], [],
+                         "the site commit must touch nothing outside data/")
+
+    def test_a_log_that_adds_nothing_is_still_deleted_from_the_inbox(self):
+        # Second pass over the same networks: the BSSID dedupe means no database change,
+        # but the log must still go, or every later run would re-read it forever.
+        self.add_inbox_log("wardrive_1.log")
+        self.assertEqual(self.publish().returncode, 0)
+        head = self.remote_head()
+
+        self.add_inbox_log("wardrive_2.log")
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head(), head, "nothing new: R5.4 forbids a commit")
+        self.assertEqual(self.inbox_ls(), ["README.md"])
+        self.assertIn("only the processed logs are being deleted", result.stdout)
+
+    def test_out_of_area_only_log_is_deleted_without_a_commit(self):
+        self.add_inbox_log("away.log", HEADER + OUT_OF_TOWN_ROW)
+        head = self.remote_head()
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head(), head)
+        self.assertEqual(self.inbox_ls(), ["README.md"])
+
+    def test_empty_inbox_touches_neither_repo(self):
+        head, inbox_head = self.remote_head(), git(self.inbox_remote, "rev-parse", "main")
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("nothing changed", result.stdout)
+        self.assertEqual(self.remote_head(), head)
+        self.assertEqual(git(self.inbox_remote, "rev-parse", "main"), inbox_head)
+
+    def test_an_unparseable_log_stays_in_the_inbox(self):
+        self.add_inbox_log("wardrive_1.log")
+        self.add_inbox_log("notes.txt", "this is not a wardrive log\n")
+        result = self.publish()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(json.loads(self.remote_file("data/networks.json"))["count"], 2)
+        self.assertEqual(sorted(self.inbox_ls()), ["README.md", "notes.txt"])
+
+    def test_dry_run_deletes_nothing_from_the_inbox(self):
+        self.add_inbox_log("wardrive_1.log")
+        head, inbox_head = self.remote_head(), git(self.inbox_remote, "rev-parse", "main")
+        result = self.publish("--dry-run")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head(), head)
+        self.assertEqual(git(self.inbox_remote, "rev-parse", "main"), inbox_head)
+        self.assertEqual(self.inbox_ls(), ["README.md", "wardrive_1.log"])
+
+    def test_a_new_log_arriving_mid_run_does_not_block_the_deletion(self):
+        self.add_inbox_log("wardrive_1.log")
+        # The owner uploads another log while the ingest is running.
+        other = os.path.join(self.tmp, "other")
+        git(self.tmp, "clone", "--quiet", self.inbox_remote, other)
+        with open(os.path.join(other, "wardrive_9.log"), "w", encoding="utf-8") as fh:
+            fh.write(HEADER + OUT_OF_TOWN_ROW)
+        self.commit_all("owner adds a log", cwd=other)
+        git(other, "push", "--quiet", "origin", "main")
+
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("rebasing", result.stdout)
+        # Ours is gone; the one that arrived mid-run is untouched and waits for next time.
+        self.assertEqual(sorted(self.inbox_ls()), ["README.md", "wardrive_9.log"])
+
+    def test_the_database_is_published_even_when_the_inbox_push_fails(self):
+        # Ordering guarantee: publish first, delete second. A lost deletion costs one
+        # duplicate re-read; a lost publish would cost the data.
+        self.add_inbox_log("wardrive_1.log")
+        other = os.path.join(self.tmp, "other")
+        git(self.tmp, "clone", "--quiet", self.inbox_remote, other)
+        with open(os.path.join(other, "wardrive_1.log"), "a", encoding="utf-8") as fh:
+            fh.write(OUT_OF_TOWN_ROW)
+        self.commit_all("owner edits the same log", cwd=other)
+        git(other, "push", "--quiet", "origin", "main")
+
+        result = self.publish()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(json.loads(self.remote_file("data/networks.json"))["count"], 2,
+                         "the database must already be published")
+        self.assertIn("wardrive_1.log", self.inbox_ls())
+        self.assertIn("the database was published but the logs are still there",
+                      result.stdout)
+
+    def test_a_missing_inbox_is_a_fatal_error_not_a_silent_no_op(self):
+        shutil.rmtree(self.inbox)
+        result = self.publish()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("::error::", result.stdout)
