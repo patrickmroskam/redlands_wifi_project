@@ -15,13 +15,23 @@ ratified_at: 2026-09-17T19:19:36Z
 A public, one-page, fully responsive website in a retro "hacker terminal" style that
 plots every WiFi network observed by the owner's wardriving rig on a map of Redlands,
 California — like wigle.net, but deliberately fenced to ZIP codes 92373 and 92374.
-There are no accounts. The owner pushes raw WiGLE-format log files into a folder in
-this repo; a once-a-day job ingests them into a committed database, drops anything
-outside Redlands or already known, deletes the processed files, and the site
-redeploys. Hosting is GitHub Pages (already enabled: `main` branch, repo root,
-https://patrickmroskam.github.io/redlands_wifi_project/).
+There are no accounts. The owner uploads raw WiGLE-format log files to a separate
+**private** inbox repository; a once-a-day job ingests them into a committed database,
+drops anything outside Redlands or already known, deletes the processed files from the
+inbox, and the site redeploys. Hosting is GitHub Pages (already enabled: `main` branch,
+repo root, https://patrickmroskam.github.io/redlands_wifi_project/).
 
 ## Requirements
+
+> **Amended 2026-09-20 (issue #44, after PR #43).** The raw-log inbox moved out of this
+> public repo to the private repository `patrickmroskam/redlands_wifi_inbox`, on the
+> owner's option-C ruling on #22 (#30). The constitution invariant was amended and
+> ratified in the `private-inbox` ask; this spec was not, so R3, R4.1, R4.9, R7.2 and
+> R8.3 described an architecture that no longer existed. They are re-worded below
+> against the shipped design. Requirement IDs are unchanged.
+>
+> **R4.9 is the one change of substance and is NOT yet ratified** — see the note under
+> it. Everything else here is the spec catching up to a decision the owner already made.
 
 ### R1. One-page site shell with an HTML/CSS banner
 A single responsive page whose hero banner reads "Redlands Wifi Project", built from
@@ -43,15 +53,16 @@ An interactive map plotting every network in the database, constrained to the Re
 - R2.6 — THE SYSTEM SHALL use a tile source that needs no API key or account (e.g. OpenStreetMap / CARTO dark tiles) with proper attribution.
 - R2.7 — IF `data/networks.json` fails to load THEN THE SYSTEM SHALL show an on-page error message instead of a blank map.
 
-### R3. Upload folder in the repo
-A folder the owner pushes raw wardrive files into; no web upload, no login.
-- R3.1 — THE SYSTEM SHALL treat every file under `ingest/` (except `README.md` and `.gitkeep`) as a candidate wardrive log.
+### R3. Upload folder (the private inbox repo)
+A folder the owner puts raw wardrive files into, in a separate private repository; no
+upload form on the site, no login.
+- R3.1 — THE SYSTEM SHALL treat every file in the top folder of the inbox (except `README.md` and dotfiles such as `.gitkeep`) as a candidate wardrive log, where the inbox is the private repository `patrickmroskam/redlands_wifi_inbox`, checked out by the ingest job to the path named by `INBOX_DIR` (`inbox/` in CI).
 - R3.2 — THE SYSTEM SHALL accept the WiGLE CSV 1.4 format as produced by the ESP32 Marauder (header line `WigleWifi-1.4,...`, then `MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type`), regardless of file extension.
-- R3.3 — THE SYSTEM SHALL document, in `ingest/README.md`, exactly how to add files (copy in, commit, push) in plain language.
+- R3.3 — THE SYSTEM SHALL document, in `ingest/README.md` and `docs/setup/private-inbox.md`, exactly how to add files (upload them to the private inbox repo, or push them there with git) in plain language, and SHALL keep the retired `ingest/` folder empty with its README pointing at the inbox.
 
 ### R4. Ingest pipeline (parse → filter → dedupe → append → delete)
 A script that turns raw logs into the committed database and cleans up after itself.
-- R4.1 — WHEN the pipeline runs THE SYSTEM SHALL parse every candidate file in `ingest/` and produce one candidate record per data row.
+- R4.1 — WHEN the pipeline runs THE SYSTEM SHALL parse every candidate file in the inbox (R3.1) and produce one candidate record per data row.
 - R4.2 — IF a row's latitude/longitude is missing, non-numeric, or 0,0 THEN THE SYSTEM SHALL drop that row.
 - R4.3 — IF a row's coordinates fall outside the boundary polygons of ZIP codes 92373 and 92374 (stored in the repo as GeoJSON, sourced from US Census ZCTA data) THEN THE SYSTEM SHALL drop that row.
 - R4.4 — IF a row's `Type` is not `WIFI` THEN THE SYSTEM SHALL drop that row.
@@ -59,7 +70,15 @@ A script that turns raw logs into the committed database and cleans up after its
 - R4.6 — IF a row's BSSID (MAC) already exists in the database THEN THE SYSTEM SHALL drop that row (the existing record wins; no update).
 - R4.7 — IF the same BSSID appears more than once within the batch THEN THE SYSTEM SHALL keep only the first occurrence.
 - R4.8 — WHEN a row survives every filter THE SYSTEM SHALL append it to `data/networks.json` with at least: bssid, ssid, auth, channel, first_seen, lat, lon.
-- R4.9 — WHEN a file has been processed THE SYSTEM SHALL delete it from `ingest/` (in the same commit as the database change).
+- R4.9 — WHEN a file has been processed THE SYSTEM SHALL delete it from the inbox it was read from, and SHALL publish the database changes *before* deleting it. WHERE the inbox is a separate repository the deletion is a second commit pushed to that repository; WHERE the inbox is this repository — the script's local default, `ingest/`, a developer-run affordance only, which never carries real logs (R7.2) — the deletion rides in the same commit as the database change.
+  *R4.9 amended 2026-09-20 (issue #44) and **awaiting owner ratification.** It previously
+  read "delete it from `ingest/` (in the same commit as the database change)" — an
+  atomicity guarantee that cannot hold once the logs live in a different repository, which
+  the owner's option-C ruling on #22 requires. The replacement is a weaker ordering
+  guarantee: if a run dies between publishing and deleting, the logs stay in the inbox and
+  the next run re-reads them, which is a no-op under the R4.6 BSSID dedupe. The other order
+  would lose logs that were never published. Pinned by
+  `test_the_database_is_published_even_when_the_inbox_push_fails`.*
 - R4.10 — IF a file cannot be parsed as WiGLE CSV THEN THE SYSTEM SHALL leave that file in place, report it by name, and exit non-zero after processing the other files.
 - R4.11 — WHEN the pipeline finishes THE SYSTEM SHALL print a summary: files processed, rows read, dropped per reason (bad coords / outside area / not wifi / opt-out / duplicate), and rows added.
 - R4.12 — THE SYSTEM SHALL never write raw log contents, RSSI, altitude, or accuracy into the published database.
@@ -85,12 +104,12 @@ A second page modeled on wigle.net's policy, adapted to this project.
 ### R7. Public-repo hygiene
 This repo is public; nothing sensitive may land in it.
 - R7.1 — THE SYSTEM SHALL contain no secrets, API keys, or `.env` files (a leaked `.env` was purged 2026-09-16).
-- R7.2 — THE SYSTEM SHALL keep the committed database (`data/networks.json`) as the only long-lived data file; raw logs exist only transiently under `ingest/`.
+- R7.2 — THE SYSTEM SHALL keep the published databases under `data/` as the only long-lived *observation* data in this repo (alongside its committed inputs: the boundary polygons, the removal denylist, and the Flock rules); and raw logs SHALL never be pushed to this repo — the ingest job reads them only from the private inbox, and deletes there each file it successfully processes (an unparseable file is deliberately kept, per R4.10). Keeping the inbox itself clear of anything but logs is the owner's obligation, not a property this repo can check. See the known consideration below for the 48 logs that predate the cutover.
 
 ### R8. Verification
 - R8.1 — THE SYSTEM SHALL run the ingest pipeline's unit tests in CI on every pull request.
 - R8.2 — THE SYSTEM SHALL include a browser smoke test (Playwright) that loads `index.html`, waits for the map, and asserts at least one marker renders from a fixture database.
-- R8.3 — THE SYSTEM SHALL keep test fixtures separate from `ingest/` (fixtures are never deleted by the pipeline).
+- R8.3 — THE SYSTEM SHALL keep test fixtures out of `ingest/` so the pipeline never deletes a fixture, and SHALL never run the pipeline against real logs in tests or pull requests (the ingest job runs the unit tests *before* it checks the inbox out, has no `pull_request` trigger, and refuses to run off `main`). Keeping fixtures out of the private inbox is the owner's obligation.
 
 ### R9. Device maps (Bluetooth and Flock cameras)
 *Added 2026-09-20 by owner request, after new wardriving hardware began logging BLE rows.
@@ -108,11 +127,11 @@ struck through below. Mapping only — no stats, breakdown, or per-device pages.
 ## Release Criteria (v1 Definition of Done)
 - [x] R1 — one page, HTML/CSS banner, retro theme, responsive, privacy link
 - [x] R2 — map shows every network from the database, fenced to 92373/92374, popups + legend + stats
-- [x] R3 — `ingest/` folder with plain-language README
+- [x] R3 — raw logs go to the private inbox repo, with a plain-language README (`ingest/` retired and empty, its README pointing there)
 - [x] R4 — pipeline: boundary filter, WIFI-only, `_nomap` opt-out, BSSID dedupe, append, delete processed files, loud failure on bad files
-- [ ] R5 — daily GitHub Actions ingest that commits to `main` and triggers a Pages redeploy — **the only unmet criterion.** The workflow exists (#5) but gates scheduled runs on `vars.INGEST_SCHEDULE == 'on'`, which is unset, so every scheduled run is skipped. Tracked on #30 behind the private-inbox cutover.
+- [ ] R5 — daily GitHub Actions ingest that commits to `main` and triggers a Pages redeploy — **the only unmet criterion.** Two things are outstanding, both owner-side: (a) the job cannot read the private inbox, because `INBOX_TOKEN` is rejected with 404 (#48, `waiting`); and (b) scheduled runs are gated on `vars.INGEST_SCHEDULE == 'on'`, which is deliberately still unset, so every scheduled run is skipped until (a) is fixed. It must be set as a **repository** variable — the job-level `if` is evaluated before the `ingest` environment resolves, so an environment variable would read as empty. The private-inbox cutover itself (#30) shipped in PR #43.
 - [x] R6 — privacy policy page modeled on wigle.net
-- [x] R7 — no secrets; raw logs never persist outside `ingest/`
+- [x] R7 — no secrets; raw logs never enter this repo (private inbox since PR #43)
 - [x] R8 — unit tests + Playwright smoke test green in CI
 - [x] R9 — Bluetooth and Flock maps, rotating BLE addresses excluded, rule-driven cameras, footer links, privacy disclosure
 - [x] The initial batch of wardrive logs pushed on 2026-09-16 has been ingested and the live site shows them
@@ -127,8 +146,16 @@ struck through below. Mapping only — no stats, breakdown, or per-device pages.
 - Removing rows from the database automatically on takedown (handled by a human via issue → PR)
 
 ## Known consideration (not a requirement)
-Raw files pushed to `ingest/` pass through this public repo's git history before
-filtering, so out-of-area rows are visible in history even after the pipeline drops
-them. The owner accepted the "push to a folder in the repo" flow knowing the repo is
-public. If this becomes a concern the fix is a private repo (GitHub Pages on private
-repos needs a paid plan) — a human decision, not a dev-team one.
+This was the concern that raw files pushed to `ingest/` pass through this public repo's
+git history before filtering, so the drive route, RSSI and out-of-area rows stay visible
+in history even after the pipeline drops them. **The owner took the fix** (option C on
+#22): since PR #43 the logs go to a private repo and never enter this one, so nothing new
+is added to public history.
+
+The fix is **forward-only.** The 48 logs pushed before the cutover are still in this
+repo's git history; emptying `ingest/` did not remove them. Rewriting that history is
+deliberately not part of the cutover: it is destructive, irreversible, and does nothing
+about clones that already exist, so it needs its own issue and its own review. **That issue is not
+filed yet** — it is an open item in `docs/spec/po-tasks.md`, recorded so far only as
+comments on #22 and #30. The owner has authorised a rewrite in principle (the
+`private-inbox` ask, reply "Rewrite history"); no actor runs it unattended.
