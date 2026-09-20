@@ -338,10 +338,14 @@ def read_log(path):
     """Return a list of dicts (one per non-blank data row; None for a malformed row)."""
     with open(path, "rb") as fh:
         raw = fh.read()
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise UnparseableFile("not UTF-8 text")
+    # Decode leniently: an 802.11 SSID is an arbitrary 32-octet string, not text, and
+    # the logger writes whatever bytes it saw over the air. A strict decode let one
+    # undecodable octet in one SSID reject every other row in the file — and because an
+    # unparseable file is deliberately kept (R4.10), the daily run then failed on it
+    # forever. Rejection instead falls to the header check below, which is the more
+    # accurate test of "is this a WiGLE log": a genuinely binary file has no WigleWifi
+    # header, and a corrupt body is still caught by the all-rows-malformed net (#53).
+    text = raw.decode("utf-8-sig", errors="replace")
     # Split on newlines only: str.splitlines() would also break rows on
     # form feeds or U+2028 inside an SSID.
     lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
