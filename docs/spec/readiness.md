@@ -1,8 +1,8 @@
 # Redlands Wifi Project — release readiness
 
-**Cycle 8 · 2026-09-19T19:38Z · product-owner**
+**Cycle 9 · 2026-09-20T01:38Z · product-owner**
 
-## Burndown toward v1: **8 / 9** (unchanged for eight cycles)
+## Burndown toward v1: **8 / 9** (unchanged for nine cycles)
 
 | # | criterion | state |
 |---|---|---|
@@ -16,85 +16,97 @@
 | R8 | unit tests + Playwright smoke green in CI | ✅ |
 | — | initial batch ingested and live | ✅ |
 
-Live site HTTP 200, 18,152 networks, CI green, `main` at `965beaa`, 0 open PRs.
+Live site HTTP 200, 18,152 networks, CI green, `main` at `f3e1b86`, 0 open PRs.
 
 ## The one thing blocking everything
 
 **#30 — the private log inbox.** It gates R5 *and* the entire dev-team routine.
 
 The owner **approved** it (ask `msg_92a6bc9c` → `yes`, plus "Rewrite history"). The four objects the
-cutover needs still do not exist, re-verified 19:38Z — a **fifth** consecutive cycle unchanged:
+cutover needs still do not exist, re-verified 01:39Z — a **sixth** consecutive cycle unchanged:
 
 - `redlands_wifi_inbox` private repo — absent (both spellings)
 - `ingest` environment — absent (only `github-pages`)
 - `INBOX_TOKEN` secret — absent (0 secrets)
 - `INGEST_SCHEDULE` variable — absent (0 variables)
 
-**R5 is implemented but gated off, and there are now three data points.** Every scheduled run this
-workflow has ever had concluded **`skipped`** — 2026-09-17T14:44:46Z, 2026-09-18T14:10:34Z, and
-today's **2026-09-19T13:43:57Z** — gated on `vars.INGEST_SCHEDULE == 'on'`
-(`.github/workflows/ingest.yml:28`). The cron fires nightly and does nothing.
+R5 is implemented but gated off. Every scheduled run this workflow has ever had concluded
+**`skipped`** — 2026-09-17T14:44:46Z, 2026-09-18T14:10:34Z, 2026-09-19T13:43:57Z — gated on
+`vars.INGEST_SCHEDULE == 'on'` (`.github/workflows/ingest.yml:28`). No new run since cycle 8, so the
+count still stands at three.
 
-**Setting `INGEST_SCHEDULE=on` is still not a shortcut to closing R5** (re-recorded so it is not
-re-proposed): with the schedule on, the only intake is the **public** `ingest/` folder — the exact
-harm #30 exists to prevent. It is step 4 of `docs/setup/private-inbox.md` and belongs to the owner,
-*after* the inbox exists.
+**Setting `INGEST_SCHEDULE=on` is still not a shortcut to closing R5**: with the schedule on, the
+only intake is the **public** `ingest/` folder — the exact harm #30 exists to prevent. It is step 4
+of `docs/setup/private-inbox.md` and belongs to the owner, *after* the inbox exists.
 
 ## What changed this cycle
 
-**The escalation rung fired, and it is now retired.** Cycle 5 committed, in advance, that if all
-four #30 objects were still absent at cycle 8 (≈ 12:38 PT) that cycle's notify would go at `high`,
-about #30 alone, 24 h after the first. They are, so it did. **From cycle 9 on there is no timed
-escalation on #30** — one `low` mention per day. An informed owner who has not acted is choosing,
-and repetition is not new information; that is the same reasoning that retired the #17 rung.
+**The find: #22's closure proposal is not auto-close eligible, and cycle 10 was set to close it.**
 
-**The find: the PO's own §4h sweep is aimed at the two issues that must never be parked.**
+The 48 h no-objection window on #22's proposal (posted 2026-09-18T01:42:32Z) shut at
+**2026-09-20T01:42:32Z — during this run** — with **0** post-proposal objections. On the aging test
+alone, #22 was due to self-close on the next pass, and `po-tasks.md` said exactly that:
+*"#22 is either self-closed with verdict `addressed-in-#30`"*.
 
-Cycles 5–7 kept finding traps on the *dev-team's* resume path. This one is on the **PO's own** path.
-The product-owner skill's §4h blocked-queue sweep enumerates, verbatim:
+It is **not eligible.** `closure-handshake.md`, the declared canonical contract, gates the verdict
+class *before* the check-and-act snippet runs:
 
-```
-gh issue list --state open --search "label:blocked sort:created-asc -label:needs-human"   → #22
-gh issue list --state open --search "label:waiting sort:created-asc -label:needs-human"   → #30
-```
+> `addressed-in-#NNN` — the work shipped in **PR** #NNN (a merged PR, not a bare commit SHA).
+> Auto-close eligible? **Yes *if PR #NNN is merged*.**
 
-Run at 19:38Z, that returns **exactly {#22, #30}** — and those are precisely the two issues in this
-backlog that must never receive `needs-human`. #22 because that label suppresses closure churn and
-would switch off its own cycle-10 aging sweep (the reason cycle 6 chose `blocked` instead). #30
-because this routine's resume check enumerates open issues labelled `waiting`, so parking #30 turns
-off the check that restarts the entire project.
+Path 2 repeats it: eligible *"with the named issue/PR **confirmed closed-completed on re-check**"*.
+Re-checked live at 01:41Z:
 
-§4h's escalate branch fires when an issue *"has aged past `closure_aging_window_hours` with the
-blocker unchanged and no path you can verify"*. Both are now past 48 h with their blockers
-unchanged, and neither carries a `Blocked by #N` dependency of the kind §4h's other two branches
-look for. A run that matched on age and on the missing dependency, without weighing the last clause,
-lands on escalate.
+| check | result |
+|---|---|
+| is #30 a merged PR? | **No** — `GET /repos/…/pulls/30` → `404 Not Found` |
+| is the named target closed-completed? | **No** — `state=OPEN`, labels `p2,waiting` |
+| has any merged PR shipped option C? | **No** — #37 is the setup doc; #26 is the privacy-page *disclosure* that the raw logs are public |
+| post-proposal `closure-objection:` count | **0** |
+| `launch-blocker`? | no |
 
-Both are branch **(b) — still legitimately blocked, leave it** — and the verifiable paths are now
-written into `po-tasks.md` so no cycle has to re-derive them: #22 resolves at the cycle-10 aging
-sweep (~2026-09-20T07:38Z, window shuts 2026-09-20T01:42Z); #30 resolves on the owner's
-`DONE private-inbox`, checked objectively every cycle.
+The precondition is false, so the remaining branch applies: **route to the human digest as
+"awaiting human closure decision" — do not auto-close.**
 
-**Confidence: high on the mechanism, medium on the hazard — and recorded that way deliberately.**
-The commands were *run*, not reasoned about, so the enumeration is certain. Whether a careful run
-would actually escalate is less certain: the "no path you can verify" clause sits in the same
-sentence as the age trigger, and both paths here are verifiable and dated. This is a guard against a
-plausible misread, not a claim the misread was imminent. Three consecutive trap-finding cycles create
-pressure to produce a fourth; this one is not inflated to match, and the remedy costs one task-file
-entry and changes no label.
+**What closing it would have cost.** #22 is the record that the raw logs expose the car's
+timestamped **drive path**, and that they remain in **public git history**. The exposure is live and
+the fix (#30) is still blocked on the owner. Closing it would have erased the only open record of a
+live privacy exposure at the moment the owner is being asked to act on it.
 
-**One reconciliation correction.** The digest's *Hosting / custom domain* rollup still read
-`p1:1` and *"Priority holds at p1"* — wrong since **cycle 4**, which deliberately moved #17
-`p1 → p2` when the owner answered `not-yet` (GitHub's label timeline confirms 2026-09-18T19:45:33Z).
-The readiness parked table was updated then; this rollup was not, and three cycles carried it
-forward unread. Corrected, with the cycle-4 rationale folded in. Operationally harmless — tier
-searches read GitHub, never this file — but it was the PO's working memory contradicting the PO's
-own decision. The other five rollups were re-checked and are correct.
+**Where the trap lives: compression, not the contract.** The handshake's own check-and-act snippet
+tests only `state` / post-proposal objection / `launch-blocker` — it omits the named-target check
+because eligibility is settled in the prose above it. `po-tasks.md` then compressed the rule down to
+its *action* and dropped the *precondition* entirely. A run following either text top-down closes
+the issue. Both are fixed: the sweep task is rewritten with the gate inline, and a new standing task
+requires any task-file entry restating a skill rule to carry that rule's preconditions.
 
-**Staleness sweep clean.** #25, #29 and #34 re-read in full: pure repo work, no halt-or-re-ask
-instruction, no owner-decision language. #30's cycle-7 banner verified present with the original
-body preserved verbatim below it. Reachable-and-undoable: empty (fourth cycle). Reachable-and-stale:
-empty.
+**Confidence: high — and unlike cycle 8's find, not hedged.** Every element is a command result
+rather than a judgement: the eligibility rule is quoted text, #30's non-PR-ness and open state are
+single API calls, and the objection count uses the skill's own `jq` query. The hazard is not
+speculative either — the wrong instruction was already written down in the task file, aimed at the
+next cycle.
+
+**Action taken:** a comment on #22. `po-closure-proposed` **kept** — the proposal is genuinely open
+(neither concurred nor objected), and the label is what keeps #22 in dev-team's step-0 queue, which
+is the handshake's *real* checker. Nothing closed, no label changed, and no objection recorded (an
+ineligible verdict is not a veto; logging it as one would wrongly bar a legitimate re-proposal).
+
+**Knock-on: two deferred tasks had their blockers corrected.** Cycle 10 was built around a close
+that will not happen.
+
+- **#17 retitle — unblocked; it was never budget-blocked.** Cycles 2–8 deferred it on "§4e needs
+  ≥ 1 realized close". That applied to the *original* route (file a second issue). Cycle 4 had
+  already narrowed it to **retitling #17 to the mitigation alone**, which files nothing — §4e
+  budgets *filing*, so it never applied. Now scheduled for cycle 10 with an accurate blocker: none.
+- **History-rewrite issue — still blocked, on a different condition.** It genuinely is a new issue
+  (+1 net delta), so it genuinely needs §4e budget. Its unblock is now **any realized close**, with
+  no cycle attached.
+
+**#17 re-raised once, as committed — and the rung is spent.** The single dated reminder scheduled at
+cycle 4 for cycle 9 was posted on #17: the tripwire table, both ~5-minute exits from
+`docs/setup/domain-takeover.md`, and an explicit statement that **neither reverses the owner's
+`not-yet`** — neither serves the site on the custom domain, and the switch is out of v1 scope per
+the ratified PRD. No re-ask (the ask is answered). **There is no further timer on #17.**
 
 **No hard invariant and no protocol step was changed. No issue filed, none closed, no label added or
 removed.**
@@ -106,10 +118,10 @@ removed.**
 | #17 | domain takeover mitigation (p2) | owner replied `not-yet` with full facts; registrar/account-side |
 | #21 | Dependabot / private vuln reporting / SHA-pinning (p3) | repository settings; no actor may flip them |
 
-Parking is not dropping. #17 keeps its objective tripwire (apex ≠ 404 ⇒ immediate `high`; 19:38Z
+Parking is not dropping. #17 keeps its objective tripwire — apex ≠ 404 ⇒ immediate `high`; 01:39Z
 reading: **404**, GitHub's "Site not found" page, apex `A` still in the Pages range, challenge TXT
-still absent, `pages.cname` still `null` — latent) and **its one dated re-raise falls at cycle 9,
-the very next run.** #21's carrier is cycle 2's standing task.
+still absent, `pages.cname` still `null` — **latent**, sixth consecutive run unchanged. Its one
+dated re-raise **has now been spent** (this cycle). #21's carrier is cycle 2's standing task.
 
 ## Still waiting on the owner
 
@@ -126,33 +138,42 @@ the very next run.** #21's carrier is cycle 2's standing task.
 *blocked* queue and not an empty one is `gh issue list --json number,labels,assignees`: **#25, #29
 and #34 are open, unassigned and unlabelled**, and all three are pure repo work (an ingest guard,
 two map-popup edge cases, an e2e test split) with no dependency on #30 or #17. They have now been
-parked **~52.5 h**. The routine is off because constitution protocol step 4 mandates it while any
+parked **~58.5 h**. The routine is off because constitution protocol step 4 mandates it while any
 `waiting` issue is live — verified against the literal text at cycle 7. The cycle-3 step-4 amendment
 would decouple those two intents; it is the owner's call and remains unruled.
 
-## Reachability sweep — all 8 open issues
+## Sweeps
 
-Reachable-and-undoable: **empty** (fourth cycle). Reachable-and-stale: **empty**. #22's cycle-6
-`blocked` parking holds, and cycle 8 verified against the skill text that §4d selects by the
-`po-closure-proposed` label without excluding `blocked` — so the parking does not disarm the sweep
-that resolves it. **Post-resume order is unchanged: #30 → #25 → #29 → #34.**
+**§4h blocked queue** — `label:blocked -label:needs-human` and `label:waiting -label:needs-human`
+return exactly **{#22, #30}**, unchanged from cycle 8, and neither carries `needs-human`: **no
+regression.** Both are branch **(b) — still legitimately blocked, leave it** — with named verifiable
+paths, **one of which changed this cycle**: #22 → **dev-team step-0 adjudication on resume** (no
+longer the cycle-10 sweep, which cannot close it); #30 → the owner's `DONE private-inbox`.
+
+**Reachability / doability / staleness** — all 8 swept; both sets **empty** (fifth consecutive
+clean). Zero issue activity since the last watermark (`total_count: 0`), so inputs were re-read
+rather than assumed. #25/#29/#34 re-read in full. #30's cycle-7 banner verified present with the
+original body verbatim below it. #1 re-read and cleared — its R5 line orders `INGEST_SCHEDULE=on`
+**after** the cutover, and it carries no priority label so it never enters a tier search.
+**Post-resume order unchanged: #30 → #25 → #29 → #34.**
 
 ## Convergence
 
-Open count flat at **8** for eight cycles; net issue delta this cycle **0**. Flatness reflects a
-**blocked queue, not a diverging one** — no agent work has been possible since 2026-09-17T15:05Z —
-so the runaway-backlog tripwire (`net_open_tripwire_k: 3`, which watches for a *rising* count) is
-not tripped. Next scheduled state changes: **cycle 9 (~2026-09-20T01:38Z)** owes #17 its single
-dated re-raise; #22's objection window shuts **2026-09-20T01:42Z**; the #22 aging sweep, the digest
-full rebuild, the #17 retitle, and the owner-approved git-history-rewrite filing are all first
-eligible at **cycle 10 (~2026-09-20T07:38Z)**.
+Open count flat at **8** for nine cycles; net issue delta this cycle **0**; closed 0 / proposed 0 /
+contested 0. Flatness reflects a **blocked queue, not a diverging one** — no agent work has been
+possible since 2026-09-17T15:05Z — so the runaway-backlog tripwire (`net_open_tripwire_k: 3`, which
+watches for a *rising* count) is not tripped.
+
+**Cycle 10 (~2026-09-20T07:38Z) owes:** the digest **full rebuild** (`digest_full_rebuild_every_cycles: 10`),
+the **#17 retitle** (now unblocked), and the **#22 sweep in its rewritten form** — route to the human
+digest, *not* self-close. The git-history-rewrite filing is **not** due at cycle 10; it waits on a
+realized close.
 
 ## Next owner message
 
-One `high` notify this cycle, about **#30 alone** — the rung committed at cycle 5, fired on its
-stated condition, in the owner's working afternoon, 24 h after the first `high`. **The rung retires
-with it.** **Sent: `msg_d45a7eb7-0213-4210-a350-8f315fe4c2bf`, `high`, `delivered`, 2026-09-19T19:4xZ
-— one message, not retried.** It carries the doc link, the exact resume phrase `DONE private-inbox`,
-the five-cycle objective evidence, the `INGEST_SCHEDULE` anti-shortcut, and the explicit promise that
-this is the last timed escalation. Cycle 9 sends `low` and carries #17's one dated re-raise; from there, one `low` mention
-per day on #30 and nothing more.
+One `low` notify this cycle. The #30 rung retired at cycle 8 after firing, and cycle 8's message
+promised the owner in as many words that it was the last timed escalation — so #30 gets one quiet
+mention and nothing more. The one substantive item is #17's single dated reminder, which is a
+reminder against a decision the owner already made, not a new escalation; cycle 4 explicitly barred
+escalating #17 on any other timer, and the tripwire is latent. The #22 find needs **no owner action**
+and is reported for transparency only.

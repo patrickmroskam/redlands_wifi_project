@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-19T19:38:00Z
-cycle: 8
-net_open_history: [8, 8, 8, 8, 8, 8, 8, 8]
+last_reconciled_at: 2026-09-20T01:42:16Z
+cycle: 9
+net_open_history: [8, 8, 8, 8, 8, 8, 8, 8, 8]
 polish_backlog_depth: 0
 ---
 
@@ -10,6 +10,115 @@ polish_backlog_depth: 0
 > Regenerable projection. Source of truth: GitHub (state) + decision-log (rationale).
 > Cycle 1 was a **full rebuild** (digest absent on first product-owner run): all 23
 > issues scanned, no delta watermark applied. Next full rebuild due at cycle 10.
+
+## Cycle 9 delta (watermark 2026-09-19T19:38Z → 2026-09-20T01:38Z): **zero owner movement; the cycle-10 closure sweep would have closed a live privacy exposure**
+
+**Nothing moved.** `search/issues?q=repo:...+updated:>=2026-09-19T19:38:00Z` → **`total_count: 0`** — not one issue touched since the last watermark. The newest message in the OH HAI inbox is cycle 8's own notify (`msg_d45a7eb7`, 2026-09-19T19:44:35Z); the owner has sent nothing since. `main` at `f3e1b86` (cycle 8's own commit), **0 open PRs**, CI green, site HTTP 200. Open count flat at **8** for a ninth cycle; net issue delta **0**.
+
+### Both standing gates re-run objectively — both still negative
+
+**#30, all four checks at 01:39Z** (a **sixth** consecutive negative):
+
+- `gh repo view patrickmroskam/redlands_wifi_inbox` → *Could not resolve to a Repository* (the `redlands-wifi-inbox` spelling too)
+- `repos/.../environments` → `total_count: 1`, only `github-pages`
+- `actions/secrets` → `total_count: 0` — no `INBOX_TOKEN`
+- `actions/variables` → `total_count: 0` — no `INGEST_SCHEDULE`
+
+`ask await` on `msg_92a6bc9c` re-read unchanged: `yes` + "Rewrite history". Not the resume key.
+`waiting` kept on #30; dev-team routine re-verified **`enabled: false`**, `lastRunAt` still
+2026-09-17T15:05:07.762Z — the three workable p3s are now parked **~58.5 h**.
+
+**#17 tripwire at 01:39Z:** apex → **404**, body is GitHub's own *"Site not found · GitHub Pages"*
+page, apex `A` → 185.199.108/109/110/111.153, `_github-pages-challenge-patrickmroskam` TXT → none,
+`www` CNAME → `patrickmroskam.github.io.`, repo `pages.cname` → `null`. **Latent**, sixth
+consecutive run unchanged. `ask await` on `msg_e812f339` re-read unchanged: `not-yet`.
+
+### The find: #22's closure proposal is not auto-close eligible, and cycle 10 was set to close it anyway
+
+The 48 h no-objection window on #22's proposal (posted 2026-09-18T01:42:32Z) shut at
+**2026-09-20T01:42:32Z** — during this run — with **0** post-proposal `closure-objection:`
+comments. On the aging test alone, #22 was due to self-close on the next pass, and
+`po-tasks.md` said so in as many words: *"#22 is either self-closed with verdict
+`addressed-in-#30`"*.
+
+It is **not eligible.** `closure-handshake.md`, the declared canonical contract, gates the
+verdict class *before* the check-and-act runs:
+
+> `addressed-in-#NNN` — the work shipped in **PR** #NNN (a merged PR, not a bare commit SHA).
+> Auto-close eligible? **Yes *if PR #NNN is merged*.**
+
+and Path 2 repeats it: auto-close eligible *"with the named issue/PR **confirmed
+closed-completed on re-check**"*. Verified live at 01:41Z:
+
+| check | result |
+|---|---|
+| is #30 a merged PR? | **No** — `GET /repos/.../pulls/30` → `404 Not Found` |
+| is the named target closed-completed? | **No** — `state=OPEN`, labels `p2,waiting` |
+| has any merged PR shipped option C? | **No** — #37 is the setup doc; #26 is the privacy-page *disclosure* that the raw logs are public |
+| post-proposal `closure-objection:` count | **0** |
+| `launch-blocker`? | no |
+
+The precondition is false, so Path 2's remaining branch applies: **route to the human digest as
+"awaiting human closure decision" — do not auto-close.**
+
+**What closing it would have cost.** #22 is the record that the raw logs expose the car's
+timestamped **drive path** and that they remain in **public git history**. The exposure is live and
+the fix (#30) is still blocked on the owner. Closing it would have erased the only open record of a
+live privacy exposure at the moment the owner is being asked to act on it.
+
+**Where the trap actually lives — compression, not the contract.** The handshake's own
+check-and-act snippet tests only `state` / post-proposal objection / `launch-blocker`; it omits the
+named-target check because eligibility is settled in the prose above it. `po-tasks.md` then
+compressed the rule down to its action and dropped the precondition entirely. A run following
+either text top-down closes the issue. Both have been fixed: the sweep task is rewritten with the
+gate inline, and a new standing task requires task-file entries that restate a skill rule to carry
+that rule's **preconditions**, not just its action.
+
+**Action taken:** comment on #22, `po-closure-proposed` **kept** (the proposal is genuinely open,
+and the label is what keeps #22 in dev-team's step-0 queue — the handshake's real checker). Nothing
+closed, no labels changed, no objection recorded (an ineligible verdict is not a veto, and logging
+it as one would wrongly bar a legitimate re-proposal later).
+
+### Knock-on: two deferred tasks had their blockers corrected
+
+Cycle 10 was built around a close that will not happen, so both tasks waiting on it were re-based:
+
+- **#17 retitle — unblocked; it was never budget-blocked.** Cycles 2–8 deferred it on "§4e needs
+  ≥ 1 realized close". That applied to the *original* route (file a second issue). Cycle 4 had
+  already narrowed it to **retitling #17 to the mitigation alone**, which files nothing — §4e
+  budgets *filing*, so it never applied. Scheduled for cycle 10 with an accurate blocker (none).
+- **History-rewrite issue — still blocked, on a different condition.** It genuinely is a new
+  issue (+1), so it genuinely needs §4e budget. Its unblock is now **any realized close**, with no
+  cycle attached — not the #22 sweep.
+
+### #17 re-raised once, as committed — and the rung is spent
+
+The single dated reminder scheduled at cycle 4 for cycle 9 was posted on #17: the tripwire table,
+both ~5-minute exits from `docs/setup/domain-takeover.md`, and an explicit statement that **neither
+reverses the owner's `not-yet`** — neither serves the site on the custom domain, and the switch is
+out of v1 scope per the ratified PRD. No re-ask (the ask is answered). **No further timer on #17.**
+
+### Sweeps
+
+**§4h blocked queue** — `label:blocked -label:needs-human` and `label:waiting -label:needs-human`
+return exactly **{#22, #30}**, unchanged. Neither carries `needs-human`: **no regression.** Both are
+branch (b), both with a named verifiable path — #22 → dev-team step-0 adjudication on resume
+(**revised this cycle**, it is no longer the cycle-10 sweep), #30 → the owner's `DONE private-inbox`.
+
+**Reachability / doability / staleness** — all 8 swept; both sets **empty** (fifth consecutive
+clean). #25/#29/#34 re-read in full: pure repo work, no halt-or-re-ask instruction. #30's cycle-7
+banner verified present with the original body verbatim below it. #1 re-read and cleared — its R5
+line orders `INGEST_SCHEDULE=on` **after** the cutover, and it carries no priority label so it never
+enters a tier search. The find this cycle was on the PO's own closure path, as the last four were.
+
+### Open-count accounting
+
+`gh issue list --state open --json number,labels,assignees` → **8 open, 0 assigned**:
+#1 `tracking` · #17 `p2,blocked,needs-human` · #21 `p3,blocked,needs-human` ·
+#22 `p2,blocked,po-closure-proposed` · #25 `p3` · #29 `p3` · #30 `p2,waiting` · #34 `p3`.
+Workable-by-an-agent today: **0** — not because the backlog is empty (#25/#29/#34 are ready) but
+because the constitution's protocol step 4 halts the whole dev-team routine while #30 waits on the
+owner. closed 0 / proposed 0 / contested 0 this period.
 
 ## Cycle 8 delta (watermark 2026-09-19T13:38Z → 19:38Z): **zero owner movement; the blocked-queue sweep is aimed at the two issues that must never be parked**
 
