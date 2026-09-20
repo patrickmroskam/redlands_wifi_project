@@ -538,3 +538,17 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: (a) a second #30 chase at `low` — rejected as repetition without new information; (b) an ask — rejected, no new decision arose this cycle and `msg_92a6bc9c`/`msg_e812f339` are both answered.
 - watch-next: cycle 12 (~2026-09-20T19:43Z) sends one `low`; next full digest rebuild at cycle 20.
+
+## 2026-09-20T14:05:00Z — owner ruling (interactive session, not a scheduled cycle)
+
+- decision: `OWNER RULING — custom domain deferred to post-v1; #17 dropped p2 → p3` — the owner ruled directly: *"Lets put the custom domain at the end… focus on getting the site completely ready to go and then migrate to the domain later."* They own `redlandswifiproject.com` at Namecheap and will transfer DNS to Cloudflare before any switch. Applied: #17 `p2` → `p3` (`issuecomment-5750877248`), and #1's custom-domain line struck through and marked DEFERRED TO POST-v1. Consistent with the ratified PRD, which already lists the domain switch as Out of Scope (v1), and with the earlier `not-yet` on ask `msg_e812f339`.
+- confidence: high
+- alternatives: (a) leaving #17 at p2 — rejected, cycle 10 held it at p2 only because no owner instruction existed and raising/lowering it unprompted would have been a silent re-escalation; that objection is gone now that the owner has ruled explicitly; (b) closing #17 outright — rejected, the takeover exposure is live and independent of the migration decision.
+- watch-next: **the automated tripwire is NOT deferred** and keeps running every cycle, exempt from both the `needs-human` parking and this ruling; a claimed name still fires `high` immediately. Future cycles must not re-raise #17's priority or re-ask about the domain — the owner has ruled twice (`not-yet`, then this).
+
+## 2026-09-20T14:05:00Z — owner ruling (interactive session)
+
+- decision: `recorded, not acted on: the Cloudflare plan makes "drop the DNS records" the cheap exit` — the Namecheap apex `A` records (185.199.108-111.153) and the `www` CNAME are what create the takeover window; they currently serve only GitHub's "Site not found" 404, and the Cloudflare transfer would re-create DNS from scratch anyway. Deleting them is ~3 min, closes the hole completely, and discards nothing the migration wasn't already going to redo.
+- confidence: medium — the reasoning is sound, but it is the owner's call and they have deferred the whole area; surfaced once, not queued as a chase.
+- alternatives: verifying the domain on the GitHub account — also closes the window and additionally reserves the name, but leaves a TXT record for the Cloudflare move to carry.
+- watch-next: do not re-raise. If the owner asks how to close the window, this is the recommendation.
