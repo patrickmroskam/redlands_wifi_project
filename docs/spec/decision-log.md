@@ -634,3 +634,10 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: none — this is a defect in what the PO was watching. Fourth instrument defect in four cycles (substring-vs-structure, task-prompt copy, secret scope, now channel-vs-state); they share a shape: **the check drifted from the thing it was meant to check.**
 - watch-next: every cycle, check the objective repo/API state for the blocking item *before* concluding from the hub that nothing moved.
+
+## 2026-09-20T19:50:00Z — session product-owner cycle 12 (send record)
+
+- decision: `ONE notify sent — msg_d4fb9496-7a1f-4b40-a3fe-a610b1fa1148 (normal), status delivered` — one message for the cycle, per the constitution's `notify_channel` rule. It leads with the fact that the owner's remaining v1 work is **one** action (the #48 token), states explicitly that `INGEST_SCHEDULE=on` is bot work and not a second owner step, and carries R4.9 as an optional one-line wording ratification.
+- confidence: high
+- alternatives: an `oh-hai ask submit` for R4.9 — rejected; ask `msg_f1c95c95` (#48) is open, unanswered, and is the single thing blocking v1. A second ask competes for the same attention on a non-blocking question dev-team had already described 90 minutes earlier. `docs/spec/readiness.md` is the durable record instead.
+- watch-next: verify this send from the **hub** (`oh-hai messages list --json`) next cycle, never by grepping the repo. `delivered` is not a read receipt. Two asks are now on the record: `msg_f1c95c95` (#48, **open**) and `msg_92a6bc9c` (history rewrite, answered). Do not re-send either.
