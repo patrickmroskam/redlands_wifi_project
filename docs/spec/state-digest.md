@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-20T19:43:59Z
-cycle: 12
-net_open_history: [8, 8, 8, 11]
+last_reconciled_at: 2026-09-21T01:44:00Z
+cycle: 13
+net_open_history: [8, 8, 11, 10]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,97 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 13 delta (watermark 2026-09-20T19:44Z → 2026-09-21T01:44Z): **v1 is code-complete — R5 met, and the last prose-only carry-note became an issue**
+
+The largest six hours in the project's history. **Seven issues closed** — #29 (PR #52), #34
+(PR #56), #41 (PR #58), #53 (PR #54), #59 (PR #60), #61 (PR #62) and **#22** — against **six
+merged PRs**, plus the ingest's own data commit `f81a645`. Open count **11 → 9**, then **10**
+with #63 filed here. `net_open_tripwire_k` is 3; the single rise recorded at cycle 12 is broken.
+
+### R5 is met, and the PO re-derived it rather than accepting the run's own report
+
+`INBOX_TOKEN` authenticates, and the **repository** variable `INGEST_SCHEDULE` is `on`, so the
+`0 10 * * *` cron runs instead of skipping. Run
+[35549848194](https://github.com/patrickmroskam/redlands_wifi_project/actions/runs/35549848194)
+read 8,393 rows from 2 inbox logs and published 3,883 (+2,234 networks → 20,386; +1,649 Bluetooth
+→ 1,649, the Bluetooth map's first data), pushed `f81a645`, deleted the processed logs.
+
+Independently verified this cycle, from the published databases and the API, **not** the job
+summary: **0 / 22,035** records outside the 92373/92374 polygons by point-in-polygon with holes
+subtracted; **0** `_nomap`/`_optout` leaks; **0** duplicate BSSIDs in either database; no
+rssi/altitude/accuracy key on any record and no auth/channel on a Bluetooth record (R4.12, R9.3);
+`INGEST_SCHEDULE=on` confirmed **repository**-scoped at `repos/…/actions/variables`; Pages build
+`db7da55`; live site HTTP 200 serving 20,386 + 1,649 with `updated_at` 2026-09-21T01:07:41Z.
+
+**The unattended path was executed, not assumed.** The inbox now holds only its README, so the
+10:00Z run tomorrow is both the first unattended run and the first empty one. `scripts/ingest.py`
+against an empty directory: `files processed: 0`, exit **0**; `publish_ingest.sh` then takes its
+`nothing changed: no commit` branch (line 125). A quiet night is a green no-op.
+
+### #48: reachable-and-undoable, and the label rule that had to be reversed to park it
+
+With `waiting` removed, #48 became an open **p2** carrying no exclusion label — the top of the
+highest workable tier. The dev-team selects the oldest issue in the highest tier, so it would have
+picked a **finished** issue ahead of the five p3s and found nothing it was permitted to do
+(`launch-blocker` bars any actor from closing it). Parked `needs-human`.
+
+That required reversing a standing rule the PO itself wrote into the dev-team prompt: *"never add
+`needs-human` to #22 or #48."* Its reason was that the label would switch off the resume sweep
+watching for the owner's ask reply. **That reason is spent** — `msg_f1c95c95` is answered and the
+work is done. No machinery is disabled either way: the resume check enumerates `waiting`, and the
+§4h check reads `blocked`/`waiting`; #48 carries neither. Recorded as a reversal, not a silent
+edit, on the issue and in the decision log.
+
+### #63 filed — the committed trigger from cycle 12 fired
+
+The history rewrite had existed only as prose since 2026-09-18 (`po-tasks.md`, `readiness.md`,
+the PRD's *Known consideration* section, the #22 and #30 closure carve-outs). Cycle 12's trigger
+was "file it in the first cycle that realizes a close"; #22 closed at 20:05:34Z. Filed as **#63**,
+`p2` `needs-human`, **post-v1, does not gate the DoD**, and added to #1 under an explicit post-v1
+heading so it cannot be mistaken for burndown.
+
+Grounded in the object store, not asserted: **48** log files, **47 blobs / 4.0 MB**, exactly **2**
+commits touch them (`2aa60b0` added, `cbb849b` deleted), **0 forks**. Caveats recorded rather than
+glossed: 560 clones / 168 uniques in 14 days — *consistent with* this project's own Actions
+checkouts and **not** evidence of third-party copies, and unattributable by GitHub — and
+force-pushed objects staying SHA-reachable until GitHub Support GCs them.
+
+### The dev-team's own prompt had drifted out of true
+
+Found while checking build order. `SKILL.md` still named #40/#44 and p3s #29/#34/#41 as "next
+workable" (all closed), still said `INGEST_SCHEDULE` was unset and the token rejected (both
+false), still carried a paragraph instructing the worker to adjudicate the `po-closure-proposed`
+on #22 (closed), and still described the PRD as R1–R8 (R9 shipped 09-20). A worker reading it
+would have spent a run re-opening a concluded handshake. Rewritten against live state; the ingest
+paths are now flagged as production, since they run unattended against the owner's real data
+nightly. Registered `description` updated to match. **The routine's prompt is PO-maintained
+state and ages like any other — check it every cycle the backlog turns over.**
+
+### Rollups
+
+| | |
+|---|---|
+| Open issues | **10** — #1 (tracking), #17, #21, #42, #45, #48, #50, #55, #57, #63 |
+| Workable (oldest-first, all `p3`) | #42, #45, #50, #55, #57 |
+| Parked | #48, #63 (`needs-human`), #17, #21 (`blocked` + `needs-human`) |
+| Open PRs | **0** |
+| v1 Release Criteria | **10 / 10** |
+| Closure proposals open | **0** |
+| Objections ledger | 1 entry, closed out |
+
+**Four of the five workable issues are latent or near-unreachable on measured evidence** —
+`not wifi: 0` across 8,393 real rows and zero `BT` rows in all 48 historical logs make #50 and #55
+unfireable on any corpus collected so far; #42 is additionally inert while `flock-rules.json` is
+empty; #45 needs a byte-identical `networks.json`, `updated_at` stamp included, pushed by a third
+party mid-run. Only **#57** describes a hazard live today, and it bites tests, not users. None was
+closed: latent is not obsolete, and the constitution bars a low-ROI close without adjudication.
+
+### #17 tripwire — tenth consecutive run, latent
+
+01:40Z: apex **404** with GitHub's own *Site not found · GitHub Pages* body, apex `A` →
+185.199.108/109/110/111.153, `www` CNAME → `patrickmroskam.github.io.`, challenge TXT **absent**.
+Fire condition not met; both rungs spent; nothing re-sent.
 
 ## Cycle 12 delta (watermark 2026-09-20T13:43Z → 19:44Z): **the drought broke — four issues shipped, five residuals filed, and the objection ledger caught its first entry**
 

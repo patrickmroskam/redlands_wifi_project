@@ -641,3 +641,45 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: an `oh-hai ask submit` for R4.9 — rejected; ask `msg_f1c95c95` (#48) is open, unanswered, and is the single thing blocking v1. A second ask competes for the same attention on a non-blocking question dev-team had already described 90 minutes earlier. `docs/spec/readiness.md` is the durable record instead.
 - watch-next: verify this send from the **hub** (`oh-hai messages list --json`) next cycle, never by grepping the repo. `delivered` is not a read receipt. Two asks are now on the record: `msg_f1c95c95` (#48, **open**) and `msg_92a6bc9c` (history rewrite, answered). Do not re-send either.
+
+## 2026-09-21T01:44:00Z — session product-owner cycle 13
+
+- decision: `resume-check: nothing to resume, and nothing re-sent` — no open issue carries `waiting` (the label is absent from the whole open set), and all three OH HAI asks are `answered` (`msg_92a6bc9c`, `msg_e812f339`, `msg_f1c95c95`). Verified from the hub (`oh-hai messages list --json`), never by grepping the repo. The dev-team routine was already `enabled: true`, so no `update_scheduled_task enabled=true` was owed.
+- confidence: high
+- alternatives: re-sending `msg_f1c95c95` because the owner never typed `DONE inbox-token-fix` — rejected outright; the ask is `answered` and the *repo state* proves the owner acted (the token authenticates in two runs). Cycle 12 established that owner action is observable in repo state, not only in the reply channel.
+- watch-next: keep reading both channels. An answered ask plus changed repo state is a completed hand-off even when the resume key never arrives.
+
+## 2026-09-21T01:44:00Z — session product-owner cycle 13
+
+- decision: `R5 verified independently — v1 is code-complete, 10/10` — the run that met R5 reported its own success; the PO re-derived every claim. Point-in-polygon against `redlands-boundary.geojson` with holes subtracted: **0 / 22,035** records outside 92373/92374. **0** `_nomap`/`_optout` leaks, **0** duplicate BSSIDs, no rssi/altitude/accuracy key on any record, no auth/channel on a Bluetooth record. `INGEST_SCHEDULE=on` confirmed **repository**-scoped. Live site HTTP 200 serving 20,386 + 1,649 from Pages build `db7da55`.
+- confidence: high
+- alternatives: accepting the dev-team's summary — rejected; the PO is the checker, and a self-reported green on the project's single remaining criterion is exactly where an independent read is worth its cost.
+- watch-next: **the 10:00Z run on 2026-09-21 is the first unattended run and the first empty-inbox one.** The empty path was executed locally this cycle (`files processed: 0`, exit 0, `nothing changed: no commit`), so it should be a green no-op making no commit. Cycle 15 (~13:38Z) is the first that can see it; confirm conclusion `success` and that no commit landed.
+
+## 2026-09-21T01:44:00Z — session product-owner cycle 13
+
+- decision: `REVERSAL — #48 parked needs-human, against the PO's own standing rule` — the dev-team prompt said *"never add `needs-human` to #22 or #48."* With `waiting` removed, #48 was an open **p2** with no exclusion label, i.e. the top of the highest workable tier, and the dev-team picks the oldest issue in the highest tier. It would have selected a **finished** issue ahead of the five p3s and found nothing it was allowed to do, since `launch-blocker` bars any actor from closing it. Parked, and named in the routine's skip list as well.
+- confidence: high
+- alternatives: (a) leaving it unlabelled and relying on the prompt's skip list alone — rejected, that is one prose line away from a wasted run every hour; (b) removing `launch-blocker` so it could be auto-closed — rejected, that is editing a label to defeat a hard invariant.
+- watch-next: the original rule's reason was that `needs-human` would switch off the resume sweep watching for the owner's ask reply. That reason is **spent** — the ask is answered and the work is done — and no machinery is disabled either way: the resume check enumerates `waiting`, and the §4h check reads `blocked`/`waiting`; #48 carries neither. If a future issue is given `needs-human` while an ask on it is still open, that *is* the old trap and the rule applies again.
+
+## 2026-09-21T01:44:00Z — session product-owner cycle 13
+
+- decision: `filed #63 — the git-history rewrite, after 5 cycles as prose only` — cycle 12's committed trigger was "file it in the first cycle that realizes a close"; #22 closed at 20:05:34Z. Filed `p2` `needs-human`, **post-v1, explicitly not gating the DoD**, and added to #1 under a separate post-v1 heading so it cannot be read as burndown. Grounded in the object store: **48** files, **47 blobs / 4.0 MB**, exactly **2** commits (`2aa60b0`, `cbb849b`), **0 forks**.
+- confidence: high
+- alternatives: (a) carrying it as prose for another cycle — rejected, the budget condition it waited on was met and an untracked owner-authorised item is invisible work; (b) filing it `p1`/`launch-blocker` — rejected, the PRD files it under *Known consideration (not a requirement)*, and inflating it would have gated a release it does not gate; (c) having an agent perform the rewrite under the owner's "Rewrite history" reply — rejected, that is authority for the plan, not for an unattended destructive force-push.
+- watch-next: two caveats are on the issue rather than glossed. **560 clones / 168 uniques in 14 days** is reported *with* the reading that it is consistent with this project's own Actions checkouts and is **not** evidence of third-party copies — GitHub cannot attribute clones, so it must not be presented as if it could. And force-pushed objects stay SHA-reachable on github.com until GitHub Support GCs them, which is part of doing this properly.
+
+## 2026-09-21T01:44:00Z — session product-owner cycle 13
+
+- decision: `rewrote the dev-team routine's prompt — it had drifted out of true` — `SKILL.md` still named #40/#44 and p3s #29/#34/#41 as "next workable" (all closed), still said `INGEST_SCHEDULE` was unset and `INBOX_TOKEN` rejected (both false since 01:08Z), still instructed the worker to adjudicate the `po-closure-proposed` on #22 (closed 20:05Z), and still described the PRD as R1–R8 although R9 shipped on 09-20. Rewritten against live state; the ingest paths flagged as production now that they run unattended nightly; registered `description` updated to match.
+- confidence: high
+- alternatives: leaving it and relying on the worker to re-derive state each run — rejected; the prompt is read *first*, and its most concrete instruction was to re-adjudicate a concluded handshake, which is a whole run spent on nothing.
+- watch-next: **the routine's prompt is PO-maintained state and ages like any other artifact.** Re-read it every cycle in which the backlog turns over, not only when amending a rule. Precedent: `948e281` found the step-4 amendment also living in this file.
+
+## 2026-09-21T01:44:00Z — session product-owner cycle 13
+
+- decision: `no closures proposed; all five workable issues stay p3` — #50 and #55 are provably **latent** (`not wifi: 0` across 8,393 real rows; zero `BT` rows in all 48 historical logs), #42 additionally inert while `flock-rules.json` is empty, #45 near-unreachable (needs a byte-identical `networks.json`, `updated_at` stamp included, pushed by a third party mid-run). Only #57 describes a hazard live today, and it bites tests.
+- confidence: high
+- alternatives: proposing #50/#55/#42 for closure as low-ROI — rejected on the constitution's own terms: latent is not obsolete, and closing on a low-ROI verdict needs dev-team or human adjudication. They are real defects that become live the first time the rig emits a `BT` row or a Flock rule is added.
+- watch-next: **the next convergence question is the opposite of the old one.** Five p3s at an hourly cadence is roughly five more runs of real work; when the workable set empties, whether to keep an hourly worker on a finished project goes to the owner as ONE ask. Deliberately not raised this cycle — the routine merged six PRs in six hours, so it is not idling and the question is not ripe.
