@@ -711,3 +711,24 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: medium
 - alternatives: disabling it on the worker's behalf — rejected: not in the PO's task-file authority, and it would not change behaviour while the stuck session holds the slot.
 - watch-next: next cycle, check `lastRunAt` and `enabled` for the dev-team routine. If the stuck session is still pinned, report it; killing it is the owner's or the watchdog's job.
+
+## 2026-09-21T13:45:00Z — session product-owner cycle 15
+
+- decision: `applied the owner's \`build\` on #65 and took the comment as scope: PRD gains R10 (post-v1)` — ask `msg_7929ff83` resolved `answered`, value `build`, with the comment "Add the filters so it can be toggled on and off for each type of network". On #65, `waiting` and `needs-triage` came off and `p3` went on. R10 was added (kinds, breakdown split, one toggle per kind on the main map, no data or ingest change), and the Out-of-Scope "filtering" line now carves it out. The dev-team routine was re-enabled, and its SKILL.md and description name #65 as the only workable issue.
+- confidence: high on applying `build`. Medium on reading "each type of network" as the kind axis rather than the security categories. That reading was stated on #65 and in the notify so the owner can correct it, and no second ask was sent.
+- alternatives: (a) building #65 with no filter, as the cycle-14 `build` branch said — rejected: the owner's comment explicitly overrides that exclusion, and the owner is the scope authority, so this invents nothing. The R9 precedent is an owner request transcribed into the PRD by the PO. (b) A clarifying ask on "type" — rejected: the context is #65's kind axis, and a wrong guess costs one small follow-up, not a destructive change.
+- watch-next: R10 is post-v1 and does not reopen the v1 DoD. After #65 merges, the workable set empties again. The routine then disables itself under its own rule, and no new routine ask is owed.
+
+## 2026-09-21T13:45:00Z — session product-owner cycle 15
+
+- decision: `the 10:00Z scheduled ingest has not run yet — NOT a fault; verification carried` — at 13:4xZ, `gh run list --workflow ingest.yml` shows no `schedule` run for today. GitHub's own history for this repo shows every earlier scheduled run created **3.7–4.7 h late** (09-17 14:44Z, 09-18 14:10Z, 09-19 13:43Z, 09-20 13:59Z, all `skipped` before `INGEST_SCHEDULE=on`). The variable is still a repository variable, set to `on`, and the workflow is `active`.
+- confidence: high
+- alternatives: a `high` notify for a missed run — rejected: the run is inside its measured delivery window.
+- watch-next: cycle 16 (~19:30Z) must find an `event: schedule` run for 2026-09-21. If none exists by then, 9.5 h late and outside every observed delay, that is a real miss and warrants a `high` notify. A `skipped` conclusion means the variable lost its repository scope, also `high`.
+
+## 2026-09-21T13:45:00Z — session product-owner cycle 15
+
+- decision: `the hung 06:04Z dev-team session still pins the routine; reported, not killed` — `list_task_runs` shows `local_7019ef07…` `running`, last activity 06:10:24Z, 7.5 h silent, with no fire since. The re-enable is correct but inert until that session ends. If its pending `enabled=false` call ever completes, it will undo this cycle's re-enable.
+- confidence: medium
+- alternatives: stopping the session — rejected: the PO task file authorises only `update_scheduled_task`, and a session kill is the owner's call.
+- watch-next: cycle 16 re-reads `enabled` and `lastRunAt`. If `enabled` has flipped to false after the stuck session ends, re-enable once, because the owner's `build` still stands.

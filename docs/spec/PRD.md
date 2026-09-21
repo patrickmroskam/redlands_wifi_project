@@ -124,6 +124,18 @@ struck through below. Mapping only — no stats, breakdown, or per-device pages.
 - R9.7 — THE SYSTEM SHALL link the two device maps, the privacy policy, and the source repository from the footer of every page.
 - R9.8 — THE SYSTEM SHALL disclose in the privacy policy what the Bluetooth map publishes and which observations it deliberately leaves out.
 
+### R10. Network kinds and per-kind map filter (post-v1)
+*Added 2026-09-21 by the owner's answer `build` to OH HAI ask `msg_7929ff83`, with the instruction
+"Add the filters so it can be toggled on and off for each type of network". Issue #65. Post-v1: it
+does not gate the v1 Definition of Done. Main map only; the Bluetooth and Flock maps are unchanged.
+"Type of network" is read as the kind axis below, not the security categories. The owner may
+correct that reading.*
+- R10.1 — THE SYSTEM SHALL classify every plotted network into exactly one kind: `Vehicle`, `Phone / hotspot`, `Wi-Fi Direct / printer`, `Default-looking`, `Hidden` (blank SSID), or `Named` (everything else), from its SSID, in the browser.
+- R10.2 — THE SYSTEM SHALL show the kind split in the breakdown under the map, with counts and shares that sum to the plotted total.
+- R10.3 — THE SYSTEM SHALL offer one on/off toggle per kind on the main map, all on by default. WHEN a kind is toggled off, THE SYSTEM SHALL hide that kind's markers, and WHEN it is toggled back on, THE SYSTEM SHALL show them again. The breakdown keeps describing the whole database.
+- R10.4 — THE SYSTEM SHALL keep each kind's SSID patterns in one list, with a comment per pattern, and SHALL unit-test them against real SSID shapes, both hits and near-misses.
+- R10.5 — THE SYSTEM SHALL NOT change `data/*.json`, its published fields, or the ingest to support R10.
+
 ## Release Criteria (v1 Definition of Done)
 - [x] R1 — one page, HTML/CSS banner, retro theme, responsive, privacy link
 - [x] R2 — map shows every network from the database, fenced to 92373/92374, popups + legend + stats
@@ -141,7 +153,7 @@ struck through below. Mapping only — no stats, breakdown, or per-device pages.
 - Any area outside ZIP codes 92373 and 92374
 - ~~Bluetooth / BLE / cell records (WIFI only)~~ — **superseded 2026-09-20 by owner request: see R9.** Cell (GSM/LTE) records remain out of scope.
 - Updating an existing record when re-observed (signal trails, last-seen, RSSI heatmaps)
-- Search, filtering, or per-network detail pages
+- Search, filtering, or per-network detail pages — **except the per-kind map toggles, added post-v1 by owner request on 2026-09-21: see R10.**
 - Custom domain, CDN, or any hosting other than GitHub Pages
 - Removing rows from the database automatically on takedown (handled by a human via issue → PR)
 

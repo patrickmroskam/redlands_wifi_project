@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-21T07:44:00Z
-cycle: 14
-net_open_history: [8, 11, 10, 5]
+last_reconciled_at: 2026-09-21T13:45:00Z
+cycle: 15
+net_open_history: [8, 11, 10, 5, 5]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,15 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 15 delta (watermark 2026-09-21T07:44Z → 13:45Z): **the owner said `build`, so #65 is the workable set**
+
+**No issue opened, closed or reopened.** Open count holds at **5**: #1 (tracking), #17, #21, #63 (`needs-human`) and #65, which is now `p3`.
+
+- **Ask `msg_7929ff83` answered `build`,** with the comment "Add the filters so it can be toggled on and off for each type of network". #65 lost `waiting` and `needs-triage` and gained `p3`. **PRD R10** (post-v1) was added: kinds, a breakdown split, and a per-kind toggle on the main map, with no data or ingest change. The dev-team routine was re-enabled with a rewritten brief.
+- **Dev-team slot is still pinned** by the hung 06:04Z session (`running`, silent since 06:10:24Z), so no fire since. Reported to the owner; the PO did not kill it.
+- **Scheduled ingest:** no `schedule` run yet today at 13:4xZ. That is inside this repo's measured GitHub delay: every earlier scheduled run was created at 13:43–14:44Z for a 10:00Z cron. `INGEST_SCHEDULE=on` is a repository variable and the workflow is `active`. Cycle 16 verifies.
+- **#17 tripwire, twelfth consecutive run:** latent. 404, apex `A` 185.199.108–111.153, `www` CNAME `patrickmroskam.github.io.`, no challenge TXT.
 
 ## Cycle 14 delta (watermark 2026-09-21T01:44Z → 07:44Z): **the backlog is empty — the one remaining question is the owner's**
 
