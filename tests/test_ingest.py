@@ -3,6 +3,7 @@
 Every test runs the pipeline inside a temporary directory built from
 tests/fixtures/. Tests never read from or write to the real ingest/ folder.
 """
+import argparse
 import importlib.util
 import io
 import json
@@ -756,10 +757,26 @@ class RemoveNetwork(PipelineCase):
         return {"bssid": bssid, "ssid": ssid, "auth": "[WPA2_PSK]", "channel": 6,
                 "first_seen": "2025-03-21 23:08:20", "lat": 34.0556, "lon": -117.1825}
 
+    def db_paths(self):
+        """Every database the ingest publishes to, keyed as ingest.RECORD_KEY keys them."""
+        return {"networks": self.db, "bluetooth": self.ble_db, ingest.FLOCK: self.flock_db}
+
+    def write_dataset(self, dataset, records):
+        """Seed one dataset's database directly, whatever JSON key it uses."""
+        with open(self.db_paths()[dataset], "w", encoding="utf-8") as fh:
+            json.dump({"updated_at": "2026-09-16T00:00:00Z", "count": len(records),
+                       ingest.RECORD_KEY[dataset]: records}, fh, indent=2)
+            fh.write("\n")
+
+    def read_dataset(self, dataset):
+        with open(self.db_paths()[dataset], encoding="utf-8") as fh:
+            return json.load(fh)
+
     def remove(self, *args):
         out = io.StringIO()
         with redirect_stdout(out):
-            code = remove_network.main([*args, "--db", self.db, "--denylist", self.denylist])
+            code = remove_network.main([*args, "--db", self.db, "--denylist", self.denylist,
+                                        "--ble-db", self.ble_db, "--flock-db", self.flock_db])
         return code, out.getvalue()
 
     def read_denylist(self):
@@ -768,7 +785,7 @@ class RemoveNetwork(PipelineCase):
 
     def snapshot(self):
         result = []
-        for path in (self.db, self.denylist):
+        for path in (self.db, self.ble_db, self.flock_db, self.denylist):
             with open(path, "rb") as fh:
                 result.append(fh.read())
         return result
@@ -829,16 +846,16 @@ class RemoveNetwork(PipelineCase):
 
     def test_failed_database_write_is_reported_and_a_re_run_finishes_the_job(self):
         self.write_db([self.net("aa:bb:cc:00:00:77")])
-        real_save = remove_network.ingest.save_db
+        real_stage = remove_network.ingest.stage_db
 
         def boom(*_a, **_k):
             raise OSError("disk full")
 
-        remove_network.ingest.save_db = boom
+        remove_network.ingest.stage_db = boom
         try:
             code, out = self.remove("--issue", "46", "aa:bb:cc:00:00:77")
         finally:
-            remove_network.ingest.save_db = real_save
+            remove_network.ingest.stage_db = real_stage
         self.assertEqual(code, 2, out)
         self.assertIn("re-run this command", out)
         self.assertNotIn("nothing was written", out)
@@ -852,6 +869,93 @@ class RemoveNetwork(PipelineCase):
         self.assertEqual(self.read_db()["count"], 0)
         self.assertEqual(len(self.read_denylist()), 1)
         self.assertEqual(self.run_pipeline()[0], 0)
+
+    def test_removal_covers_every_database_the_ingest_checks(self):
+        """#59: a removal honoured in one database only leaves the device published in
+        the others, and then check_data() stops every later run on it."""
+        for dataset in ingest.RECORD_KEY:
+            with self.subTest(dataset=dataset):
+                bssid = "c1:00:00:00:00:01"
+                self.write_dataset(dataset, [self.net(bssid, ssid="Dual radio")])
+                code, out = self.remove("--issue", "59", bssid)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.read_dataset(dataset)[ingest.RECORD_KEY[dataset]], [])
+                self.assertEqual(self.read_dataset(dataset)["count"], 0)
+                self.assertNotIn("no matching record", out)
+                # The gate that used to wedge here now has nothing to complain about.
+                self.assertEqual(self.run_pipeline()[0], 0, out)
+                self.write_denylist([])
+
+    def test_one_removal_clears_the_same_address_from_every_database_at_once(self):
+        """A dual-radio device answering on one address is in two databases (see
+        test_wifi_and_bluetooth_may_share_a_bssid_without_colliding); one run clears both."""
+        bssid = "c1:00:00:00:00:02"
+        self.write_db([self.net(bssid), self.net("aa:bb:cc:00:00:99")])
+        self.write_dataset("bluetooth", [self.net(bssid, ssid="BLE side")])
+        self.write_dataset(ingest.FLOCK, [self.net(bssid, ssid="Flock side")])
+        code, out = self.remove("--issue", "59", "C1-00-00-00-00-02")
+        self.assertEqual(code, 0, out)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]], ["aa:bb:cc:00:00:99"])
+        self.assertEqual(self.read_ble()["devices"], [])
+        self.assertEqual(self.read_flock()["devices"], [])
+        self.assertEqual(self.run_pipeline()[0], 0)
+
+    def test_a_write_failure_part_way_through_names_the_databases_it_changed(self):
+        """Three renames are not one atomic step: say which ones landed."""
+        bssid = "c1:00:00:00:00:03"
+        self.write_db([self.net(bssid)])
+        self.write_dataset("bluetooth", [self.net(bssid)])
+        real_commit = remove_network.ingest.commit_db
+        calls = []
+
+        def boom(staged):
+            calls.append(staged[1])
+            if len(calls) == 1:
+                return real_commit(staged)
+            raise OSError("disk full")
+
+        remove_network.ingest.commit_db = boom
+        try:
+            code, out = self.remove("--issue", "59", bssid)
+        finally:
+            remove_network.ingest.commit_db = real_commit
+        self.assertEqual(code, 2, out)
+        self.assertIn(os.path.basename(calls[0]), out)   # the one that did land
+        self.assertIn(os.path.basename(calls[1]), out)   # the one that did not
+        self.assertIn("re-run this command", out)
+        self.assertNotIn("nothing was written", out)
+        self.assertEqual(self.run_pipeline()[0], 2)      # wedged until the re-run
+        code, out = self.remove("--issue", "59", bssid)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.run_pipeline()[0], 0)
+        # No staged temp file is left in data/ for the publish step to commit.
+        self.assertEqual([f for f in os.listdir(self.tmp) if f.startswith(".")], [])
+
+    def test_a_missing_secondary_database_is_refused_before_anything_is_written(self):
+        self.write_db([self.net("aa:bb:cc:00:00:78")])
+        os.remove(self.ble_db)
+        before = [self.read_db(), self.read_denylist()]
+        code, out = self.remove("--issue", "47", "aa:bb:cc:00:00:78")
+        self.assertEqual(code, 2, out)
+        self.assertIn("does not exist", out)
+        self.assertIn("nothing was written", out)
+        self.assertEqual([self.read_db(), self.read_denylist()], before)
+
+    def test_paths_outside_the_working_directory_are_printed_as_given(self):
+        self.write_db([self.net("aa:bb:cc:00:00:79")])
+        code, out = self.remove("--issue", "48", "aa:bb:cc:00:00:79")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("..", out)
+        self.assertIn(self.db, out)
+
+    def test_remove_network_and_the_ingest_gate_cover_the_same_databases(self):
+        """The silent half of #59: check_data() scans every dataset in RECORD_KEY and
+        treats a leftover as fatal, so remove_network must delete from all of them.
+        Adding a dataset to the pipeline without teaching this tool fails here."""
+        args = argparse.Namespace(db="a.json", ble_db="b.json", flock_db="c.json")
+        self.assertEqual(set(remove_network.db_paths_from_args(args)),
+                         set(ingest.RECORD_KEY))
+        self.assertEqual(set(self.db_paths()), set(ingest.RECORD_KEY))
 
     def test_refuses_a_broken_denylist(self):
         self.write_db([self.net("aa:bb:cc:00:00:75")])
@@ -874,10 +978,16 @@ class CommittedDatabase(unittest.TestCase):
         self.assertEqual(db["count"], len(db["networks"]))
 
     def test_committed_denylist_is_valid_and_no_removed_network_is_published(self):
-        db_path = os.path.join(REPO, "data", "networks.json")
-        stored = ingest.stored_bssids(ingest.load_db(db_path), db_path)
         removed = ingest.load_denylist(os.path.join(REPO, "data", "removed.json"))
-        self.assertEqual(sorted(stored & removed), [])
+        # Every published database, not just the map: a leftover in any of them is the
+        # half-done removal check_data() refuses to run on (#59).
+        for dataset, name in (("networks", "networks.json"), ("bluetooth", "bluetooth.json"),
+                              (ingest.FLOCK, "flock.json")):
+            with self.subTest(dataset=dataset):
+                path = os.path.join(REPO, "data", name)
+                key = ingest.RECORD_KEY[dataset]
+                stored = ingest.stored_bssids(ingest.load_db(path, key), path, key)
+                self.assertEqual(sorted(stored & removed), [])
 
 
 class FieldNormalisation(unittest.TestCase):
