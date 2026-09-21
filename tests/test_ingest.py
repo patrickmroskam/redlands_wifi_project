@@ -1460,6 +1460,84 @@ class BluetoothDatabase(PipelineCase):
         self.assertEqual(self.read_ble()["devices"], [], out)
         self.assertEqual(self.read_db()["networks"], [], out)
 
+    # --- a classic-Bluetooth (Type=BT) row's opt-out (#50) ------------------------
+    # BT rows are never published, but they carry a real MAC and the device's own name,
+    # so an opt-out on one must still withhold that address everywhere.
+    BT_ADDR = "c1:00:00:00:00:09"
+
+    @staticmethod
+    def bt_row(mac, name=""):
+        return row(mac, ssid=name, auth="[BT]", channel="0", typ="BT")
+
+    def test_an_opt_out_on_a_bt_row_withholds_the_ble_record(self):
+        for order in (lambda a, b: a + b, lambda a, b: b + a):
+            with self.subTest():
+                self.write_ble([])
+                self.put("a.log", HEADER + order(
+                    self.bt_row(self.BT_ADDR, name="Speaker_nomap"),
+                    ble_row(self.BT_ADDR, name="Speaker")))
+                code, out = self.run_pipeline()
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.read_ble()["devices"], [], out)
+                # The BT row keeps its own reason; the withheld BLE row is the opt-out.
+                self.assertIn("not wifi:        1", out)
+                self.assertIn("opt-out:         1", out)
+
+    def test_an_opt_out_on_a_bt_row_withholds_the_wifi_record(self):
+        self.put("a.log", HEADER + self.bt_row(self.BT_ADDR, name="Speaker_OPTOUT")
+                 + row(self.BT_ADDR, ssid="Speaker"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_db()["networks"], [], out)
+
+    def test_a_bt_opt_out_in_another_file_of_the_batch_still_wins(self):
+        self.put("wardrive_1.log", HEADER + ble_row(self.BT_ADDR, name="Speaker"))
+        self.put("wardrive_2.log", HEADER + self.bt_row(self.BT_ADDR, name="Speaker_nomap"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_ble()["devices"], [], out)
+
+    def test_an_unreadable_bt_name_withholds_the_address(self):
+        line = self.bt_row(self.BT_ADDR, name="@NAME@").encode("utf-8").replace(
+            b"@NAME@", b"Speaker_nomap\xa5")
+        self.put("a.log", data=HEADER.encode("utf-8") + line
+                 + ble_row(self.BT_ADDR, name="Speaker").encode("utf-8"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.read_ble()["devices"], [], out)
+
+    def test_a_bt_opt_out_of_a_published_device_is_flagged_for_removal(self):
+        self.write_ble([{"bssid": self.BT_ADDR, "name": "Speaker",
+                         "first_seen": "2026-09-19 23:32:05", "lat": 34.05, "lon": -117.18}])
+        self.put("a.log", HEADER + self.bt_row(self.BT_ADDR.upper(), name="Speaker_nomap"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("already published but now opted out", out)
+        self.assertIn(self.BT_ADDR, out)
+
+    def test_a_bt_row_without_a_suffix_withholds_nothing(self):
+        self.put("a.log", HEADER + self.bt_row(self.BT_ADDR, name="Speaker")
+                 + ble_row(self.BT_ADDR, name="Speaker"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertEqual([d["bssid"] for d in self.read_ble()["devices"]], [self.BT_ADDR])
+        self.assertIn("not wifi:        1", out)
+        self.assertIn("opt-out:         0", out)
+
+    def test_cell_rows_with_opt_out_names_register_nothing(self):
+        # A tower id is not a MAC: it must never be normalized into an address.
+        self.put("a.log", HEADER + row("310260_7_1234", ssid="Carrier_nomap", typ="LTE")
+                 + row("310-410-1234", ssid="Carrier_nomap", typ="GSM")
+                 + row("21:00:00:00:00:09"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0, out)
+        self.assertIn("not wifi:        2", out)
+        self.assertIn("malformed:       0", out)
+        self.assertIn("opt-out:         0", out)
+        self.assertNotIn("already published but now opted out", out)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["21:00:00:00:00:09"])
+
     def test_same_device_is_never_added_twice_across_runs(self):
         self.put("a.log", HEADER + ble_row(STATIC_RANDOM))
         self.run_pipeline()

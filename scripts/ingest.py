@@ -618,6 +618,19 @@ def build_record(shape, row, ssid, bssid, lat, lon, matched_by=None):
     return record
 
 
+def withholds(ssid):
+    """Why this SSID keeps its address off every map, or None if it does not.
+
+    "unreadable_ssid" when it holds a byte we could not decode (its opt-out cannot be
+    verified), "opt_out" when it ends with an opt-out suffix. classify() and run() share
+    this so a row that is never published (a Type=BT row) is read by the same test."""
+    if REPLACEMENT in ssid:
+        return "unreadable_ssid"
+    if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
+        return "opt_out"
+    return None
+
+
 def classify(row, fence, known, removed=frozenset(), flock=None):
     """Route one row to the databases it belongs in.
 
@@ -637,9 +650,13 @@ def classify(row, fence, known, removed=frozenset(), flock=None):
     if is_malformed(row):
         return "malformed", [], None, ()
     dataset = PUBLISHED_TYPES.get(row["Type"].strip().upper())
-    if dataset is None:
-        return "not_wifi", [], None, ()
     bssid = normalize_bssid(row["MAC"])
+    if dataset is None:
+        # Unpublished, but not necessarily addressless: a classic-Bluetooth (Type=BT) row
+        # carries a real MAC and the device's own name, so the caller still reads its
+        # opt-out (#50). A cell row's column holds a tower id, which normalizes to None,
+        # so it never registers anything.
+        return "not_wifi", [], bssid, ()
     # A removal request outranks everything, including the opt-out: the address is
     # already off the map for good, and reporting it as an opt-out would list it under
     # "already published but now opted out" and send the operator after a removal that
@@ -666,10 +683,9 @@ def classify(row, fence, known, removed=frozenset(), flock=None):
     # the opt-out for the reason given below: the caller registers it batch-wide, so a
     # branch that returns first loses it. A genuine U+FFFD in an SSID is withheld too —
     # rare, and the safe direction.
-    if REPLACEMENT in ssid:
-        return "unreadable_ssid", [], bssid, ()
-    if ssid.strip().lower().endswith(OPT_OUT_SUFFIXES):
-        return "opt_out", [], bssid, ()
+    withheld = withholds(ssid)
+    if withheld:
+        return withheld, [], bssid, ()
     if dataset == "bluetooth" and not ble_address_is_stable(bssid):
         return "ble_private", [], bssid, ()
     lat = parse_coord(row["CurrentLatitude"])
@@ -785,7 +801,12 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
                 # "we must not publish this address" — a verified opt-out, or an SSID
                 # we could not read well enough to rule one out. Both withhold every
                 # other row for the same address in this batch (R4.5, R9.6).
-                if reason in ("opt_out", "unreadable_ssid"):
+                # A not_wifi row is never published, but a Type=BT row names a real
+                # device and its opt-out holds for that address everywhere (#50). Its
+                # drop reason stays not_wifi; bssid is None for a cell row's tower id.
+                if reason in ("opt_out", "unreadable_ssid") or (
+                        reason == "not_wifi" and bssid is not None
+                        and withholds(row["SSID"])):
                     opted_out.add(bssid)
                     if bssid in stored_any and bssid not in summary["opted_out_but_published"]:
                         summary["opted_out_but_published"].append(bssid)
