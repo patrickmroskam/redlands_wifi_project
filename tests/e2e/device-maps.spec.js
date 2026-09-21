@@ -7,14 +7,14 @@ const path = require('path');
 const { installHooks } = require('./helpers');
 
 const FIXTURE_BLE = path.join(__dirname, '..', 'fixtures', 'bluetooth-3.json');
-const FIXTURE_FLOCK = path.join(__dirname, '..', 'fixtures', 'flock-2.json');
+const FIXTURE_FLOCK = path.join(__dirname, '..', 'fixtures', 'flock-3.json');
 const EMPTY_DB = JSON.stringify({ updated_at: null, count: 0, devices: [] });
 
 const PAGES = [
   { name: 'bluetooth', url: '/bluetooth.html', db: '**/data/bluetooth.json',
     fixture: FIXTURE_BLE, count: 3, kind: 'device', noun: 'device' },
   { name: 'flock', url: '/flock.html', db: '**/data/flock.json',
-    fixture: FIXTURE_FLOCK, count: 2, kind: 'camera', noun: 'camera' },
+    fixture: FIXTURE_FLOCK, count: 3, kind: 'camera', noun: 'camera' },
 ];
 
 installHooks();
@@ -123,10 +123,39 @@ test('a camera popup names the rule that matched it', async ({ page }) => {
   await page.route('**/data/flock.json', (route) =>
     route.fulfill({ path: FIXTURE_FLOCK, contentType: 'application/json' }));
   await page.goto('/flock.html');
-  await expect.poll(() => markerCount(page)).toBe(2);
+  await expect.poll(() => markerCount(page)).toBe(3);
   await page.evaluate(() => window.__rwp.markers[0].openPopup());
   await expect(page.locator('.net-popup')).toContainText('Matched by');
   await expect(page.locator('.net-popup')).toContainText('oui:a4:da:22');
+});
+
+test('a camera heard over Bluetooth reads as a Bluetooth device, not a WiFi network', async ({ page }) => {
+  // R9.3: a BLE-sourced camera has a name, not an SSID, and never auth or channel (#42).
+  await page.route('**/data/flock.json', (route) =>
+    route.fulfill({ path: FIXTURE_FLOCK, contentType: 'application/json' }));
+  await page.goto('/flock.html');
+  await expect.poll(() => markerCount(page)).toBe(3);
+  await page.evaluate(() => window.__rwp.markers[2].openPopup());
+  await expect(page.locator('.net-popup .ssid')).toHaveText('FlockCam');
+  await expect(page.locator('.net-popup')).toContainText('Name');
+  await expect(page.locator('.net-popup')).toContainText('c1:00:00:00:00:01');
+  await expect(page.locator('.net-popup')).toContainText('oui:c1:00:00');
+  await expect(page.locator('.net-popup')).not.toContainText('SSID');
+  await expect(page.locator('.net-popup')).not.toContainText('Auth');
+  await expect(page.locator('.net-popup')).not.toContainText('Channel');
+});
+
+test('a nameless Bluetooth camera reads as unnamed, not hidden', async ({ page }) => {
+  // Most BLE devices advertise no name; "hidden" is WiFi's word for an empty SSID.
+  const db = JSON.stringify({ updated_at: '2026-09-20T12:00:00Z', count: 1, devices: [
+    { bssid: 'c1:00:00:00:00:02', name: '', first_seen: '2026-09-19 23:43:00',
+      lat: 34.0556, lon: -117.1825, matched_by: 'oui:c1:00:00' }] });
+  await page.route('**/data/flock.json', (route) =>
+    route.fulfill({ body: db, contentType: 'application/json' }));
+  await page.goto('/flock.html');
+  await expect.poll(() => markerCount(page)).toBe(1);
+  await page.evaluate(() => window.__rwp.markers[0].openPopup());
+  await expect(page.locator('.net-popup .ssid')).toHaveText('unnamed');
 });
 
 test('the WiFi map still reads the WiFi database and keeps its own colours', async ({ page }) => {

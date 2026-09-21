@@ -1527,6 +1527,30 @@ class FlockDatabase(PipelineCase):
         self.assertEqual(self.read_ble()["count"], 1)
         self.assertEqual(self.read_flock()["count"], 1)
 
+    def test_a_ble_camera_keeps_the_ble_record_shape(self):
+        # R9.3 bars auth mode and channel from every published BLE device, including
+        # the Flock copy: the shape follows the row's Type, not the destination (#42).
+        self.write_flock_rules(oui_prefixes=["c1:00:00"])
+        self.put("a.log", HEADER + ble_row(STATIC_RANDOM, name="cam"))
+        code, _ = self.run_pipeline()
+        self.assertEqual(code, 0)
+        camera = self.read_flock()["devices"][0]
+        self.assertEqual(sorted(camera), ["bssid", "first_seen", "lat", "lon", "matched_by", "name"])
+        self.assertEqual(camera["name"], "cam")
+        self.assertEqual(camera["matched_by"], "oui:c1:00:00")
+        # The Bluetooth map's copy is the plain BLE record: matched_by is Flock-only.
+        device = self.read_ble()["devices"][0]
+        self.assertEqual(sorted(device), ["bssid", "first_seen", "lat", "lon", "name"])
+
+    def test_a_wifi_camera_keeps_the_wifi_record_shape(self):
+        self.write_flock_rules(ssid_patterns=["flock"])
+        self.put("a.log", HEADER + row("35:00:00:00:00:01", ssid="Flock 5"))
+        self.run_pipeline()
+        camera = self.read_flock()["devices"][0]
+        self.assertEqual(sorted(camera), ["auth", "bssid", "channel", "first_seen", "lat", "lon",
+                                          "matched_by", "ssid"])
+        self.assertNotIn("matched_by", self.read_db()["networks"][0])
+
     def test_a_rotating_ble_address_is_never_a_camera(self):
         # The privacy filter runs before the flock rules: a rule cannot re-admit a
         # rotating address by matching its prefix.
