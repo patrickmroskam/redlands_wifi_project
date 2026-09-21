@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-21T01:44:00Z
-cycle: 13
-net_open_history: [8, 8, 11, 10]
+last_reconciled_at: 2026-09-21T07:44:00Z
+cycle: 14
+net_open_history: [8, 11, 10, 5]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,30 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 14 delta (watermark 2026-09-21T01:44Z → 07:44Z): **the backlog is empty — the one remaining question is the owner's**
+
+**Six issues closed and none reopened.** #48 was closed at 01:53Z on the owner's chat instruction. The dev-team then shipped every leftover `p3`: #42 (PR #64 `c6a19be`), #45 (PR #66 `dcc736d`), #50 (PR #67 `f6645e0`), #55 (PR #68 `5147435`) and #57 (PR #69 `c4783f3`, merged 06:10Z, CI green). One issue was filed: #65, by the owner's request via dev-team at 02:43Z. Open count went **10 → 5**: #1 (tracking), #17, #21, #63 (all `needs-human`) and #65.
+
+### Workable set: empty
+
+No open issue carries p0–p3 without `needs-human`/`blocked`/`waiting`. That fires the committed trigger carried since cycle 13: take the post-v1 routine question to the owner as **one** ask.
+
+### #65 triaged to the owner, not to dev-team
+
+#65 (stats "kind" split: Vehicle / Phone-hotspot / Wi-Fi Direct / Default-looking / Named) is well specified, but it is **outside the ratified PRD**. It gets no priority label and is labelled `waiting` on OH HAI ask `msg_7929ff83-3b6c-4eef-b80b-18f0faa26190` (select `build`/`stop`, key `redlands-po-D14-post-v1-issue-65`). This one ask also carries the routine question, so a single decision covers both.
+
+### The dev-team routine is standing down on its own rule, and the session that did it hung
+
+The 06:04Z dev-team session merged #57, found no remaining workable issue, and called `update_scheduled_task enabled=false`, which is its task file's owner-ruled rule. That call never returned. The session has shown `running` since 06:10:24Z. The routine still reports `enabled: true`, but the live session blocks new fires, so 07:04Z did not run. It also skipped its notify and its #1 reconcile; the PO ticked #57 on #1 this cycle. **The PO did not complete the disable.** Its task file only authorises re-enabling. The worker's next run applies the rule again, and the stuck session is the memory watchdog's to count.
+
+### #17 tripwire, eleventh consecutive run: latent
+
+The apex returns 404 with GitHub's *Site not found* page. The apex `A` records are still 185.199.108–111.153. The `www` CNAME is still `patrickmroskam.github.io.` and the challenge TXT is still absent.
+
+### Ingest
+
+Unchanged since the R5 run. The first unattended scheduled run is 10:00Z today; the next PO cycle verifies it against the data.
 
 ## Cycle 13 delta (watermark 2026-09-20T19:44Z → 2026-09-21T01:44Z): **v1 is code-complete — R5 met, and the last prose-only carry-note became an issue**
 

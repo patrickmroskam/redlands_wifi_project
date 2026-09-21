@@ -690,3 +690,24 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: (a) `normal` or `high` — rejected, the dev-team's own notify carried the same single action (close #48) **30 minutes earlier**, at 01:14:34Z; two escalated messages half an hour apart about one click is a drip, and this one opens by saying it is not a new request; (b) opening an ask for the post-v1 routine decision — rejected, not ripe: the routine merged six PRs in the preceding six hours and five workable p3s remain, so there is no idle problem to rule on yet. It has a committed trigger in `po-tasks.md` (first cycle whose workable set is empty) and fires as ONE ask then; (c) an ask for R4.9's ratification — rejected, nothing is blocked on it and it folds into that later ask rather than consuming a queue slot alone.
 - watch-next: three asks in this project's history are all `answered`, so the queue is empty — the next ask is unopposed whenever it is warranted. **Do not spend that slot on a status question.** The sibling projects show the cost of the other failure mode: dealer-step-2.0 sent 23 consecutive no-work notifies before anyone paused it.
+
+## 2026-09-21T07:44:00Z — session product-owner cycle 14
+
+- decision: `triage #65 → owner (waiting), not dev-team` — the stats "kind" axis is outside the ratified PRD; the PRD lists filtering as out of scope for v1. No priority label was added; `waiting` was added and linked to ask `msg_7929ff83`.
+- confidence: high
+- alternatives: (a) labelling it `p3` because the owner asked for it in chat — rejected: the issue itself says "proposed shape, not decided", and the task file bars inventing scope; (b) closing it as post-v1 — rejected: it is a live owner request, not obsolete.
+- watch-next: resume check. `build` → remove `waiting`+`needs-triage`, add `p3`, re-enable `autonomy-dev-team-redlands-wifi-project`, and rewrite its SKILL.md workable set to #65. `stop` → remove `waiting`, add `needs-human`, and leave dev-team as-is.
+
+## 2026-09-21T07:44:00Z — session product-owner cycle 14
+
+- decision: `fired the committed post-v1 routine trigger as ONE ask, merged with #65` — the workable set emptied at 06:10Z. One select ask was sent (`msg_7929ff83-3b6c-4eef-b80b-18f0faa26190`, 07:4xZ, status `open`, idempotency key `redlands-po-D14-post-v1-issue-65`). It is in place of this cycle's notify, so exactly one message was sent. R4.9 was mentioned as no-reply-needed.
+- confidence: high
+- alternatives: two messages (a routine ask plus a #65 ask) — rejected: the decisions are coupled, because building #65 is the only reason to keep the worker on.
+- watch-next: never re-send while open. Do not drip notifies at an idle project.
+
+## 2026-09-21T07:44:00Z — session product-owner cycle 14
+
+- decision: `did NOT complete the hung dev-team's self-disable` — the 06:04Z session hung inside `update_scheduled_task enabled=false`. The routine still reads `enabled: true`, but the stuck session blocks new fires. The PO task file authorises only re-enabling, so the PO did not disable it. The dev-team SKILL.md was rewritten: workable set EMPTY, #65 skip-until-`p3`, #48 bullet removed. #57 was ticked on #1, the reconcile the hung session skipped.
+- confidence: medium
+- alternatives: disabling it on the worker's behalf — rejected: not in the PO's task-file authority, and it would not change behaviour while the stuck session holds the slot.
+- watch-next: next cycle, check `lastRunAt` and `enabled` for the dev-team routine. If the stuck session is still pinned, report it; killing it is the owner's or the watchdog's job.
