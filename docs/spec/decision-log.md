@@ -732,3 +732,10 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: medium
 - alternatives: stopping the session — rejected: the PO task file authorises only `update_scheduled_task`, and a session kill is the owner's call.
 - watch-next: cycle 16 re-reads `enabled` and `lastRunAt`. If `enabled` has flipped to false after the stuck session ends, re-enable once, because the owner's `build` still stands.
+
+## 2026-09-21T13:50:00Z — session product-owner cycle 15 (send record)
+
+- decision: `ONE notify sent, at normal; no ask opened` — `msg_902ea013-9f04-4af8-a41c-a060e1fd20b6`, `delivered`. It carries: build applied (R10), dev-team re-enabled, ONE owner action (stop the hung session `local_7019ef07`), an invitation to correct the "type" reading, and the ingest-delay FYI.
+- confidence: high
+- alternatives: `high` — rejected: nothing is at risk, only a delay. An ask — rejected: stopping a session is an action, not a decision.
+- watch-next: do not repeat the stop-session request next cycle if the slot has cleared. If it is still pinned, mention it once more at `low`.
