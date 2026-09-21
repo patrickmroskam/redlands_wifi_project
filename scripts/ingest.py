@@ -585,29 +585,35 @@ def is_malformed(row):
     return normalize_bssid(row["MAC"]) is None
 
 
-def build_record(dataset, row, ssid, bssid, lat, lon, matched_by):
-    """The published fields for one row. Never RSSI, altitude or accuracy (R4.12)."""
-    if dataset == "bluetooth":
+def build_record(shape, row, ssid, bssid, lat, lon, matched_by=None):
+    """The published fields for one row. Never RSSI, altitude or accuracy (R4.12).
+
+    `shape` is the dataset the row's own Type selects, NOT the database the record is
+    going to: a Flock copy of a BLE row is still a BLE device, and R9.3 bars auth mode and
+    channel from every published BLE device, wherever it is published. `matched_by` is
+    given only for the Flock copy, and is the one field that copy adds."""
+    if shape == "bluetooth":
         # A BLE row's AuthMode is the constant "[BLE]" and its Channel is always 0, so
         # neither is published. The SSID column carries the advertised device name,
         # which is usually empty.
-        return {
+        record = {
             "bssid": bssid,
             "name": ssid,
             "first_seen": normalize_first_seen(row["FirstSeen"]),
             "lat": lat,
             "lon": lon,
         }
-    record = {
-        "bssid": bssid,
-        "ssid": ssid,
-        "auth": row["AuthMode"].strip(),
-        "channel": parse_channel(row["Channel"]),
-        "first_seen": normalize_first_seen(row["FirstSeen"]),
-        "lat": lat,
-        "lon": lon,
-    }
-    if dataset == FLOCK:
+    else:
+        record = {
+            "bssid": bssid,
+            "ssid": ssid,
+            "auth": row["AuthMode"].strip(),
+            "channel": parse_channel(row["Channel"]),
+            "first_seen": normalize_first_seen(row["FirstSeen"]),
+            "lat": lat,
+            "lon": lon,
+        }
+    if matched_by is not None:
         record["matched_by"] = matched_by
     return record
 
@@ -674,7 +680,8 @@ def classify(row, fence, known, removed=frozenset(), flock=None):
         return "outside_area", [], bssid, ()
     matched_by = flock.match(row, bssid) if flock else None
     targets = [dataset] + ([FLOCK] if matched_by else [])
-    entries = [(name, build_record(name, row, ssid, bssid, lat, lon, matched_by))
+    entries = [(name, build_record(dataset, row, ssid, bssid, lat, lon,
+                                   matched_by if name == FLOCK else None))
                for name in targets if bssid not in known[name]]
     if not entries:
         return "duplicate", [], bssid, targets

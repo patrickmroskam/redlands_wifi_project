@@ -1,0 +1,9 @@
+{
+  "updated_at": "2026-09-20T12:00:00Z",
+  "count": 3,
+  "devices": [
+    {"bssid": "a4:da:22:00:00:01", "ssid": "Flock Safety 4417", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-19 23:40:00", "lat": 34.0556, "lon": -117.1825, "matched_by": "oui:a4:da:22"},
+    {"bssid": "a4:da:22:00:00:02", "ssid": "", "auth": "[OPEN]", "channel": 1, "first_seen": "2026-09-19 23:41:00", "lat": 34.0570, "lon": -117.1840, "matched_by": "ssid:flock safety"},
+    {"bssid": "c1:00:00:00:00:01", "name": "FlockCam", "first_seen": "2026-09-19 23:42:00", "lat": 34.0580, "lon": -117.1850, "matched_by": "oui:c1:00:00"}
+  ]
+}
