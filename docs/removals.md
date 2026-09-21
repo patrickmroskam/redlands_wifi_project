@@ -6,9 +6,10 @@ the network must not add it back. That is what `data/removed.json` is for.
 
 ## Procedure
 
-1. Read the request. Find the network's BSSID in `data/networks.json`. If the
-   requester gave only a name and a street, match the SSID and check that the
-   location is close. When unsure, ask on the issue. Don't guess.
+1. Read the request. Find the network's BSSID in `data/networks.json` (or in
+   `data/bluetooth.json` for a Bluetooth device). If the requester gave only a name
+   and a street, match the SSID and check that the location is close. When unsure,
+   ask on the issue. Don't guess.
 2. On a new branch, run:
    ```bash
    python3 scripts/remove_network.py --issue <issue number> <BSSID> [<BSSID> ...]
@@ -16,11 +17,16 @@ the network must not add it back. That is what `data/removed.json` is for.
    Any spelling of the BSSID works (`AA:BB:…`, `aa-bb-…`, `aabb.ccdd.eeff`,
    `aabbccddeeff`). List every radio the request covers: a mesh or dual-band router
    has one BSSID per radio.
-   The script deletes every matching record from `data/networks.json`, fixes `count`,
-   and adds each canonical BSSID, today's UTC date and the issue number to
-   `data/removed.json`. It works even if the network isn't on the map yet.
-3. Commit **both** files in one commit and open a PR. CI checks that the denylist is
-   valid and that no listed BSSID is still in the database.
+   The script deletes every matching record from **all three** published databases —
+   `data/networks.json`, `data/bluetooth.json` and `data/flock.json` — fixes each
+   `count`, and adds each canonical BSSID, today's UTC date and the issue number to
+   `data/removed.json`. It works even if the network isn't on the map yet. Deleting
+   from only one of them would leave the device published on another map *and* stop
+   every later ingest run, so the script always covers the same set the ingest checks.
+3. Commit **every** file the script changed in one commit and open a PR. It prints a
+   line per database, so commit the ones whose count is non-zero along with
+   `data/removed.json`. CI checks that the denylist is valid and that no listed BSSID
+   is still in any of the three databases.
 4. If an ingest run happens between your branch and the merge, the ingest refuses to
    push a commit that would republish a listed network (it re-checks after its
    rebase). If the ingest still stops with "still contains … removed network(s)",
@@ -48,9 +54,13 @@ appears once, and the date is a real `YYYY-MM-DD` day.
   check comes right after the MAC is validated, so it applies whatever the row's
   name, location or opt-out suffix.
 - **The run stops (exit 2) and changes nothing** if the denylist is missing,
-  unreadable or malformed, or if a listed BSSID is still in `data/networks.json`
-  (a half-done removal). The logs wait in `ingest/` until a human fixes it.
-  Treating a broken list as empty would republish removed networks.
+  unreadable or malformed, or if a listed BSSID is still in any of
+  `data/networks.json`, `data/bluetooth.json` or `data/flock.json` (a half-done
+  removal). The logs wait in the inbox until a human fixes it. Treating a broken list
+  as empty would republish removed networks.
+- If the script stops part-way with "… could not be written", it names the files it
+  did change. Nothing is lost: the denylist is written first, so the device can never
+  be re-added, and re-running the same command finishes the job.
 
 ## Limits
 

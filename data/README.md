@@ -144,8 +144,10 @@ A list of BSSIDs that were taken off the map after a removal request. The ingest
 never adds them again, under any name. Each entry has exactly `bssid` (canonical
 lower-case form), `date` (`YYYY-MM-DD`), and `issue` (the request's issue number).
 Nothing else is stored. Change it only with `scripts/remove_network.py`, in the same
-commit that deletes the record. A missing or malformed file stops the ingest. The
-procedure is in [docs/removals.md](../docs/removals.md).
+commit that deletes the record from every database that held it (`networks.json`,
+`bluetooth.json` and `flock.json` — one device can be in more than one). A missing or
+malformed file stops the ingest, and so does a listed BSSID still present in any of
+those three. The procedure is in [docs/removals.md](../docs/removals.md).
 
 ## `redlands-boundary.geojson` — the fence
 
