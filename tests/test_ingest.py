@@ -1759,6 +1759,104 @@ class UndecodableBytes(PipelineCase):
         self.assertEqual(self.read_db()["count"], 0)
 
 
+
+class DamagedLogsAreNotSilentlyAccepted(PipelineCase):
+    """The file-level net asked "is every row malformed?", which one ordinary cell row
+    answered "no" for a corrupt file; a partly corrupt file went unreported; and a
+    malformed row returned before its opt-out was read (#55)."""
+
+    CORRUPT = "\x00garbage line with no columns\n"
+
+    def test_one_cell_row_cannot_vouch_for_an_otherwise_corrupt_file(self):
+        self.put("a.log", HEADER + row("310-410-1234", typ="GSM") + self.CORRUPT * 20)
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.inbox_files(), ["a.log"])
+        self.assertIn("a.log: no usable row: 20 of 21 row(s) malformed", out)
+        self.assertIn("files processed:   0", out)
+
+    def test_a_healthy_cell_and_bluetooth_only_log_is_still_processed(self):
+        # No usable row, but no damage either: nothing to keep back.
+        self.put("a.log", HEADER + row("310-410-1234", typ="GSM")
+                 + row("0e:00:00:00:00:01", typ="BT"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.inbox_files(), [])
+        self.assertIn("not wifi:        2", out)
+        self.assertNotIn("damaged rows", out)
+
+    def test_a_partly_corrupt_file_is_processed_and_named_with_its_damage(self):
+        self.put("a.log", HEADER + row("0e:00:00:00:00:01") + row("0e:00:00:00:00:02")
+                 + row("0e:00:00:00:00:03") + self.CORRUPT * 2)
+        self.put("b.log", HEADER + row("0e:00:00:00:00:04"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.inbox_files(), [])
+        self.assertEqual(self.read_db()["count"], 4)
+        self.assertIn("processed 1 file(s) with damaged rows (dropped as malformed):", out)
+        self.assertIn("  a.log: 2 of 5 row(s)", out)
+        self.assertNotIn("b.log:", out)
+
+    def test_a_healthy_log_reports_no_damage(self):
+        self.put("a.log", HEADER + row("0e:00:00:00:00:01"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertNotIn("damaged rows", out)
+
+    def test_an_opt_out_on_a_row_with_a_damaged_mac_is_registered_batch_wide(self):
+        # The only row with the suffix has a bad digit in its MAC; a clean row of the
+        # same device, without the suffix, is in another file. Neither is published.
+        self.put("a.log", data=HEADER.encode("utf-8")
+                 + row("0f:00:00:00:00:0\u00bf", ssid="Home_nomap").encode("utf-8")
+                 .replace("\u00bf".encode("utf-8"), b"\xa5")
+                 + row("0f:00:00:00:01:00", ssid="Neighbour").encode("utf-8"))
+        self.put("b.log", HEADER + row("0f:00:00:00:00:01", ssid="Home"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["0f:00:00:00:01:00"])
+        self.assertIn("malformed:       1", out)
+        self.assertIn("opt-out:         1", out)
+
+    def test_a_damaged_mac_opt_out_reports_an_already_published_match(self):
+        self.write_db([{"bssid": "0f:00:00:00:00:02", "ssid": "Home", "auth": "[OPEN]",
+                        "channel": 6, "first_seen": "2025-03-21 23:08:20",
+                        "lat": 34.0556, "lon": -117.1825}])
+        self.put("a.log", HEADER + row("0f:00:00:00:00:0z", ssid="Home_optout")
+                 + row("0f:00:00:00:01:00"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertIn("already published but now opted out", out)
+        self.assertIn("  0f:00:00:00:00:02", out)
+
+    def test_a_bt_row_with_a_broken_mac_is_malformed_and_its_opt_out_holds(self):
+        self.put("a.log", HEADER + row("10:00:00:00:00:0z", ssid="Car_nomap", typ="BT")
+                 + row("10:00:00:00:00:01", ssid="Car", typ="BLE"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_ble()["count"], 0)
+        self.assertIn("malformed:       1", out)
+        self.assertIn("not wifi:        0", out)
+
+    def test_an_opt_out_on_a_mac_too_damaged_to_match_is_reported_by_file(self):
+        self.put("a.log", HEADER + row("zz:zz:zz:zz:zz:z1", ssid="Home_nomap")
+                 + row("11:00:00:00:00:01"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertIn("opt-out on a row whose MAC is too damaged to match (check by hand):\n"
+                      "  a.log", out)
+
+    def test_a_cell_row_is_never_malformed_and_never_matched(self):
+        self.put("a.log", HEADER + row("not-a-mac_", ssid="Tower_nomap", typ="LTE")
+                 + row("12:00:00:00:00:01"))
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.read_db()["count"], 1)
+        self.assertIn("malformed:       0", out)
+        self.assertNotIn("too damaged", out)
+
+
 class UnreadableSsidIsWithheld(PipelineCase):
     """Decoding leniently means an SSID can arrive unreadable. The opt-out is the one
     privacy filter that reads the END of a field, so a trailing bad octet would slip an
