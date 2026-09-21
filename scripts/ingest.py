@@ -58,6 +58,15 @@ REPLACEMENT = "\ufffd"
 # Log Type values this pipeline publishes, and the database each one feeds. Any other
 # type (GSM, LTE, ...) is a cell tower: its id column is not a MAC and it is dropped.
 PUBLISHED_TYPES = {"WIFI": "networks", "BLE": "bluetooth"}
+# Log Type values whose MAC column is a real device address, and so is validated. A
+# classic-Bluetooth (Type=BT) row is never published but its address still carries an
+# opt-out (#50), so a BT row with a broken MAC is malformed, not `not wifi` (#55). Cell
+# rows (GSM/LTE/...) hold tower ids in that column and are never validated.
+ADDRESSED_TYPES = frozenset(PUBLISHED_TYPES) | {"BT"}
+# An opt-out whose own MAC is unreadable is matched against the batch by the hex digits
+# that did survive (#55). Below this many there is too little left to tell one device
+# from another, and matching would withhold unrelated networks: it is reported instead.
+MIN_KNOWN_DIGITS = 6
 # `flock` is additive: a matching row is published to its own database *as well as*
 # the one its Type selects, so the main map never changes meaning when a rule is added.
 FLOCK = "flock"
@@ -358,10 +367,9 @@ def read_log(path):
     # forever. Rejection instead falls to the header check below, which is the more
     # accurate test of "is this a WiGLE log": a genuinely binary file has no WigleWifi
     # header. A row we cannot read is then dropped rather than trusted — see classify's
-    # unreadable_ssid branch. Note the all-rows-malformed net below is NOT a general
-    # guard for a partly corrupt file: it needs *every* row to be malformed, and a
-    # single intact row disarms it, so a truncated log is processed for what survives
-    # and the rest is counted as malformed (#55).
+    # unreadable_ssid branch. A partly corrupt file (a truncated log) is processed for
+    # what survives; run() names it in the report with its damaged-row count, and only
+    # keeps it back when no usable row survives at all (#55).
     text = raw.decode("utf-8-sig", errors="replace")
     # Split on newlines only: str.splitlines() would also break rows on
     # form feeds or U+2028 inside an SSID.
@@ -574,15 +582,52 @@ def save_db(path, db, key="networks"):
 def is_malformed(row):
     """True when a row carries no usable BSSID — classify()'s `malformed` verdict.
 
-    run() shares this predicate so the file-level "every row is malformed" test can
-    never drift from the per-row one.
+    run() shares this predicate so its file-level damage test can never drift from the
+    per-row one.
     """
     if row is None or not row["MAC"].strip():
         return True
+    # A Type we could not decode is damage, not a cell row: exempting it as one hid a
+    # corrupt row (and any opt-out on it) from every check below (#55).
+    if REPLACEMENT in row["Type"]:
+        return True
     # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
-    if row["Type"].strip().upper() not in PUBLISHED_TYPES:
+    if row["Type"].strip().upper() not in ADDRESSED_TYPES:
         return False
     return normalize_bssid(row["MAC"]) is None
+
+
+def is_usable(row):
+    """True when a row carries a valid address of a published Type.
+
+    This is the file-level question "did the file yield anything", which is NOT the
+    negation of is_malformed(): a cell row is neither usable nor malformed, so one of
+    them must not be able to vouch for an otherwise corrupt file (#55)."""
+    return (row is not None and row["Type"].strip().upper() in PUBLISHED_TYPES
+            and normalize_bssid(row["MAC"]) is not None)
+
+
+def damaged_mac_pattern(value):
+    """A pattern matching the addresses a damaged MAC could have been, or None.
+
+    Only a MAC that still has its 12 digit positions can be matched: separators are
+    removed, the surviving hex digits must match exactly, and each unreadable position
+    (a U+FFFD from a bad octet, a stray letter) matches any digit. None when a position
+    was lost or added, or fewer than MIN_KNOWN_DIGITS survived, so the caller can report
+    the opt-out it could not apply rather than guess (#55)."""
+    text = re.sub(r"[:\-.]", "", value.strip().strip(_INVISIBLE).strip().lower())
+    if len(text) != 12:
+        return None
+    known = sum(ch in "0123456789abcdef" for ch in text)
+    if known < MIN_KNOWN_DIGITS:
+        return None
+    return re.compile("".join(ch if ch in "0123456789abcdef" else "[0-9a-f]" for ch in text))
+
+
+def matches_damaged(bssid, patterns):
+    """True when a canonical address matches any damaged-MAC opt-out pattern."""
+    digits = bssid.replace(":", "")
+    return any(pattern.fullmatch(digits) for pattern in patterns)
 
 
 def build_record(shape, row, ssid, bssid, lat, lon, matched_by=None):
@@ -761,26 +806,41 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
         "added_by_dataset": {dataset: 0 for dataset in db_paths},
         "flock_rules": bool(flock_rules),
         "opted_out_but_published": [],
+        "damaged": [],
+        "unmatched_opt_outs": [],
         "not_deleted": [],
         "dry_run": dry_run,
     }
     added = {dataset: [] for dataset in db_paths}
     opted_out = set()  # every BSSID seen with an opt-out SSID anywhere in this batch
+    opted_out_damaged = []  # patterns for opt-outs whose own MAC is unreadable (#55)
     for name in candidate_files(ingest_dir):
         try:
             rows = read_log(os.path.join(ingest_dir, name))
         except (UnparseableFile, OSError) as exc:
             summary["unparseable"].append((name, str(exc)))
             continue
-        # A file whose every data row is malformed is not a log we are reading
-        # correctly — most likely the logger changed how it writes the MAC column.
-        # Dropping all of its rows and deleting it would lose the data with an exit 0,
-        # so treat the whole file as unparseable instead (R4.10).
-        if rows and all(is_malformed(row) for row in rows):
-            summary["unparseable"].append(
-                (name, "every data row is malformed ({} row(s))".format(len(rows))))
+        # A file that yields no usable row and shows damage is not a log we are reading
+        # correctly — most likely the logger changed how it writes the MAC column, or
+        # the body is corrupt. Dropping its rows and deleting it would lose the data with
+        # an exit 0, so treat the whole file as unparseable instead (R4.10). "Usable" is
+        # asked separately from "malformed": a cell row is neither, and sharing one
+        # predicate let a single ordinary GSM row vouch for a corrupt file (#55). A
+        # healthy cell-only log has no damage, so it is still processed.
+        damaged = sum(1 for row in rows if is_malformed(row))
+        if damaged and not any(is_usable(row) for row in rows):
+            why = ("every data row is malformed ({} row(s))".format(len(rows))
+                   if damaged == len(rows) else
+                   "no usable row: {} of {} row(s) malformed".format(damaged, len(rows)))
+            summary["unparseable"].append((name, why))
             continue
         summary["files_processed"].append(name)
+        # A partly damaged file is still processed for what survives, but it is named
+        # in the report: a corrupt tail (a card pulled mid-write) otherwise vanished
+        # into the batch-wide malformed count (#55). The file is deleted from the inbox
+        # as usual; its bytes remain in the inbox's git history.
+        if damaged:
+            summary["damaged"].append((name, damaged, len(rows)))
         for row in rows:
             summary["rows_read"] += 1
             reason, entries, bssid, targets = classify(
@@ -810,6 +870,21 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
                     opted_out.add(bssid)
                     if bssid in stored_any and bssid not in summary["opted_out_but_published"]:
                         summary["opted_out_but_published"].append(bssid)
+                # A malformed row returns before the opt-out is read, so a suffix on a
+                # row whose MAC is damaged was lost while a clean row of the same device
+                # elsewhere in the batch was published (#55). Its address is unknown,
+                # so match what survives of it; if too little does, report it. A row
+                # that failed to split has no trustworthy SSID column and is skipped.
+                elif reason == "malformed" and row is not None and withholds(row["SSID"]):
+                    pattern = damaged_mac_pattern(row["MAC"])
+                    if pattern is None:
+                        summary["unmatched_opt_outs"].append(name)
+                        continue
+                    opted_out_damaged.append(pattern)
+                    for stored_bssid in sorted(stored_any):
+                        if (matches_damaged(stored_bssid, [pattern]) and stored_bssid
+                                not in summary["opted_out_but_published"]):
+                            summary["opted_out_but_published"].append(stored_bssid)
             else:
                 for dataset, record in entries:
                     known[dataset].add(bssid)
@@ -820,8 +895,10 @@ def run(ingest_dir, db_path, boundary_path, denylist_path=DEFAULT_DENYLIST,
     # withholding it is still one row dropped.
     withheld = set()
     for dataset, records in added.items():
-        added[dataset] = [r for r in records if r["bssid"] not in opted_out]
-        withheld.update(r["bssid"] for r in records if r["bssid"] in opted_out)
+        dropped = {r["bssid"] for r in records if r["bssid"] in opted_out
+                   or matches_damaged(r["bssid"], opted_out_damaged)}
+        added[dataset] = [r for r in records if r["bssid"] not in dropped]
+        withheld.update(dropped)
     summary["dropped"]["opt_out"] += len(withheld)
     for dataset, records in added.items():
         summary["added_by_dataset"][dataset] = len(records)
@@ -899,6 +976,17 @@ def format_summary(summary):
         out.append("")
         out.append("already published but now opted out (remove by hand, see privacy policy):")
         out.extend("  " + bssid for bssid in summary["opted_out_but_published"])
+    if summary["damaged"]:
+        out.append("")
+        out.append("processed {} file(s) with damaged rows (dropped as malformed):".format(
+            len(summary["damaged"])))
+        for name, damaged, rows in summary["damaged"]:
+            out.append("  {}: {} of {} row(s)".format(name, damaged, rows))
+    if summary["unmatched_opt_outs"]:
+        out.append("")
+        out.append("opt-out on a row whose MAC is too damaged to match (check by hand):")
+        for name in sorted(set(summary["unmatched_opt_outs"])):
+            out.append("  {}".format(name))
     if summary["not_deleted"]:
         out.append("")
         out.append("processed but could not delete {} file(s):".format(len(summary["not_deleted"])))
@@ -959,7 +1047,9 @@ def main(argv=None):
             print("nothing was written or deleted.")
         return EXIT_FATAL
     print(format_summary(summary))
-    if summary["unparseable"] or summary["not_deleted"]:
+    # An opt-out we could not apply is a privacy signal that may have been lost: the
+    # run still publishes, but must not look clean to an unattended nightly job.
+    if summary["unparseable"] or summary["not_deleted"] or summary["unmatched_opt_outs"]:
         return EXIT_PROBLEMS
     return EXIT_OK
 
