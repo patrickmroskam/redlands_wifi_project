@@ -87,9 +87,11 @@ with a count for each drop reason.
    in the inbox and the next run re-reads them, which the BSSID dedupe makes a no-op;
 5. checks that GitHub Pages started a build for that commit, and requests one if not.
 
-Scheduled runs stay off until the repository variable `INGEST_SCHEDULE` is `on`. It must
-be a *repository* variable, not an environment one: the job's `if:` is evaluated before
-the `ingest` environment resolves, so an environment variable would always read empty.
+The nightly schedule is **on** (since 2026-09-21): the repository variable
+`INGEST_SCHEDULE` is `on`, so the 10:00 UTC cron runs the job instead of skipping it.
+It must be a *repository* variable, not an environment one: the job's `if:` is evaluated
+before the `ingest` environment resolves, so an environment variable would always read
+empty. Set it back to anything else to park the schedule without editing the workflow.
 
 The report appears in the run's summary panel. A red run means a file could not be
 parsed (the good files were still published; the bad one stays in the inbox) or a
