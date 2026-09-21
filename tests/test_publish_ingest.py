@@ -90,6 +90,33 @@ class PublishCase(unittest.TestCase):
         return subprocess.run(["bash", "scripts/publish_ingest.sh", *args], cwd=self.work,
                               env=env, capture_output=True, text=True)
 
+    def race_an_identical_push(self, then_revert=False):
+        """Make the first push lose a race to a commit with the same content (#45).
+
+        A one-shot pre-push hook pushes a commit whose tree is exactly ours but whose
+        message differs (so its SHA differs), then rejects our push. The retry's rebase
+        finds our change already upstream and drops our commit. With `then_revert`, the
+        twin is reverted upstream straight away, so our data is NOT public after all.
+        """
+        revert = ("c=$(git -c user.name=other -c user.email=o@example.com commit-tree "
+                  "HEAD^^{tree} -p \"$c\" -m 'revert the other run')\n") if then_revert else ""
+        hooks = os.path.join(self.tmp, "hooks")
+        os.makedirs(hooks)
+        hook = os.path.join(hooks, "pre-push")
+        with open(hook, "w", encoding="utf-8") as fh:
+            fh.write(
+                "#!/usr/bin/env bash\n"
+                "done=\"$(dirname \"$0\")/raced\"\n"
+                "[ -e \"$done\" ] && exit 0\n"
+                "touch \"$done\"\n"
+                "c=$(git -c user.name=other -c user.email=o@example.com commit-tree "
+                "'HEAD^{tree}' -p HEAD^ -m 'another run published the same change')\n"
+                + revert +
+                "git push --quiet --no-verify origin \"$c:refs/heads/main\" || exit 3\n"
+                "exit 1\n")
+        os.chmod(hook, 0o755)
+        git(self.work, "config", "core.hooksPath", hooks)
+
     def remote_head(self):
         return git(self.remote, "rev-parse", "main")
 
@@ -190,6 +217,23 @@ class Publishes(PublishCase):
         # The owner's new log is kept for the next run.
         self.assertIn("ingest/wardrive_2.log", self.remote_ls("ingest"))
         self.assertIn("pushed_sha=" + self.remote_head(), self.read(self.output))
+        self.assertNotEqual(self.remote_head(), git(other, "rev-parse", "HEAD"),
+                            "pushed_sha must name a commit this run added")
+
+    def test_a_commit_the_rebase_drops_is_never_reported_as_pushed(self):
+        # Someone else published the identical change mid-run; the retry's rebase drops
+        # ours, and HEAD becomes their commit (#45).
+        self.add_log("wardrive_1.log")
+        self.race_an_identical_push()
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("retrying once", result.stdout)
+        self.assertIn("already on main", result.stdout)
+        self.assertNotIn("pushed ", result.stdout)
+        self.assertNotIn("pushed_sha", self.read(self.output))
+        self.assertEqual(self.remote_log()[0], "another run published the same change")
+        self.assertEqual(json.loads(self.remote_file("data/networks.json"))["count"], 2)
+        self.assertEqual(self.remote_ls("ingest"), ["ingest/README.md"])
 
     def test_rebase_conflict_on_the_database_pushes_nothing_and_exits_2(self):
         self.add_log("wardrive_1.log")
@@ -439,6 +483,29 @@ class SeparateInbox(SeparateInboxCase):
         self.assertEqual(self.remote_head(), head)
         self.assertEqual(git(self.inbox_remote, "rev-parse", "main"), inbox_head)
         self.assertEqual(self.inbox_ls(), ["README.md", "wardrive_1.log"])
+
+    def test_a_dropped_database_commit_still_deletes_the_log(self):
+        # The identical database is already public, so the log is safe to delete (#45).
+        self.add_inbox_log("wardrive_1.log")
+        self.race_an_identical_push()
+        result = self.publish()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("already on main", result.stdout)
+        self.assertNotIn("pushed_sha", self.read(self.output))
+        self.assertEqual(self.remote_log()[0], "another run published the same change")
+        self.assertEqual(self.inbox_ls(), ["README.md"])
+
+    def test_a_dropped_commit_whose_twin_was_reverted_keeps_the_log(self):
+        # The rebase drops our commit against a twin that is no longer in effect, so our
+        # data is not public: fail loudly and leave the log for the next run (#45).
+        self.add_inbox_log("wardrive_1.log")
+        self.race_an_identical_push(then_revert=True)
+        result = self.publish()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("does not carry its databases", result.stdout)
+        self.assertNotIn("pushed_sha", self.read(self.output))
+        self.assertEqual(self.remote_log()[0], "revert the other run")
+        self.assertEqual(sorted(self.inbox_ls()), ["README.md", "wardrive_1.log"])
 
     def test_a_new_log_arriving_mid_run_does_not_block_the_deletion(self):
         self.add_inbox_log("wardrive_1.log")
