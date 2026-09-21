@@ -26,7 +26,7 @@
 # Both repos are assumed to start with a clean index — true for a CI checkout. A
 # deletion staged before the script runs is not counted as processed work.
 #   GITHUB_STEP_SUMMARY  the ingest report is appended here
-#   GITHUB_OUTPUT        receives pushed_sha=<sha> after a push
+#   GITHUB_OUTPUT        receives pushed_sha=<sha> only when this run pushed a commit
 set -uo pipefail
 
 DB=data/networks.json
@@ -164,30 +164,50 @@ if [ -n "$(git diff --cached --name-only)" ]; then
     exit 2
   fi
 
+  pushed=1
   if ! git push --quiet origin "HEAD:$branch"; then
     # The owner may have pushed meanwhile; those changes touch other paths, so a
     # rebase is clean. One retry only — a second failure needs a human look.
     echo "push rejected; rebasing onto origin/$branch and retrying once"
+    ours=$(git rev-parse HEAD) || exit 2
     git -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" \
         pull --quiet --rebase origin "$branch" || {
       git rebase --abort 2>/dev/null
       echo "::error::main changed a published database or a processed log during this run (rebase conflict); nothing was pushed — re-run the workflow"
       exit 2
     }
-    # A removal (data/removed.json) may have landed meanwhile without touching the
-    # database, so the rebase is clean but this commit could republish a removed
-    # network. Re-check on the rebased tree; the next run will drop it properly.
-    python3 scripts/ingest.py --check || {
-      echo "::error::a network removed on request during this run is in this commit; nothing was pushed — re-run the workflow"
-      exit 2
-    }
-    git push --quiet origin "HEAD:$branch" || { echo "::error::push to $branch failed twice; nothing was pushed"; exit 2; }
+    if [ "$(git rev-list --count FETCH_HEAD..HEAD 2>/dev/null)" = "0" ]; then
+      # The rebase dropped our commit: an identical change was already upstream, and HEAD
+      # is now someone else's commit. Never report it as ours — the Pages step would wait
+      # for a build this run did not trigger (#45). The data is public, so the processed
+      # logs can still be deleted below — but only once the databases upstream really are
+      # the ones this run wrote. The rebase drops a commit whose patch matches ANY upstream
+      # commit, even one reverted since; then this run's data is not public, and the logs
+      # must stay for the next run.
+      git diff --quiet "$ours" HEAD -- "${DBS[@]}" || {
+        echo "::error::the rebase dropped this run's commit, but $branch does not carry its databases; nothing was pushed and no log was deleted — re-run the workflow"
+        exit 2
+      }
+      pushed=""
+      echo "this run's database change is already on $branch (an identical commit landed during the run); nothing to push"
+    else
+      # A removal (data/removed.json) may have landed meanwhile without touching the
+      # database, so the rebase is clean but this commit could republish a removed
+      # network. Re-check on the rebased tree; the next run will drop it properly.
+      python3 scripts/ingest.py --check || {
+        echo "::error::a network removed on request during this run is in this commit; nothing was pushed — re-run the workflow"
+        exit 2
+      }
+      git push --quiet origin "HEAD:$branch" || { echo "::error::push to $branch failed twice; nothing was pushed"; exit 2; }
+    fi
   fi
 
-  sha=$(git rev-parse HEAD)
-  echo "pushed $sha: +$added networks, $processed files processed"
-  if [ -n "${GITHUB_OUTPUT:-}" ]; then
-    echo "pushed_sha=$sha" >>"$GITHUB_OUTPUT"
+  if [ -n "$pushed" ]; then
+    sha=$(git rev-parse HEAD)
+    echo "pushed $sha: +$added networks, $processed files processed"
+    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+      echo "pushed_sha=$sha" >>"$GITHUB_OUTPUT"
+    fi
   fi
 elif [ "$processed" -gt 0 ]; then
   echo "no database change to publish; only the processed logs are being deleted"
