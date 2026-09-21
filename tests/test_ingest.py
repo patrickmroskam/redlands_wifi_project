@@ -1842,10 +1842,31 @@ class DamagedLogsAreNotSilentlyAccepted(PipelineCase):
         self.put("a.log", HEADER + row("zz:zz:zz:zz:zz:z1", ssid="Home_nomap")
                  + row("11:00:00:00:00:01"))
         code, out = self.run_pipeline()
-        self.assertEqual(code, 0)
+        # Still published and deleted, but the unattended run must not look clean.
+        self.assertEqual(code, 1)
+        self.assertEqual(self.inbox_files(), [])
         self.assertEqual(self.read_db()["count"], 1)
         self.assertIn("opt-out on a row whose MAC is too damaged to match (check by hand):\n"
                       "  a.log", out)
+
+    def test_a_row_with_an_undecodable_type_is_damage_not_a_cell_row(self):
+        bad = lambda r: r.encode("utf-8").replace(",WIFI\n".encode("utf-8"), b",WI\xa5I\n")
+        # Its opt-out still holds for the clean row of the same device...
+        self.put("a.log", data=HEADER.encode("utf-8")
+                 + bad(row("13:00:00:00:00:01", ssid="Home_nomap"))
+                 + row("13:00:00:00:01:00").encode("utf-8"))
+        self.put("b.log", HEADER + row("13:00:00:00:00:01", ssid="Home"))
+        # ...and a file of them cannot be vouched for by one cell row.
+        self.put("c.log", data=HEADER.encode("utf-8")
+                 + row("310-410-1234", typ="GSM").encode("utf-8")
+                 + bad(row("13:00:00:00:02:00")) * 5)
+        code, out = self.run_pipeline()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.inbox_files(), ["c.log"])
+        self.assertEqual([n["bssid"] for n in self.read_db()["networks"]],
+                         ["13:00:00:00:01:00"])
+        self.assertIn("c.log: no usable row: 5 of 6 row(s) malformed", out)
+        self.assertIn("  a.log: 1 of 2 row(s)", out)
 
     def test_a_cell_row_is_never_malformed_and_never_matched(self):
         self.put("a.log", HEADER + row("not-a-mac_", ssid="Tower_nomap", typ="LTE")

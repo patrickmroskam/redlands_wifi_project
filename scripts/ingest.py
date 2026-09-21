@@ -587,6 +587,10 @@ def is_malformed(row):
     """
     if row is None or not row["MAC"].strip():
         return True
+    # A Type we could not decode is damage, not a cell row: exempting it as one hid a
+    # corrupt row (and any opt-out on it) from every check below (#55).
+    if REPLACEMENT in row["Type"]:
+        return True
     # Cell rows (GSM/LTE/...) carry tower ids, not MACs, in this column: check Type first.
     if row["Type"].strip().upper() not in ADDRESSED_TYPES:
         return False
@@ -1043,7 +1047,9 @@ def main(argv=None):
             print("nothing was written or deleted.")
         return EXIT_FATAL
     print(format_summary(summary))
-    if summary["unparseable"] or summary["not_deleted"]:
+    # An opt-out we could not apply is a privacy signal that may have been lost: the
+    # run still publishes, but must not look clean to an unattended nightly job.
+    if summary["unparseable"] or summary["not_deleted"] or summary["unmatched_opt_outs"]:
         return EXIT_PROBLEMS
     return EXIT_OK
 
