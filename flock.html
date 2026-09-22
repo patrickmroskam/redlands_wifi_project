@@ -31,9 +31,10 @@
       <p class="empty-note">
         A marker appears here only when an observation matches a rule in
         <a href="https://github.com/patrickmroskam/redlands_wifi_project/blob/main/data/flock-rules.json" rel="noopener noreferrer">data/flock-rules.json</a>.
-        Every marker names the rule that matched it. The rules shipped empty on purpose:
-        no rule has been confirmed against a real camera yet, and a guessed one would put
-        a surveillance marker on somebody's home network.
+        Every marker names the rule that matched it. Each rule is a full six-octet MAC
+        address, so it matches one confirmed device and nothing else: a vendor prefix
+        would put a surveillance marker on somebody's home network, and the same chip
+        vendors turn up in doorbells and other consumer gear.
       </p>
     </section>
 
