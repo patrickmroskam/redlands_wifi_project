@@ -1,5 +1,7 @@
 {
-  "updated_at": null,
-  "count": 0,
-  "devices": []
+  "updated_at": "2026-09-22T22:11:17Z",
+  "count": 1,
+  "devices": [
+    {"bssid": "f0:82:c0:c1:fd:55", "name": "", "first_seen": "2026-09-20 18:20:27", "lat": 34.0696487, "lon": -117.1912231, "matched_by": "oui:f0:82:c0:c1:fd:55"}
+  ]
 }
