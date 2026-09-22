@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-22T14:50:00Z
-cycle: 17
-net_open_history: [11, 10, 5, 5, 5, 5]
+last_reconciled_at: 2026-09-22T19:55:00Z
+cycle: 18
+net_open_history: [11, 10, 5, 5, 5, 5, 5]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,45 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 18 delta (watermark 2026-09-22T14:50Z → 19:55Z): **the first real data batch since cutover landed mid-run; the #65 worker is wedged**
+
+**No issue opened, closed or reopened, and no PR opened.** Open count holds at **5**: #1 (tracking), #17, #21, #63 (`needs-human`) and #65 (`p3`, now **claimed**). Two new commits on `origin/main`: cycle 17's `6331ad7` and the ingest's `359b432`.
+
+### A real ingest batch landed during this cycle — verified in the data, not the summary
+
+The owner dispatched `Ingest wardrive logs` manually at 19:41:30Z (run `35775404541`, `event: workflow_dispatch`, `actor: patrickmroskam`), one minute into this PO run. It succeeded, and this is the **first batch with actual new rows since the 2026-09-21 cutover** — every scheduled run before it was a green no-op.
+
+| dataset | before | after | delta |
+|---|---|---|---|
+| `data/networks.json` | 20,386 | **23,597** | +3,211 |
+| `data/bluetooth.json` | 1,649 | **3,404** | +1,755 |
+| `data/flock.json` | 0 | **0** | +0 |
+
+- 25,346 rows read from **5** logs; the 5 processed logs were deleted from the private inbox (`pushedAt` 19:41:59Z).
+- Commit `359b432` touches **only** `data/networks.json` and `data/bluetooth.json` — the one-commit invariant holds.
+- Pages built for `359b432` at 19:43:15Z, and the **live site** serves `count=23597` / `count=3404`, `updated_at=2026-09-22T19:41:56Z`. Verified by fetching the published JSON, per the standing rule to check the data rather than the job summary.
+- `flock: 0` again, as designed — `flock-rules.json` ships both lists empty, and the map is **parked by owner ruling**. 25,346 rows producing zero cameras is the expected outcome, not a regression, and it is not re-raised.
+
+R4, R5 and R9 are now confirmed end to end on a real multi-log batch, not just on a no-op.
+
+### The #65 worker is wedged, and it is pinning every hourly fire
+
+Dev-team session `local_7e45b5c4…` started 2026-09-22T15:10:31Z and has shown `running` with **last activity 15:16:41Z** ever since — silent for 4 h 39 m at the close of this cycle. PID 52097 (started 15:09:40Z, ~212 MiB) is still alive, so this is wedged-and-live, not a dead orphan.
+
+- It **claimed #65** (assignee set) and left **real, uncommitted R10 work** in worktree `…/07a037bf…/scratchpad/wt65` on branch `feat/65-network-kinds`: modified `assets/map.js`, `assets/stats.js`, `assets/site.css`, `index.html`, mtimes 15:13–15:16Z. The branch itself carries no commits beyond `6331ad7` and was never pushed.
+- Because the run still reads `running`, the scheduler **skipped the 16:10, 17:10, 18:10 and 19:10 fires**. The routine reads `enabled: true` with `nextRunAt` 20:10Z, which will also be skipped while the session lives. So #65 cannot progress without intervention.
+- **The PO did not unassign #65, kill the process, or flip the routine.** Unassigning while the process is alive risks a double claim if it wakes, and the bot shares the `patrickmroskam` identity, so the assignee alone is never the evidence. Reported instead, per the cycle-16/17 rule: report, do not flip.
+
+### The "resumes on display wake" hypothesis is weaker than cycle 17 recorded
+
+Cycle 17 proposed that stalled sessions resume on user activity. This cycle contradicts it: the owner was **demonstrably active at 19:41Z** (they pushed logs and dispatched a workflow), and the wedged session did **not** resume — it was still frozen at its 15:16:41Z mark 14 minutes later. Whatever stalls these sessions, plain owner activity is not sufficient to clear it. Downgrade cycle 17's hypothesis from medium to **low** confidence.
+
+### Scheduled nightly, reachability, tripwire
+
+- **Scheduled ingest** `35740280107` (`schedule`, created 14:26:02Z, 4.4 h late) `success`, 0 files, no commit — a green no-op, confirmed by the data being unchanged right up to the 19:41Z dispatch.
+- **Reachability sweep** (standing, cycle 6 form): all 5 open issues checked. #63 is the highest-priority open issue at `p2` but is durably `needs-human` (destructive history rewrite, owner-run). #17/#21 are `p3` + `blocked` + `needs-human`. #1 carries no priority label so no worker selects it. The reachable-and-undoable set is **empty**; no labels were changed.
+- **#17 tripwire, fifteenth consecutive reading: latent.** Apex 404 serving GitHub's own "Site not found" page; apex `A` still 185.199.108–111.153; challenge TXT still absent.
 
 ## Cycle 17 delta (watermark 2026-09-21T19:45Z → 2026-09-22T14:50Z): **cycle 16 itself hung for ~19 h; its re-enable only landed at 14:46Z**
 

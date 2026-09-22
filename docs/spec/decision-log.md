@@ -774,3 +774,24 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - alternatives: none considered.
 - watch-next: none beyond the standing tasks.
 
+
+## 2026-09-22T19:55:00Z — session product-owner cycle 18
+
+- decision: `left the wedged #65 claim alone and reported it` — dev-team session `local_7e45b5c4…` (started 15:10:31Z, last activity 15:16:41Z, still `running`, PID 52097 alive) claimed #65 and left uncommitted R10 work in worktree `wt65` on `feat/65-network-kinds`. Because the run reads `running`, the scheduler skipped the 16:10/17:10/18:10/19:10 fires and will skip 20:10Z. The PO did not unassign #65, did not kill the process, and did not flip the routine.
+- confidence: high
+- alternatives: (a) unassigning #65 so the next fire re-claims — rejected, the process is alive and could wake into a double claim, and the bot shares the `patrickmroskam` identity so the assignee is never sufficient evidence of a bot claim; (b) killing PID 52097 — rejected, outside a PO pass's remit and it destroys the uncommitted work without the owner choosing to; (c) disabling then re-enabling the routine to free the slot — rejected, the slot is pinned by the live session, not by the enabled flag, so it would not help and would re-flip a routine the cycle-16/17 rule says to leave alone.
+- watch-next: cycle 19 re-reads `list_task_runs`. If `local_7e45b5c4…` still reads `running` with the 15:16:41Z mark, treat the wedge as permanent (the rung-18213 class) rather than slow, and say so plainly. If it has ended, confirm whether #65 progressed or the claim is now orphaned — and only then consider releasing the assignee, with the worktree evidence cited.
+
+## 2026-09-22T19:55:00Z — session product-owner cycle 18
+
+- decision: `verified the first real ingest batch since cutover against the published data` — the owner dispatched run `35775404541` at 19:41:30Z; 25,346 rows from 5 logs published +3,211 networks (20,386 → 23,597) and +1,755 Bluetooth (1,649 → 3,404) in commit `359b432`, which touches only the two database files. Pages built at 19:43:15Z and the live JSON serves the new counts at `updated_at=2026-09-22T19:41:56Z`.
+- confidence: high
+- alternatives: reading the job summary alone — rejected by the standing rule that a publish is verified against the data; the summary and the published site are separate failure domains, and earlier cycles were misled by trusting the former.
+- watch-next: nothing owed. R4/R5/R9 are now confirmed on a real multi-log batch rather than a no-op, so future no-op cycles no longer need to carry "the pipeline is unproven on real data" as a caveat.
+
+## 2026-09-22T19:55:00Z — session product-owner cycle 18
+
+- decision: `downgraded the display-wake hypothesis to low confidence` — cycle 17 proposed (medium confidence) that stalled scheduled sessions resume on user activity, from two morning resumptions. This cycle falsifies the simple form: the owner was demonstrably active at 19:41Z, pushing logs and dispatching a workflow, and the wedged 15:10Z session did not resume.
+- confidence: high (about the downgrade; the underlying cause remains unknown)
+- alternatives: keeping it at medium — rejected, it would let a later cycle wait out a permanent wedge on the expectation that the owner's next interaction clears it, which is exactly the error that cost #65 a full day.
+- watch-next: do not re-argue the cause; it is not the bot's to fix. Cycle 19 records only whether the wedge cleared and what cleared it.
