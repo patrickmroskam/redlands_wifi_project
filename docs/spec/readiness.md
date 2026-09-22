@@ -32,3 +32,7 @@ v1 is done and unchanged. #65 (PRD R10: per-kind classification plus main-map to
 - **Scheduled ingest:** run `35740280107` succeeded, created 14:26Z (4.4 h late, inside the measured 3.7–6.3 h band). 0 files, no commit. The later 19:41Z run was a manual dispatch, not the cron.
 - **#17 tripwire:** fifteenth consecutive latent reading (404 on GitHub's own "Site not found" page, apex `A` in the Pages range, no challenge TXT).
 - **Flock map:** still 0 cameras after a 25,346-row batch. Expected — the rule lists ship empty by design and the map is parked by owner ruling. Not re-raised.
+
+## Send record
+
+- Cycle 18 notify `msg_7dc1b062-a94a-4d39-b0f1-48776d2797c8`, priority `normal`, `delivered` 2026-09-22T19:5xZ. Content: the 19:41Z batch published (+3,211 networks / +1,755 Bluetooth, live), the wedged #65 worker with the one-action relaunch remedy, the retraction of the display-wake hypothesis, and the carried optional R10 clarification. No ask sent — no decision is owed, only a recommendation. Verified from the hub, and not retried.
