@@ -1,12 +1,30 @@
 {
   "_comment": [
-    "What marks an observed row as a Flock Safety camera. Both lists ship EMPTY on",
-    "purpose: no rule has been verified against a real observation yet, and guessing",
-    "one would put a surveillance-camera marker on a resident's access point.",
+    "What marks an observed row as a Flock Safety camera.",
     "",
     "ssid_patterns: case-insensitive substrings matched against the SSID / device name.",
-    "oui_prefixes:  MAC address prefixes, lower case and colon-separated, matched",
-    "               against the start of the canonical BSSID (e.g. \"a4:da:22\").",
+    "oui_prefixes:  MAC prefixes, lower case and colon-separated, matched against the",
+    "               start of the canonical BSSID. A full six-octet address is a legal",
+    "               entry and matches that one device only — which is how every rule",
+    "               here is written, on purpose. A three-octet vendor prefix would",
+    "               match every gadget sharing that chip vendor, and this data already",
+    "               contains the counter-example: the ESP32 Marauder's own Flock OUI",
+    "               list includes 08:3a:88 (USI), which matches a resident's Ring",
+    "               doorbell. Never add a bare vendor prefix.",
+    "",
+    "PROVENANCE OF THE ENTRY BELOW (2026-09-22, confirmed by the owner):",
+    "The wardrive hardware is an ESP32 Marauder v1.17.0. Its Flock detector flags a",
+    "BLE device on XUNTONG manufacturer data (0xff 0xc8 0x09) plus a Penguin-style",
+    "name, OR on a MAC in a 27-entry OUI list (WiFiScan.h:862). A hit only increments",
+    "an on-screen counter — WiFiScan.cpp:702 — and the CSV row it writes has an empty",
+    "SSID field (WiFiScan.cpp:678), so no log can ever name a camera. The manufacturer",
+    "data is not in the CSV either, which leaves the MAC as the only replayable signal.",
+    "",
+    "f0:82:c0:c1:fd:55 — Silicon Laboratories (a BLE beacon chip, consistent with a",
+    "Penguin battery pack). Seen on 2026-09-20 and 2026-09-21 within 6 m of the same",
+    "point, 34.06965/-117.19122: stationary across days, which is how a pole-mounted",
+    "camera behaves and not how a phone or a vehicle behaves. The owner confirmed the",
+    "camera and authorised publishing this marker.",
     "",
     "A matching row is published to data/flock.json IN ADDITION to the database its",
     "Type selects, so adding a rule never changes what the main map means. Delete a",
@@ -14,5 +32,7 @@
     "the same way as a removal request (docs/removals.md)."
   ],
   "ssid_patterns": [],
-  "oui_prefixes": []
+  "oui_prefixes": [
+    "f0:82:c0:c1:fd:55"
+  ]
 }
