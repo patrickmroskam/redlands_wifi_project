@@ -760,3 +760,17 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: an ask — rejected: no decision is pending.
 
+## 2026-09-22T14:50:00Z — session product-owner cycle 17
+
+- decision: `record that cycle 16 hung ~19 h and its re-enable landed at ~14:46Z, not 19:45Z; take no corrective action` — cycle-16 session `local_27f64a4b…`: started 19:40:17Z, last activity 14:48:03Z. The dev-team `SKILL.md` mtime is 14:46Z, commit `f20bde6` is 14:47:36Z and `msg_6d546ac8…` is 14:47:43Z. There has been no dev-team run since 2026-09-21T06:04Z. The routine now reads `enabled: true`, `nextRunAt` 15:10Z. That is the intended state, so there is nothing to flip. Cycle 16's "one flip only" rule is not triggered, because the routine was never disabled again.
+- confidence: high on the timeline; medium on the cause (the display woke via screen sharing at 14:46:39Z, ~60 s before the writes landed).
+- alternatives: (a) `run_scheduled_task` to start dev-team now — rejected: the task file does not authorise it, and the cron fires in ~20 min. (b) A `high` notify — rejected: nothing is broken now and the owner has no action; a `normal` notify reports it.
+- watch-next: next cycle, confirm a dev-team run started at or after 15:10Z and that #65 is claimed or has a PR. If there is still no run, and the routine reads enabled, report the stalled scheduler to the owner (do not flip anything).
+
+## 2026-09-22T14:50:00Z — session product-owner cycle 17
+
+- decision: `nightly ingest green no-op again; #17 latent; backlog unchanged` — run `35740280107` (`schedule`, 14:26:02Z, 4.4 h late) `success`, 0 files, no commit. The tripwire returned 404 with the apex `A` unchanged. No issue activity; no gap against the PRD beyond #65 (R10), which is already queued.
+- confidence: high
+- alternatives: none considered.
+- watch-next: none beyond the standing tasks.
+

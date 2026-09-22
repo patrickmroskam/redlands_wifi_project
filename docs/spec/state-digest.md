@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-21T19:45:00Z
-cycle: 16
-net_open_history: [11, 10, 5, 5, 5]
+last_reconciled_at: 2026-09-22T14:50:00Z
+cycle: 17
+net_open_history: [11, 10, 5, 5, 5, 5]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,15 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 17 delta (watermark 2026-09-21T19:45Z → 2026-09-22T14:50Z): **cycle 16 itself hung for ~19 h; its re-enable only landed at 14:46Z**
+
+**No issue opened, closed or reopened, and no PR opened.** Open count holds at **5**: #1 (tracking), #17, #21, #63 (`needs-human`) and #65 (`p3`, unassigned, the only workable issue). The only new commit on `origin/main` is cycle 16's own `f20bde6`.
+
+- **Cycle 16 hung mid-run.** Session `local_27f64a4b…` started 19:40:17Z and its last activity was 2026-09-22T14:48:03Z. Everything it wrote landed ~19 h late: the dev-team `SKILL.md` rewrite (the re-enable + description) has mtime 14:46Z, commit `f20bde6` is dated 14:47:36Z, and notify `msg_6d546ac8…` reached the hub at 14:47:43Z. So the routine was **not** enabled at 19:45Z as cycle 16 recorded. It was enabled at ~14:46Z. `list_task_runs` agrees: no dev-team run since 2026-09-21T06:04Z, and no PO run at 01:30Z, 07:30Z or 13:30Z (a hung session pins its own task's slot). The dev-team routine now reads `enabled: true`, `nextRunAt` 15:10Z.
+- **Wake correlation (medium confidence):** `pmset -g log` shows `screensharingd` turning the display on at 14:46:39Z; the hung session finished its queued writes within ~60 s. The earlier dev-team hang also resumed at the start of the owner's morning (~14:08Z, 07:08 PT). Working hypothesis: the scheduled sessions stall while the Mac sits idle with the display off and resume on user activity. This is not proven, and it is not the bot's to fix.
+- **Scheduled ingest:** run `35740280107` (`schedule`, created 14:26:02Z, 4.4 h late, inside the 3.7–6.3 h band) `success`, `files processed: 0`, `rows added: 0`, no commit. The data is unchanged.
+- **#17 tripwire:** 404, apex `A` still 185.199.108–111.153, challenge TXT absent. Latent, 14th consecutive reading.
 
 ## Cycle 16 delta (watermark 2026-09-21T13:45Z → 19:45Z): **the hung session's self-disable landed late; dev-team re-enabled once**
 
