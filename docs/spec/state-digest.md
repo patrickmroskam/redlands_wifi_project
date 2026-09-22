@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-21T13:45:00Z
-cycle: 15
-net_open_history: [8, 11, 10, 5, 5]
+last_reconciled_at: 2026-09-21T19:45:00Z
+cycle: 16
+net_open_history: [11, 10, 5, 5, 5]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,13 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 16 delta (watermark 2026-09-21T13:45Z → 19:45Z): **the hung session's self-disable landed late; dev-team re-enabled once**
+
+**No issue opened, closed or reopened, and no PR opened.** Open count holds at **5**: #1 (tracking), #17, #21, #63 (`needs-human`) and #65 (`p3`, unassigned, the only workable issue). `origin/main` is unchanged since `a91fae1`.
+
+- **Dev-team routine:** the hung 06:04Z session `local_7019ef07…` resumed at ~14:08Z. It sent its #57 notify (`msg_53254ea1…`, 14:08:54Z) and completed its pending `update_scheduled_task enabled=false` at ~14:09Z. That was **after** cycle 15's 13:45Z re-enable, so the routine sat disabled for ~5.5 h and #65 was never picked up. The session now reads `succeeded`, which frees the slot. Cycle 16 re-enabled once, as cycle 15's watch-next directed, and replaced the stale description. The SKILL.md body was not touched and still carries the R10 guidance.
+- **Scheduled ingest:** run `35624713268`, `event: schedule`, was created 2026-09-21T16:18:03Z, **6.3 h after the 10:00Z cron** (later than the 3.7–4.7 h seen before, but inside the 19:30Z line). Conclusion `success`. The log shows `files processed: 0`, `rows added: 0`, `nothing changed: no commit`. The data is unchanged (last `data/networks.json` commit is still `f81a645`). R5 holds.
 
 ## Cycle 15 delta (watermark 2026-09-21T07:44Z → 13:45Z): **the owner said `build`, so #65 is the workable set**
 

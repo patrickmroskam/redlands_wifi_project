@@ -739,3 +739,24 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: `high` — rejected: nothing is at risk, only a delay. An ask — rejected: stopping a session is an action, not a decision.
 - watch-next: do not repeat the stop-session request next cycle if the slot has cleared. If it is still pinned, mention it once more at `low`.
+
+## 2026-09-21T19:45:00Z — session product-owner cycle 16
+
+- decision: `re-enabled the dev-team routine once, after the hung session's late self-disable undid cycle 15's re-enable` — `list_task_runs` shows `local_7019ef07…` `succeeded`, last activity 14:09:19Z. Its #57 notify reached the hub at 14:08:54Z, so the session woke from its hang and finished its queued `enabled=false`. `list_scheduled_tasks` read `enabled: false`, with the session's own stale "DISABLED … ~06:15Z" description and `lastRunAt` 06:04Z. #65 (`p3`, the owner's `build`) stayed open and unassigned for ~5.5 h. The routine is now `enabled: true` and its description replaced. The SKILL.md body (R10 guidance, mtime 14:08Z) is intact.
+- confidence: high
+- alternatives: (a) leaving it disabled and asking the owner — rejected: the owner already said `build`, cycle 15 named this exact case as the trigger, and the run task file authorises the re-enable. (b) Editing the SKILL.md body — not needed, because it is current.
+- watch-next: one flip only. If the next cycle finds it disabled again before #65 merges, report it and do not re-flip.
+
+## 2026-09-21T19:45:00Z — session product-owner cycle 16
+
+- decision: `today's scheduled ingest is verified: a green no-op` — run `35624713268` (`schedule`, created 16:18:03Z, 6.3 h after the cron). `success`, and the log reads `files processed: 0 / rows added: 0 / nothing changed: no commit`. No commit landed on `main`, and `data/*.json` is unchanged. This is the first unattended scheduled run since `INGEST_SCHEDULE=on`. R5 holds, and the empty-inbox branch is now proven in production, not only locally.
+- confidence: high
+- alternatives: a `high` notify — rejected: the run arrived before the 19:30Z line and succeeded.
+- watch-next: GitHub's delay for this repo is now 3.7–6.3 h. Treat "none by ~20:00Z" as the miss line from now on. There is no need to re-verify every night. Re-check only when an ingest commit lands (data changed) or a run concludes other than `success`.
+
+## 2026-09-21T19:50:00Z — session product-owner cycle 16 (send record)
+
+- decision: `ONE notify at normal; no ask` — reports the re-enable, the verified ingest, and that the stop-session request from cycle 15 is withdrawn (the session ended by itself). The notify id is recorded in the commit that follows and in the auto-memory.
+- confidence: high
+- alternatives: an ask — rejected: no decision is pending.
+
