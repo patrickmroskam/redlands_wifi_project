@@ -844,3 +844,23 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high
 - alternatives: an `ask` — rejected, a relaunch is an action, not a decision, and ask `msg_7929ff83` already settled the #65 scope question.
 - **sent:** `msg_79fa8544-4f05-4e11-aab5-56c2b668e4df`, `high`, `delivered`, 2026-09-23T01:58Z. One message, not retried. Verified from the hub, not the repo.
+
+## 2026-09-23T07:55:00Z — session product-owner cycle 20
+
+- decision: `the #65 wedge resolved as case (a); no action owed` — the app was relaunched, a fresh dev-team run shipped #65 as PR #72 (`bb657ed`) and then disabled itself per the task-file rule. The cycle-19 wedge task is DONE.
+- confidence: high (closedAt 03:09:13Z, dev-team `enabled:false`, lastRunAt 02:43Z, notify `msg_1f6272bc…` on the hub).
+- alternatives: re-enabling the dev team — rejected; `gh issue list` shows no unblocked p0–p3 issue, so it would idle hourly.
+- watch-next: re-enable only on an owner "yes" to the cycle-20 ask, or when the owner unblocks #17/#21/#63.
+
+## 2026-09-23T07:55:00Z — session product-owner cycle 20
+
+- decision: `bundled the two open post-v1 proposals into ONE select ask` — (1) the R9.4 full-MAC amendment, carried since cycle 19; (2) ingest-on-upload, for the same-filename overwrite window the owner's 2026-09-22 session surfaced and offered but never filed. Neither is in the ratified PRD, so both are proposals, not issues. The overwrite claim is stated with its limit: the replaced file survives in the inbox's git history, so no data is lost, but no ingest ever maps it.
+- confidence: high that it is a decision rather than an FYI; with the backlog empty, the owner's answer is the only thing that can move the project.
+- alternatives: (a) another notify restating R9.4 — rejected; a select ask gives a closeable answer, and a second notify would drip. (b) Filing ingest-on-upload as an issue — rejected; that is new scope, and it needs an owner token.
+- **sent:** ask `msg_18000c3c-4780-4cd7-9a11-002884b1db46`, select, idempotency key `redlands-po-D20-postv1-fixes`, status `open`. Not to be re-asked while open. It supersedes the cycle-24 drop rule for R9.4: a "neither" answer ends both proposals.
+
+## 2026-09-23T07:55:00Z — session product-owner cycle 20
+
+- decision: `refreshed the dev-team routine's SKILL.md` — its body still named #65 as the workable set (the known silent-staleness trap). Rewritten to "EMPTY — re-derive on re-enable". The R10 invariants (separate classify/kindOf axes, nothing above `#map`, full Playwright suite) and the full-MAC Flock rule are carried forward. Description left as the dev-team wrote it (accurate).
+- confidence: high
+- alternatives: none.

@@ -1,12 +1,13 @@
 # Redlands Wifi Project — release readiness
 
-*Cycle 19 · 2026-09-23T01:55Z · PRD `ratified` · constitution in force*
+*Cycle 20 · 2026-09-23T07:55Z · PRD `ratified` · constitution in force*
 
-## Burndown: v1 is 10/10 done
+## Burndown: v1 is 10/10 done, and R10 has shipped
 
-All ten Release Criteria in the PRD's Definition of Done are met and have been since
-2026-09-21 (R5, issue #61). **Nothing in v1 is outstanding.** Everything below is post-v1
-or housekeeping.
+All ten Release Criteria in the PRD's Definition of Done have been met since 2026-09-21
+(R5, #61). The post-v1 tranche the owner commissioned, **R10 (network kinds + per-kind map
+toggles, #65)**, shipped at 03:09Z as PR #72 (`bb657ed`): CI green (204 Python + 88
+Playwright), live on Pages. **Nothing in the ratified spec is unbuilt.**
 
 ## Live state, verified against the published data
 
@@ -16,72 +17,51 @@ or housekeeping.
 | `data/bluetooth.json` | **3,404** | 2026-09-22T19:41:56Z |
 | `data/flock.json` | **1** | 2026-09-22T22:11:17Z |
 
-Checked by fetching the published JSON from GitHub Pages, per the standing rule to verify a
-publish against the data rather than the job summary.
+Fetched from GitHub Pages this cycle. The last scheduled ingest (2026-09-22T14:26Z) was
+green; tonight's `0 10 * * *` fire has not come due yet (this cycle ran at 07:40Z).
 
-## What moved this cycle
+## What moved since cycle 19
 
-- **The first Flock camera is on the map.** The owner drove a live session on 2026-09-22
-  (19:40Z–22:16Z), confirmed the device, and authorised the publish ("publish it", 22:07:25Z).
-  `f0:82:c0:c1:fd:55` shipped in **#70**; **#71** corrected `flock.html`, which still told
-  visitors no rule had been confirmed. R9.4 and R9.5 now hold on real data.
-- **The rule is one full MAC, on purpose.** A vendor prefix would have marked a resident's
-  Ring doorbell as a surveillance camera — the firmware's own Flock OUI list contains the USI
-  prefix that doorbell uses. See the R9.4 amendment proposal below.
-- **No issue opened, closed or reopened.** Open count holds at 5.
+- **The #65 wedge cleared the way cycle 19 said it would.** The app was relaunched, PID
+  52097 was gone, and the next dev-team run rebuilt #65 from `origin/main` (the wedged
+  worker's ~3 min of uncommitted work was discarded, as planned) and merged it.
+- **The dev-team routine disabled itself** at ~03:2xZ, per its task-file rule. The backlog
+  is empty of workable issues, which is why it's off. It isn't a fault.
+- **The dev-team routine's prompt was stale.** It still named #65 as the workable set. Refreshed
+  this cycle to "empty; re-derive on re-enable", with the R10 and Flock invariants carried forward.
 
-## The one blocker: #65 cannot move, and only the owner can clear it
+## Decisions the owner needs to make: ONE ask, optional
 
-The dev-team worker that claimed **#65** (R10 — network kinds and per-kind map toggles) froze
-at 2026-09-22T15:16:41Z and has been wedged ever since. As of this report it is **10 h 32 m**
-old, still reading `running`, with its process alive.
+Ask `msg_18000c3c-4780-4cd7-9a11-002884b1db46` (select), idempotency key
+`redlands-po-D20-postv1-fixes`. Answers: build both / MAC rule only / ingest-on-upload only / neither.
 
-Because the scheduler treats a `running` run as occupying the slot, **ten hourly fires have
-been skipped** (16:10 → 01:10) and one more will be lost every hour. #65 is the only workable
-issue in the backlog, so the dev-team routine is effectively stopped.
+1. **R9.4 full-MAC amendment.** Every Flock rule SHALL be one device's full six-octet MAC,
+   never a vendor prefix. It hardens behaviour that has already shipped. It adds no scope.
+2. **Ingest on upload.** A second same-named upload before the (4–6 h late) nightly run
+   replaces the first file, whose rows are then never mapped. They stay in the inbox's git
+   history, so nothing is lost, but nothing picks them up either. Proposed fix: an inbox push
+   triggers the ingest (needs one owner-provided token). Workaround meanwhile: run the ingest by
+   hand after uploading.
 
-**This is now called permanent, not slow.** Two independent facts rule out it thawing on its
-own: the owner was active at 19:41Z, and then ran a five-hour interactive session on the same
-machine while this one stayed frozen at its 15:16:41Z mark.
-
-**The fix is to quit and reopen the Claude app.** The cost is about three minutes of uncommitted
-work in a scratch worktree, which the next run redoes from scratch. The site, the data and the
-git history are untouched by this.
-
-*Why this is escalated now and was not before:* cycle 18 asked at `normal` (19:48Z). At 22:07Z
-the owner was mid-publish in their own live session — **a relaunch would have killed it**, so not
-relaunching was correct, and that notify never said so. That session ended at 22:16Z. No owner
-work is in flight now, which is what makes this a clean moment.
-
-## Decisions the owner needs to make
-
-1. **Relaunch the app** — an action, not a decision, but it is the only thing unblocking #65.
-2. **R9.4 amendment (optional, post-v1).** Write the full-MAC rule into the spec: *every Flock
-   rule SHALL be a full six-octet address, never a vendor prefix.* It is already how the shipped
-   rule works and why, but it currently lives only in a JSON comment and a web page — neither of
-   which an actor must read, so a future rule could widen to an OUI and publish a neighbour's
-   doorbell. Marked *awaiting owner ratification* in the PRD. Declining is fine; it stays where
-   it is.
-3. **"Each type of network" (standing, optional).** R10 reads this as the *kind* axis — vehicle /
-   phone hotspot / printer / default-looking / hidden / named. If the security types
-   (open / WEP / WPA) were meant, say so before #65 ships.
+Either "yes" becomes a `p3` issue and re-enables the dev team. "Neither" closes both proposals
+for good.
 
 ## Parked, correctly — no action implied
 
 | issue | tier | why it is parked |
 |---|---|---|
 | #63 | `p2` `needs-human` | Rewrite 48 pre-cutover logs out of public git history. Owner-authorised in principle; destructive and irreversible, so no actor runs it unattended. |
-| #17 | `p3` `blocked` `needs-human` | `redlandswifiproject.com` takeover window. **Tripwire latent, sixteenth consecutive reading** — apex 404 on GitHub's "Site not found", `A` records unchanged, no challenge TXT. |
-| #21 | `p3` `blocked` `needs-human` | Optional GitHub security settings (Dependabot alerts, private vulnerability reporting). |
+| #17 | `p3` `blocked` `needs-human` | `redlandswifiproject.com` takeover window. **Tripwire latent, seventeenth consecutive reading.** The apex returns 404 on GitHub's "Site not found" page, the `A` records are still 185.199.108–111.153, and there is no challenge TXT. |
+| #21 | `p3` `blocked` `needs-human` | Optional GitHub security settings. |
 | #1 | tracking | The v1 umbrella. No priority label, so no worker selects it. |
 
-Reachability sweep run on all five open issues: the reachable-but-undoable set is **empty**.
-No labels changed, no priorities changed.
+Evidence for "no agent work": `gh issue list --state open --json number,labels,assignees` →
+four open issues (#1 `tracking`; #17, #21 `p3 blocked needs-human`; #63 `p2 needs-human`), none
+assigned. The reachability sweep over those four found nothing that is reachable but undoable.
 
 ## Convergence tripwire
 
-**Not tripped.** v1 is complete, the backlog is not growing (open count flat at 5 for seven
-cycles), and no actor is generating work for itself. The one incomplete item, #65, is blocked on
-a host-level fault rather than on scope. The correct end state for this project remains: #65
-ships, the hourly routine disables itself per its task-file rule, and the PO pass continues at
-its six-hour cadence as a watchdog over the nightly ingest.
+**Not tripped.** Across 36 issues ever filed, 32 are closed and 4 are open, and all 4 are parked.
+The open count fell from 5 to 4. No actor is generating its own work. The project has reached
+the end state cycle 19 predicted: the hourly worker is off, and this six-hour pass continues as
+a watchdog over the nightly ingest and the #17 tripwire.

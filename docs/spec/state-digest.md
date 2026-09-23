@@ -1,10 +1,10 @@
 ---
-last_reconciled_at: 2026-09-23T01:55:00Z
-cycle: 19
-net_open_history: [10, 5, 5, 5, 5, 5, 5]
+last_reconciled_at: 2026-09-23T07:55:00Z
+cycle: 20
+net_open_history: [5, 5, 5, 5, 5, 5, 4]
 polish_backlog_depth: 0
-last_full_rebuild_cycle: 10
-next_full_rebuild_cycle: 20
+last_full_rebuild_cycle: 20
+next_full_rebuild_cycle: 30
 ---
 
 # Redlands Wifi Project — state digest (PO working memory)
@@ -14,6 +14,44 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 20 delta (watermark 2026-09-23T01:55Z → 07:55Z) — FULL REBUILD: **#65 shipped, the backlog is empty, the hourly worker is off**
+
+**Full rebuild, as scheduled (`digest_full_rebuild_every_cycles: 10`).** The rollups below were
+re-derived from `gh issue list --state all`, not carried forward: **36 issues ever, 32 closed,
+4 open.**
+
+| open | labels | assignee | movable by an agent? |
+|---|---|---|---|
+| #1 | `tracking` | — | no (umbrella, no tier) |
+| #17 | `p3` `blocked` `needs-human` | — | no (DNS / domain verification) |
+| #21 | `p3` `blocked` `needs-human` | — | no (repo security settings) |
+| #63 | `p2` `needs-human` | — | no (force-push history rewrite) |
+
+**Closed this window: #65** (2026-09-23T03:09:13Z, PR #72 → `bb657ed`). The wedge that held it
+for ~12 h cleared when the app was relaunched (PID 52097 gone). The fresh dev-team run discarded
+the dead worker's `wt65` work, rebuilt it from `origin/main`, and merged it on green CI. Cycle 19's
+three-way trigger therefore resolved as **case (a)**. The dev-team routine then set itself to
+`enabled:false` (lastRunAt 02:43Z), per the task-file rule. That is correct: no unblocked p0–p3 issue remains.
+
+**Owner channel checked, not just the hub.** `git log origin/main` shows nothing after `bb657ed`.
+The last two merged PRs are #72 and #71. `list_sessions` shows no owner-driven redlands session
+since cycle 19. The only hub traffic for this project is the dev-team's #65 notify
+(`msg_1f6272bc…`). The kthxbai ask `msg_40c6d395` answered at 03:16Z was a DRY RUN rehearsal,
+not the relaunch.
+
+**Live data unchanged:** networks 23,597 · bluetooth 3,404 · flock 1 (Pages JSON). The last
+scheduled ingest, at 2026-09-22T14:26Z, was green. The two `workflow_dispatch` runs (19:41Z,
+22:10Z) were also green.
+
+**PO-maintained state repaired:** the dev-team `SKILL.md` body still said "Workable set: #65".
+It has been rewritten to "EMPTY, re-derive on re-enable", and it keeps the durable R10 and
+full-MAC Flock invariants.
+
+**One ask opened:** `msg_18000c3c-4780-4cd7-9a11-002884b1db46` bundles the two open post-v1
+proposals (the R9.4 full-MAC amendment, and ingest-on-upload for the same-filename overwrite
+window) into a single select. It replaces the notify that cycle 19 would otherwise have
+repeated. Nothing else is owed from the owner.
 
 ## Cycle 19 delta (watermark 2026-09-22T19:55Z → 2026-09-23T01:55Z): **the owner drove a live session and shipped the first Flock camera; the #65 wedge is now permanent**
 
