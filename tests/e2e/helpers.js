@@ -13,6 +13,7 @@ const FIXTURE_DUP = path.join(__dirname, '..', 'fixtures', 'networks-dup.json');
 const FIXTURE_CORNERS = path.join(__dirname, '..', 'fixtures', 'networks-corners.json');
 const FIXTURE_EMPTY = path.join(__dirname, '..', 'fixtures', 'networks-empty.json');
 const FIXTURE_CATEGORIES = path.join(__dirname, '..', 'fixtures', 'networks-categories.json');
+const FIXTURE_KINDS = path.join(__dirname, '..', 'fixtures', 'networks-kinds.json');
 
 // Call this at the top of every spec file. These hooks are deliberately NOT registered at
 // this module's top level: Node caches a module after its first require, so top-level
@@ -80,8 +81,28 @@ function listRow(page, category, kind = 'cat-row') {
   return page.locator(`#category-table tr.${kind}[data-category="${category}"]`).locator('th, td');
 }
 
+// The cells of a kind list row (#65, R10.2): name, count, share. Keyed on data-kind, not
+// data-category, so `default` picks the kind row and never the security one.
+function kindRow(page, kind) {
+  return page.locator(`#kind-table tr[data-kind="${kind}"]`).locator('th, td');
+}
+
+// The kinds of the markers the map will actually hit-test, in draw order (#65, R10.3).
+function visibleKinds(page) {
+  return page.evaluate(() => window.__rwp.markers.map((m) => m.options.networkKind));
+}
+
+// Flip one kind's toggle and wait for the map to settle on the new visible set.
+async function toggleKind(page, kind, on) {
+  const box = page.locator(`#kind-toggle-${kind}`);
+  await box.setChecked(on);
+  await expect.poll(() => page.evaluate((k) => window.__rwp.markers
+    .every((m) => m.options.networkKind !== k), kind)).toBe(!on);
+}
+
 module.exports = {
   FIXTURE_3, FIXTURE_EDGE, FIXTURE_XSS, FIXTURE_DUP, FIXTURE_CORNERS, FIXTURE_EMPTY,
-  FIXTURE_CATEGORIES,
+  FIXTURE_CATEGORIES, FIXTURE_KINDS,
   installHooks, useFixture, markerKinds, expectMarkers, markerPoint, clickMarker, listRow,
+  kindRow, visibleKinds, toggleKind,
 };

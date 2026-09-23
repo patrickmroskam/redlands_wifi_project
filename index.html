@@ -37,6 +37,14 @@
       <div id="map"></div>
     </section>
 
+    <!-- Per-kind map toggles (#65, R10.3). map.js fills and unhides this once it has plotted the
+         networks; with no script, or no database, there is nothing to filter and it stays hidden.
+         Below the map, not above it: six toggles are ~160 px tall at phone width, which is most of
+         a 740 px screen, and pushing the map itself under the fold is a poor trade for a filter. -->
+    <fieldset id="kind-filters" class="filters" hidden>
+      <legend class="filters-legend">Show on map</legend>
+    </fieldset>
+
     <section class="breakdown" aria-labelledby="breakdown-heading">
       <h2 id="breakdown-heading" class="section-title">Network breakdown</h2>
       <div class="breakdown-grid">
@@ -49,6 +57,11 @@
           <h3 class="col-title">By category</h3>
           <p id="list-status" class="col-note">&gt; loading…</p>
           <div id="category-list" class="category-list" hidden></div>
+        </div>
+        <div class="breakdown-col" id="kind-col">
+          <h3 class="col-title">By kind</h3>
+          <p id="kind-status" class="col-note">&gt; loading…</p>
+          <div id="kind-list" class="category-list" hidden></div>
         </div>
       </div>
     </section>

@@ -32,7 +32,21 @@
     var listStatus = document.getElementById('list-status');
     if (listStatus) listStatus.textContent = '> category list unavailable';
   }
+  // Likewise for a stats.js cached from before the kind column existed (#65).
+  if (!window.RWPStats || !window.RWPStats.kindOf) {
+    var kindStatusEl = document.getElementById('kind-status');
+    if (kindStatusEl) kindStatusEl.textContent = '> kind list unavailable';
+  }
   var errorEl = document.getElementById('error');
+
+  // Per-kind map filter (#65, R10.3). Only the main map has both the toggle container and a
+  // classifier to drive it; the Bluetooth and Flock pages share this script but have neither, so
+  // they keep the single unfiltered layer they have always had. A stats.js cached from before R10
+  // has no kindOf either, and degrades the same way.
+  var filtersEl = document.getElementById('kind-filters');
+  var KINDS = window.RWPStats && window.RWPStats.KINDS;
+  var kindClassifier = window.RWPStats && window.RWPStats.kindOf;
+  var kindFilterOn = !!(filtersEl && KINDS && kindClassifier);
 
   function showError(message) {
     var line = document.createElement('p');
@@ -208,8 +222,11 @@
   // once no popup is open, or its snap-back would pan the new popup out of view again. If a popup
   // reopened before the check, the fence stays loose until that popup closes, which restores it.
   var openPopups = 0;
+  // Which marker the open popup belongs to, so hiding that marker's kind can close it (R10.3).
+  var openPopupSource = null;
   map.on('popupopen', function (e) {
     openPopups += 1;
+    openPopupSource = e.popup && e.popup._source;
     // Leaflet decides whether this popup needs auto-panning into view before it fires popupopen,
     // and it measures against wherever the map is sitting at that instant. Open a popup while the
     // fence's restore pan is still running — a tap on one marker moments after closing another —
@@ -227,6 +244,7 @@
   });
   map.on('popupclose', function () {
     openPopups -= 1;
+    openPopupSource = null;
     setTimeout(function () {
       if (!fenceBounds || openPopups !== 0) return;
       // Restoring the fence pans the map back inside it. Doing that while the popup's own auto-pan
@@ -246,6 +264,63 @@
   // opens the popup at the click point. So markers are not interactive themselves: a click on the
   // map opens the marker whose centre is nearest, anchored on that centre.
   var projected = { zoom: null, points: [] };
+
+  // Every marker in plot order, and the kinds currently switched off. window.__rwp.markers holds
+  // only the visible ones: a hidden marker must not win a click, and the smoke test reads the same
+  // list. With every kind on — the default — the two are identical, order included.
+  var allMarkers = [];
+  var hiddenKinds = {};
+  var kindLayers = {};
+
+  function refreshVisibleMarkers() {
+    window.__rwp.markers = kindFilterOn
+      ? allMarkers.filter(function (m) { return !hiddenKinds[m.options.networkKind]; })
+      : allMarkers;
+    // The projection cache is keyed on that list; a toggle can change it without changing its
+    // length (one kind off, another on), so drop the cache outright rather than letting it guess.
+    projected = { zoom: null, points: [] };
+  }
+
+  function setKindVisible(id, visible) {
+    var layer = kindLayers[id];
+    if (!layer) return;
+    hiddenKinds[id] = !visible;
+    if (visible) {
+      if (!map.hasLayer(layer)) layer.addTo(map);
+    } else {
+      // Removing a marker's layer does not close a popup already open on it.
+      if (openPopupSource && openPopupSource.options.networkKind === id) map.closePopup();
+      if (map.hasLayer(layer)) map.removeLayer(layer);
+    }
+    refreshVisibleMarkers();
+  }
+
+  // One checkbox per kind, all checked (R10.3). Built here rather than in index.html so the
+  // controls only ever exist when there are markers behind them.
+  function buildKindFilters() {
+    KINDS.forEach(function (k) {
+      var item = document.createElement('label');
+      item.className = 'filter-item';
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = true;
+      box.id = 'kind-toggle-' + k.id;
+      box.setAttribute('data-kind', k.id);
+      box.addEventListener('change', function () { setKindVisible(k.id, box.checked); });
+      var swatch = document.createElement('span');
+      swatch.className = 'pie-swatch kind-' + k.id;
+      swatch.setAttribute('aria-hidden', 'true');
+      var text = document.createElement('span');
+      text.className = 'filter-label';
+      text.textContent = k.label;
+      item.appendChild(box);
+      item.appendChild(swatch);
+      item.appendChild(text);
+      filtersEl.appendChild(item);
+    });
+    filtersEl.hidden = false;
+  }
+
   function nearestMarker(latlng) {
     var markers = window.__rwp.markers;
     var zoom = map.getZoom();
@@ -311,7 +386,10 @@
     var skipped = 0;
     var duplicates = 0;
     var seen = Object.create(null);
-    var markers = L.layerGroup();
+    // One layer group per kind where the filter runs, so a toggle is a single add/remove; one
+    // group for everything where it does not (the Bluetooth and Flock maps).
+    var markers = kindFilterOn ? null : L.layerGroup();
+    if (kindFilterOn) KINDS.forEach(function (k) { kindLayers[k.id] = L.layerGroup(); });
     var plottedNets = [];
     records.forEach(function (net) {
       var lat = toCoord(net && net.lat);
@@ -330,22 +408,31 @@
         seen[key] = true;
       }
       var kind = kindOf(net);
+      var netKind = kindFilterOn ? kindClassifier(net) : null;
       // The popup is built only when it opens; 18k detached popup trees would cost memory at load.
       var marker = L.circleMarker([lat, lon], {
         renderer: markerRenderer,
         interactive: false,
         kind: kind,
+        networkKind: netKind,
         radius: MARKER_RADIUS,
         weight: 1,
         color: '#000',
         fillColor: COLORS[kind],
         fillOpacity: 0.9
-      }).bindPopup(function () { return popupFor(net); }, POPUP_OPTIONS).addTo(markers);
-      window.__rwp.markers.push(marker);
+      }).bindPopup(function () { return popupFor(net); }, POPUP_OPTIONS)
+        .addTo(kindFilterOn ? kindLayers[netKind] : markers);
+      allMarkers.push(marker);
       plottedNets.push(net);
       plotted += 1;
     });
-    markers.addTo(map);
+    if (kindFilterOn) {
+      KINDS.forEach(function (k) { kindLayers[k.id].addTo(map); });
+      if (plotted > 0) buildKindFilters();
+    } else {
+      markers.addTo(map);
+    }
+    refreshVisibleMarkers();
     statsEl.textContent = '> ' + plotted.toLocaleString('en-US') + ' ' + NOUN + (plotted === 1 ? '' : 's') +
       ' mapped · last updated ' + formatUpdated(db.updated_at);
     // The breakdown counts exactly the networks on the map (#12). A bug there must not blank the map.

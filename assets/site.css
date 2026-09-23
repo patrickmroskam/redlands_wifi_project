@@ -179,6 +179,10 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 @media (min-width: 720px) {
   .breakdown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* The kind column (#65) only joins the row when three fit; below that it wraps under the other two. */
+@media (min-width: 1040px) {
+  .breakdown-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .breakdown-col { min-width: 0; padding: 10px 14px; border: 1px solid var(--line); background: var(--panel); }
 .col-title { margin: 0 0 8px; color: var(--amber); font-size: 1rem; }
 .col-note { margin: 0; color: var(--green-dim); }
@@ -210,6 +214,33 @@ code { color: var(--amber); overflow-wrap: anywhere; }
 .cat-table .sub-row .cat-count { color: var(--green-dim); }
 .cat-table tfoot th, .cat-table tfoot td { border-top: 1px dashed var(--line); color: var(--amber); font-weight: bold; }
 .hidden-note { margin-top: 8px; font-size: 0.85rem; }
+
+/* Per-kind map toggles (#65, R10.3), directly above the map they filter. */
+.filters {
+  margin: 8px 0 0;
+  padding: 8px 14px 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: center;
+  min-width: 0;
+}
+.filters[hidden] { display: none; }
+.filters-legend { float: left; width: 100%; padding: 0; margin: 0 0 6px; color: var(--amber); }
+.filter-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; }
+.filter-item input { accent-color: var(--green); margin: 0; cursor: pointer; }
+.filter-item .pie-swatch { flex: 0 0 auto; }
+.filter-label { overflow-wrap: anywhere; }
+
+/* Kind colours (#65), shared by the toggles and the kind table. */
+.kind-vehicle { --cat: #ff8a3d; }
+.kind-phone { --cat: #2de2e6; }
+.kind-direct { --cat: #4f9dff; }
+.kind-default { --cat: #ff5f56; }
+.kind-hidden { --cat: #8a9a8e; }
+.kind-named { --cat: #33ff66; }
 
 /* Category colours, shared by the pie, its legend, and the #13 list. Open matches the map legend. */
 .cat-default { --cat: #ff5f56; }
