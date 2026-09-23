@@ -843,3 +843,4 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - decision: `ONE notify at high; no ask opened` — carries: the relaunch request with the reason it is newly safe, the answer to the owner's filename question, the one optional R9.4 ruling, and the standing "type of network" correction invitation. The id is recorded in the commit that follows and in the auto-memory.
 - confidence: high
 - alternatives: an `ask` — rejected, a relaunch is an action, not a decision, and ask `msg_7929ff83` already settled the #65 scope question.
+- **sent:** `msg_79fa8544-4f05-4e11-aab5-56c2b668e4df`, `high`, `delivered`, 2026-09-23T01:58Z. One message, not retried. Verified from the hub, not the repo.
