@@ -1,7 +1,7 @@
 ---
-last_reconciled_at: 2026-09-22T19:55:00Z
-cycle: 18
-net_open_history: [11, 10, 5, 5, 5, 5, 5]
+last_reconciled_at: 2026-09-23T01:55:00Z
+cycle: 19
+net_open_history: [10, 5, 5, 5, 5, 5, 5]
 polish_backlog_depth: 0
 last_full_rebuild_cycle: 10
 next_full_rebuild_cycle: 20
@@ -14,6 +14,74 @@ next_full_rebuild_cycle: 20
 > issues scanned, no delta watermark applied. **Cycle 10 was the second full rebuild**
 > (`digest_full_rebuild_every_cycles: 10`): rollups re-derived from live state, not carried
 > forward. Next full rebuild due at cycle 20.
+
+## Cycle 19 delta (watermark 2026-09-22T19:55Z → 2026-09-23T01:55Z): **the owner drove a live session and shipped the first Flock camera; the #65 wedge is now permanent**
+
+**No issue opened, closed or reopened.** Open count holds at **5**: #1 (tracking), #17, #21, #63 (`needs-human`) and #65 (`p3`, still claimed by the wedged worker). Two PRs opened and merged — **#70** and **#71** — both owner-directed inside a live session, not by the dev-team routine. Three new commits on `origin/main`: `8024c26` (#70), `cc1038c` (ingest), `996c02d` (#71).
+
+### Correction: there was no concurrent PO run. The owner took over cycle 17's session.
+
+Cycle 18 recorded a second PO session in flight alongside it and read it as a scheduler catch-up replay. That was wrong, and the transcript settles it. Session `local_fae990b8…` (transcript `63e89bbc…`) **is** the cycle-17 run: it started 14:48:10Z and sent cycle 17's notify at 14:50:20Z. At **19:40:09Z the owner typed into it**, and it ran as an interactive, owner-driven session until 22:16:02Z. Three owner turns are on the record:
+
+| time | the owner said |
+|---|---|
+| 19:40:09Z | "I just uploaded some files into the inbox that my hardware reported at least 2 flock cameras. have the dev team run the injest and check the flock cameras" |
+| 20:21:52Z | "put in there somewhere...the logs are always named the same so even if the same name shows up, the system should look at it as a new log" |
+| 22:07:25Z | "publish it" |
+
+Two consequences for the record. First, **the Flock publish was explicitly owner-authorised** — `publish it` at 22:07:25Z, after the session showed the owner the candidate analysis. It is not an unattended actor publishing a camera location. Second, **no OH HAI notify was owed for it and none was sent**: the owner was in the room and got the full summary in chat at 22:16Z. Cycle 19 does not re-report it.
+
+*Instrument note:* a hub-only read of this window shows silence from 19:48Z onward and would have reported "no owner movement" for a stretch in which the owner shipped two PRs. This is the cycle-12 standing task (`check repo/API state, not just the hub`) firing again, in a new shape — the owner's channel was a session, not the hub.
+
+### The first Flock camera is published, and the rule is deliberately one full MAC
+
+`data/flock-rules.json` carries its first entry: `f0:82:c0:c1:fd:55` (Silicon Laboratories), merged in **#70** (`8024c26`). Verified against the published data, not the job summary:
+
+| dataset | before | after |
+|---|---|---|
+| `data/networks.json` | 23,597 | **23,597** (+0) |
+| `data/bluetooth.json` | 3,404 | **3,404** (+0) |
+| `data/flock.json` | 0 | **1** (+1) |
+
+- The live site serves `data/flock.json` with `count=1`, `matched_by: "oui:f0:82:c0:c1:fd:55"`, `updated_at=2026-09-22T22:11:17Z`. R9.4 (record which rule matched) and R9.5 (additive, never instead of) both hold on real data.
+- **#71** (`996c02d`) removed `flock.html`'s standing copy saying no rule had been confirmed, which the merge of #70 had just made false.
+- The owner reported "at least 2" cameras. One was published. The other OUI-list match in the same batch was `08:3a:88:…` — USI, the same vendor prefix as a resident's `Ring-353a57` doorbell in that very batch. The session put that to the owner before publishing.
+
+### The full-MAC rule is a load-bearing privacy invariant with no home in the spec
+
+Every Flock rule is a six-octet address matching exactly one device, never a three-octet vendor prefix. That is not a style choice: the ESP32 Marauder's own 27-entry Flock OUI list contains `08:3a:88` (USI), which matches a Ring doorbell in this project's real data. Replaying the firmware's OUI test over the five logs matched **7 BLE devices across two vendors** — publishing on a vendor prefix would have marked a resident's doorbell as a surveillance camera.
+
+This invariant is currently written in **two places that no actor is required to read**: the `_comment` block in `data/flock-rules.json`, and the visitor-facing copy in `flock.html`. It is **not** in `docs/spec/constitution.md` (which holds the hard invariants) and not in R9.4. A future actor widening a rule to an OUI would ship a privacy harm while passing every test. **Proposal to the owner — not filed as an issue**, because it hardens an existing owner-confirmed decision rather than adding scope.
+
+### The owner's 20:21Z ingest requirement is already satisfied — verified in code
+
+> "the logs are always named the same so even if the same name shows up, the system should look at it as a new log"
+
+Confirmed in `scripts/ingest.py`. Candidate selection (line 330) rejects a file only if its name is in `NON_CANDIDATES` (`README.md`, `.gitkeep`) or starts with `.`; `sorted(names, key=natural_key)` at line 334 orders the batch for determinism and nothing else. **No filename is remembered between runs** — R4.9 deletes each file after it is processed, and de-duplication is per-BSSID (R4.6/R4.7), never per-file. Re-uploading `wardrive_1.log` with new rows ingests the new rows; re-uploading it unchanged adds nothing. The 22:10Z run is the proof: 2 files processed, +0 networks, +0 bluetooth, +1 flock.
+
+No gap. No issue filed. The owner asked directly, so the answer is carried in this cycle's notify.
+
+### The #65 wedge is permanent — cycle 18's committed trigger fires case (a)
+
+Cycle 18 committed to one of three readings this cycle. The evidence names **case (a)**:
+
+- Session `local_7e45b5c4…` still reads `running`, with last activity **still 2026-09-22T15:16:41Z** — unchanged across 6 h 24 m and two PO cycles.
+- PID 52097 is still alive: **10 h 32 m** elapsed, ~205 MiB.
+- The dev-team routine reads `enabled: true`, `lastRunAt` **2026-09-22T15:10:31Z**. Every fire since has been skipped: **16:10, 17:10, 18:10, 19:10, 20:10, 21:10, 22:10, 23:10, 00:10, 01:10 — ten slots**, and 02:10Z will be the eleventh.
+
+Per the trigger, this is now called **permanent** (the rung-18213 class), not slow. It is no longer described as a session that might resume. Two independent falsifications now stand against "it thaws on its own": the owner was active at 19:41Z (cycle 18's finding), and the owner then ran a *five-hour interactive session on the same machine* from 19:40Z to 22:16Z while this session stayed frozen at its 15:16:41Z mark.
+
+**Still not done, and deliberately:** #65 is not unassigned, PID 52097 is not killed, and the routine is not re-flipped. The process is alive, the bot shares the `patrickmroskam` identity so the assignee proves nothing, and the slot is pinned by the live session rather than by the `enabled` flag — flipping it would not free anything. The ~3 minutes of uncommitted R10 work in `wt65` is written off, not salvaged.
+
+**What is new this cycle is the timing, and it changes the ask.** At 22:07Z — 2 h 19 m after cycle 18's notify asked for a relaunch — the owner was mid-publish in their own live session. **Relaunching then would have killed that session**, so not relaunching was the right call, and the notify never said so. That session ended at 22:16Z. There is now no owner work in flight, which makes this a clean moment to relaunch, and that is why this cycle escalates to `high` rather than repeating itself at `normal`.
+
+### Standing checks
+
+- **#17 takeover tripwire — latent, sixteenth consecutive reading.** Apex returns **404** on GitHub's own "Site not found" page, apex `A` records are `185.199.108–111.153`, and no `_github-pages-challenge-patrickmroskam` TXT resolves. Do nothing.
+- **Reachability sweep — reachable-and-undoable set is empty.** All 5 open issues swept. #63 (`p2`) is the highest open tier but is durably `needs-human` (history rewrite). #17 and #21 are `p3` + `blocked` + `needs-human`. #1 carries no priority label, so no worker selects it. #65 is the only workable issue and is claimed. No labels changed.
+- **Evidence rule.** This cycle does not claim an empty backlog. #65 is workable, is `p3`, and is assigned — cited from `gh issue list --json number,labels,assignees`.
+- **Priorities unchanged.** #65 stays `p3`: it is post-v1 by R10's own text and is the only workable item, so tier ordering has nothing to order against.
+
 
 ## Cycle 18 delta (watermark 2026-09-22T14:50Z → 19:55Z): **the first real data batch since cutover landed mid-run; the #65 worker is wedged**
 

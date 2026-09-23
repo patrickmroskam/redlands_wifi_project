@@ -1,38 +1,87 @@
 # Redlands Wifi Project — release readiness
 
-> Regenerated each product-owner cycle. **Cycle 18 · 2026-09-22T19:55Z.**
+*Cycle 19 · 2026-09-23T01:55Z · PRD `ratified` · constitution in force*
 
-## Burndown: 10 of 10 v1 Release Criteria met; the one post-v1 item (R10 / #65) is claimed but stalled
+## Burndown: v1 is 10/10 done
 
-v1 is done and unchanged. #65 (PRD R10: per-kind classification plus main-map toggles) is `p3` and remains the only workable issue. A worker **started** it this cycle — the first real attempt since the owner said `build` ~36 h ago — and then wedged 6 minutes in, holding the claim. Open count: **5** (#1 tracking; #17, #21, #63 `needs-human`; #65 `p3`, claimed).
+All ten Release Criteria in the PRD's Definition of Done are met and have been since
+2026-09-21 (R5, issue #61). **Nothing in v1 is outstanding.** Everything below is post-v1
+or housekeeping.
 
-**The pipeline proved itself on real data this cycle.** An owner-dispatched ingest at 19:41Z took 25,346 rows from 5 logs and published **+3,211 networks (20,386 → 23,597)** and **+1,755 Bluetooth (1,649 → 3,404)**, commit `359b432`, Pages built, live site serving the new counts. Every scheduled run since the 09-21 cutover had been a no-op, so R4/R5/R9 are now confirmed end to end on a real multi-log batch rather than on an empty inbox.
+## Live state, verified against the published data
 
-## Standing decision queue (the owner holds all of these)
+| dataset | records | as of |
+|---|---|---|
+| `data/networks.json` | **23,597** | 2026-09-22T19:41:56Z |
+| `data/bluetooth.json` | **3,404** | 2026-09-22T19:41:56Z |
+| `data/flock.json` | **1** | 2026-09-22T22:11:17Z |
 
-| # | Decision | Status | Channel |
-|---|---|---|---|
-| — | **#65 is stalled behind a wedged worker.** Quitting/relaunching the Claude app clears it; the cost is ~3 minutes of uncommitted R10 work, which is simply redone | **new this cycle**, recommended | notify (cycle 18) |
-| — | Correct the R10 reading if "each type of network" meant the security categories, not vehicle/hotspot/printer/… | optional, carried | notify (cycle 15) |
-| — | R4.9 wording (publish-then-delete), `awaiting owner ratification` | carried; nothing blocked | none |
-| — | #63 git-history rewrite: owner decides when, and is present when it runs | carried | `needs-human` |
-| — | #17 custom domain (post-v1 by owner ruling), #21 repo security settings | carried | `needs-human` |
+Checked by fetching the published JSON from GitHub Pages, per the standing rule to verify a
+publish against the data rather than the job summary.
+
+## What moved this cycle
+
+- **The first Flock camera is on the map.** The owner drove a live session on 2026-09-22
+  (19:40Z–22:16Z), confirmed the device, and authorised the publish ("publish it", 22:07:25Z).
+  `f0:82:c0:c1:fd:55` shipped in **#70**; **#71** corrected `flock.html`, which still told
+  visitors no rule had been confirmed. R9.4 and R9.5 now hold on real data.
+- **The rule is one full MAC, on purpose.** A vendor prefix would have marked a resident's
+  Ring doorbell as a surveillance camera — the firmware's own Flock OUI list contains the USI
+  prefix that doorbell uses. See the R9.4 amendment proposal below.
+- **No issue opened, closed or reopened.** Open count holds at 5.
+
+## The one blocker: #65 cannot move, and only the owner can clear it
+
+The dev-team worker that claimed **#65** (R10 — network kinds and per-kind map toggles) froze
+at 2026-09-22T15:16:41Z and has been wedged ever since. As of this report it is **10 h 32 m**
+old, still reading `running`, with its process alive.
+
+Because the scheduler treats a `running` run as occupying the slot, **ten hourly fires have
+been skipped** (16:10 → 01:10) and one more will be lost every hour. #65 is the only workable
+issue in the backlog, so the dev-team routine is effectively stopped.
+
+**This is now called permanent, not slow.** Two independent facts rule out it thawing on its
+own: the owner was active at 19:41Z, and then ran a five-hour interactive session on the same
+machine while this one stayed frozen at its 15:16:41Z mark.
+
+**The fix is to quit and reopen the Claude app.** The cost is about three minutes of uncommitted
+work in a scratch worktree, which the next run redoes from scratch. The site, the data and the
+git history are untouched by this.
+
+*Why this is escalated now and was not before:* cycle 18 asked at `normal` (19:48Z). At 22:07Z
+the owner was mid-publish in their own live session — **a relaunch would have killed it**, so not
+relaunching was correct, and that notify never said so. That session ended at 22:16Z. No owner
+work is in flight now, which is what makes this a clean moment.
+
+## Decisions the owner needs to make
+
+1. **Relaunch the app** — an action, not a decision, but it is the only thing unblocking #65.
+2. **R9.4 amendment (optional, post-v1).** Write the full-MAC rule into the spec: *every Flock
+   rule SHALL be a full six-octet address, never a vendor prefix.* It is already how the shipped
+   rule works and why, but it currently lives only in a JSON comment and a web page — neither of
+   which an actor must read, so a future rule could widen to an OUI and publish a neighbour's
+   doorbell. Marked *awaiting owner ratification* in the PRD. Declining is fine; it stays where
+   it is.
+3. **"Each type of network" (standing, optional).** R10 reads this as the *kind* axis — vehicle /
+   phone hotspot / printer / default-looking / hidden / named. If the security types
+   (open / WEP / WPA) were meant, say so before #65 ships.
+
+## Parked, correctly — no action implied
+
+| issue | tier | why it is parked |
+|---|---|---|
+| #63 | `p2` `needs-human` | Rewrite 48 pre-cutover logs out of public git history. Owner-authorised in principle; destructive and irreversible, so no actor runs it unattended. |
+| #17 | `p3` `blocked` `needs-human` | `redlandswifiproject.com` takeover window. **Tripwire latent, sixteenth consecutive reading** — apex 404 on GitHub's "Site not found", `A` records unchanged, no challenge TXT. |
+| #21 | `p3` `blocked` `needs-human` | Optional GitHub security settings (Dependabot alerts, private vulnerability reporting). |
+| #1 | tracking | The v1 umbrella. No priority label, so no worker selects it. |
+
+Reachability sweep run on all five open issues: the reachable-but-undoable set is **empty**.
+No labels changed, no priorities changed.
 
 ## Convergence tripwire
 
-**Not tripped.** `net_open_history` is `[11, 10, 5, 5, 5, 5, 5]`, flat. It is flat because no worker has completed anything since 2026-09-21T06:10Z, not because of churn. This is an execution stall, not backlog thrash.
-
-## Process health
-
-- **Resume check:** no `waiting` issue is open, and no redlands ask is open (verified against the OH HAI hub, not the repo).
-- **Closure proposals:** none. **PO net issue delta:** 0 filed, 0 closed.
-- **The #65 worker is wedged and pinning the hourly slot.** Session `local_7e45b5c4…` started 15:10:31Z, last activity **15:16:41Z**, still `running`; PID 52097 alive. It claimed #65 and left uncommitted work on `feat/65-network-kinds` in worktree `wt65` (`assets/map.js`, `assets/stats.js`, `assets/site.css`, `index.html`). The 16:10, 17:10, 18:10 and 19:10 fires were all skipped, and 20:10Z will be too while the session lives. The PO did not unassign, kill, or re-flip anything.
-- **Cycle 17's "resumes on display wake" hypothesis is downgraded to low confidence.** The owner was active at 19:41Z (pushed logs, dispatched a workflow) and the wedged session did not resume.
-- **No stall-bumper is available.** The scrum-master remedy (`claude --resume`) is inert in this environment — the PATH CLI is unauthenticated — and `autonomy-orphan-reclaim` is disabled, so nothing will salvage or release this claim automatically.
-- **Scheduled ingest:** run `35740280107` succeeded, created 14:26Z (4.4 h late, inside the measured 3.7–6.3 h band). 0 files, no commit. The later 19:41Z run was a manual dispatch, not the cron.
-- **#17 tripwire:** fifteenth consecutive latent reading (404 on GitHub's own "Site not found" page, apex `A` in the Pages range, no challenge TXT).
-- **Flock map:** still 0 cameras after a 25,346-row batch. Expected — the rule lists ship empty by design and the map is parked by owner ruling. Not re-raised.
-
-## Send record
-
-- Cycle 18 notify `msg_7dc1b062-a94a-4d39-b0f1-48776d2797c8`, priority `normal`, `delivered` 2026-09-22T19:5xZ. Content: the 19:41Z batch published (+3,211 networks / +1,755 Bluetooth, live), the wedged #65 worker with the one-action relaunch remedy, the retraction of the display-wake hypothesis, and the carried optional R10 clarification. No ask sent — no decision is owed, only a recommendation. Verified from the hub, and not retried.
+**Not tripped.** v1 is complete, the backlog is not growing (open count flat at 5 for seven
+cycles), and no actor is generating work for itself. The one incomplete item, #65, is blocked on
+a host-level fault rather than on scope. The correct end state for this project remains: #65
+ships, the hourly routine disables itself per its task-file rule, and the PO pass continues at
+its six-hour cadence as a watchdog over the nightly ingest.

@@ -119,6 +119,13 @@ struck through below. Mapping only — no stats, breakdown, or per-device pages.
 - R9.2 — WHERE a BLE observation's address may be a rotating private address (resolvable or non-resolvable) THE SYSTEM SHALL NOT publish it, so the map records devices rather than the people who passed by.
 - R9.3 — THE SYSTEM SHALL publish a BLE device with only: address, advertised name, approximate location, and first seen — never RSSI, altitude, accuracy, auth mode, or channel.
 - R9.4 — THE SYSTEM SHALL mark an observation as a Flock camera only when it matches a rule in `data/flock-rules.json`, and SHALL record on each published camera which rule matched it.
+  *Amendment **proposed** 2026-09-23 (cycle 19), **awaiting owner ratification**: add "…and every
+  rule SHALL be a full six-octet address matching one device, never a shorter vendor prefix."
+  This is how the shipped rule is already written (#70) and why; a vendor prefix would publish a
+  resident's Ring doorbell as a camera, because the firmware's own Flock OUI list contains USI
+  `08:3a:88`, which matches one in this project's real data. The invariant currently lives only in
+  `data/flock-rules.json`'s comment and `flock.html`'s visitor copy, neither of which an actor
+  must read.*
 - R9.5 — WHERE a row matches a Flock rule THE SYSTEM SHALL publish it to `data/flock.json` in addition to the database its Type selects, never instead of it.
 - R9.6 — THE SYSTEM SHALL apply the same fence, `_nomap` / `_optout` opt-out, removal denylist, and BSSID dedupe to every database.
 - R9.7 — THE SYSTEM SHALL link the two device maps, the privacy policy, and the source repository from the footer of every page.
@@ -167,7 +174,9 @@ is added to public history.
 The fix is **forward-only.** The 48 logs pushed before the cutover are still in this
 repo's git history; emptying `ingest/` did not remove them. Rewriting that history is
 deliberately not part of the cutover: it is destructive, irreversible, and does nothing
-about clones that already exist, so it needs its own issue and its own review. **That issue is not
-filed yet** — it is an open item in `docs/spec/po-tasks.md`, recorded so far only as
-comments on #22 and #30. The owner has authorised a rewrite in principle (the
-`private-inbox` ask, reply "Rewrite history"); no actor runs it unattended.
+about clones that already exist, so it needs its own issue and its own review. **That issue is
+[#63](https://github.com/patrickmroskam/redlands_wifi_project/issues/63)**, filed 2026-09-21 by
+the Product Owner at `p2` + `needs-human` (bookkeeping corrected 2026-09-23, cycle 19 — this
+paragraph still read "not filed yet" for two days after it was filed). The owner has authorised
+a rewrite in principle (the `private-inbox` ask, reply "Rewrite history"); no actor runs it
+unattended.

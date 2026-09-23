@@ -795,3 +795,51 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - confidence: high (about the downgrade; the underlying cause remains unknown)
 - alternatives: keeping it at medium — rejected, it would let a later cycle wait out a permanent wedge on the expectation that the owner's next interaction clears it, which is exactly the error that cost #65 a full day.
 - watch-next: do not re-argue the cause; it is not the bot's to fix. Cycle 19 records only whether the wedge cleared and what cleared it.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19
+
+- decision: `the #65 wedge is permanent — cycle 18's trigger fires case (a); still no unassign, no kill, no re-flip` — `local_7e45b5c4…` reads `running` with last activity **still 2026-09-22T15:16:41Z**, unchanged across 6 h 24 m and two PO cycles; PID 52097 alive 10 h 32 m; dev-team `lastRunAt` still 15:10:31Z with ten fires skipped (16:10→01:10). Called permanent (the rung-18213 class), not slow.
+- confidence: high
+- alternatives: (a) unassigning #65 — rejected again, unchanged reasons: the process is alive and could wake into a double claim, and the bot shares the `patrickmroskam` identity so the assignee is never evidence of a bot claim; (b) killing PID 52097 — rejected, outside a PO pass's remit; (c) disabling/re-enabling the routine — rejected, the slot is pinned by the live session, not the `enabled` flag.
+- watch-next: cycle 20 records only *what cleared it*, per the new standing task. Do not re-argue the diagnosis.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19
+
+- decision: `escalated to high — on new information, not on repetition` — cycle 18 sent `normal` at 19:48:50Z. The owner was then demonstrably active until 22:16Z and did not relaunch. The escalation does **not** rest on that silence: at 22:07Z the owner was mid-publish in their own live session, and **a relaunch would have killed it**, so not relaunching was correct and cycle 18's notify never said so. That session ended 22:16Z; no owner work is now in flight, which is the new fact. Cost is ten lost slots and one more per hour, on the only workable issue.
+- confidence: high
+- alternatives: (a) repeating at `normal` — rejected, three `normal`/`low` messages on the same stall is how a real ask becomes wallpaper; (b) an `ask` — rejected, a relaunch is an action, not a decision; (c) holding until morning — rejected, 01:55Z is ~18:55 PT and the owner was active three hours ago, so this is not an overnight send.
+- watch-next: **one escalation only.** If cycle 20 finds it still wedged, report at `normal` and do not send a second `high`. #65 is optional post-v1 work; a second `high` would misprice it.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19
+
+- decision: `corrected cycle 18 — there was no concurrent PO run; the owner took over cycle 17's session` — session `local_fae990b8…` (transcript `63e89bbc…`) started 14:48:10Z and sent cycle 17's notify at 14:50:20Z; the owner typed into it at 19:40:09Z and it ran interactively until 22:16:02Z. Cycle 18 read it as a scheduler catch-up replay 67 s behind itself. Three owner turns are on the record, including **"publish it"** at 22:07:25Z.
+- confidence: high (the transcript carries the turns and their timestamps)
+- alternatives: none — the earlier reading is simply falsified.
+- watch-next: the Flock publish is therefore **explicitly owner-authorised**, not an unattended actor publishing a camera location, and no notify was owed for it (the owner got the summary in chat at 22:16Z). Cycle 19 does not re-report it.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19
+
+- decision: `the owner's 20:21Z filename requirement is already satisfied — verified in code, no issue filed` — "the logs are always named the same so even if the same name shows up, the system should look at it as a new log". `scripts/ingest.py:330` rejects a candidate only on `NON_CANDIDATES` (`README.md`, `.gitkeep`) or a leading dot; `sorted(names, key=natural_key)` at :334 orders the batch and nothing more. No filename is remembered between runs — R4.9 deletes each processed file and dedupe is per-BSSID (R4.6/R4.7). The 22:10Z run is the proof: 2 files, +0 networks, +0 bluetooth, +1 flock.
+- confidence: high
+- alternatives: filing it as an issue — rejected, there is no gap; the correct output is an answer to the owner, carried in this cycle's notify because they asked directly.
+- watch-next: none.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19
+
+- decision: `proposed the full-MAC Flock invariant into R9.4 as awaiting ratification; did NOT file it as an issue` — every rule is a six-octet address matching one device, never a vendor prefix, because the firmware's own 27-entry Flock OUI list contains USI `08:3a:88`, which matches a resident's `Ring-353a57` doorbell in this project's real data. Replaying that list over the five logs matched 7 BLE devices across two vendors. The invariant currently lives only in `data/flock-rules.json`'s `_comment` and `flock.html`'s visitor copy — neither of which any actor is required to read — so a future actor could widen a rule to an OUI, ship a privacy harm, and pass every test.
+- confidence: high on the risk; the remedy is the owner's call.
+- alternatives: (a) filing a `p3` issue to amend `constitution.md` directly — rejected for now under the run task's rule that anything not in the PRD becomes a proposal, not an issue; it becomes an issue the moment the owner ratifies. (b) Leaving it in the two data files — rejected, that is the status quo that makes it invisible.
+- watch-next: carried as a PO task; dropped at cycle 24 if still unruled, rather than asked a third time.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19
+
+- decision: `corrected the PRD's stale Known-consideration note` — it still read "**That issue is not filed yet**" for the git-history rewrite, two days after the PO filed it as #63 (2026-09-21, cycle 13). Replaced with the issue link and a dated note. Treated as bookkeeping, not a scope change, so it carries no ratification marker: it corrects a statement of fact about a paragraph the PRD itself labels *not a requirement*.
+- confidence: high
+- alternatives: leaving it and tracking the drift — rejected; a spec that misstates what is filed is how #63 became invisible in the first place.
+- watch-next: none.
+
+## 2026-09-23T01:55:00Z — session product-owner cycle 19 (send record)
+
+- decision: `ONE notify at high; no ask opened` — carries: the relaunch request with the reason it is newly safe, the answer to the owner's filename question, the one optional R9.4 ruling, and the standing "type of network" correction invitation. The id is recorded in the commit that follows and in the auto-memory.
+- confidence: high
+- alternatives: an `ask` — rejected, a relaunch is an action, not a decision, and ask `msg_7929ff83` already settled the #65 scope question.
