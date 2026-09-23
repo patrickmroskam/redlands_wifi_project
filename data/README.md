@@ -94,6 +94,22 @@ rules" and is not an error; a malformed one stops the run.
 
 ## How the site groups networks (`assets/stats.js`)
 
+Two independent axes describe the same network, and both are computed in the
+browser from the published record — neither changes `networks.json` or the
+ingest:
+
+- **Security** — how it is encrypted. Drives the pie and the "By category"
+  column.
+- **Kind** — what the device is. Drives the "By kind" column and the per-kind
+  map toggles (#65, PRD R10).
+
+A network gets exactly one value on each axis, and they are deliberately not
+merged: `DIRECT-7F-HP OfficeJet Pro` is **Default-looking** on the security axis
+(its factory name is the interesting thing there) and **Wi-Fi Direct / printer**
+on the kind axis.
+
+### Security: the pie and the category list
+
 The "Network breakdown" section under the map puts every network the map plots
 into exactly one category, so the pie adds up to 100%:
 
@@ -137,6 +153,53 @@ Under **Default-looking**, indented rows show how those networks are secured
 (using the step 2 rules alone). A note below the table counts hidden (blank)
 SSIDs; those networks are already counted under their security type. The total
 equals the number of networks on the map.
+
+### Kind: what the device is
+
+Every plotted network also gets exactly one **kind**, guessed from its SSID. The
+first group below whose pattern matches wins, so the order is the rule:
+
+1. **Hidden** — a blank or whitespace-only SSID. Decided before any pattern,
+   because there is no name to match.
+2. **Wi-Fi Direct / printer** — `DIRECT-…`. This beats the maker's name, so
+   `DIRECT-BMW 16740` is Wi-Fi Direct rather than a Vehicle: the prefix says
+   what the radio *is* (a Wi-Fi Direct group owner), while the rest of the name
+   only hints at what is behind it.
+3. **Vehicle** — factory naming schemes for in-car head units and their
+   hotspots: `myChevrolet 3B64`, `CHEVROLET1347`, `Chevy WiFi`,
+   `TOYOTA Camry-2.4g_26e19f`, `Mazda_2017888db0d8`, `HONDA1359`, `Kia_2fTI`,
+   `My VW 6616`, `Audi_MMI_8140`, `Porsche_WLAN_4345`, `BMW02628 CarPlay`,
+   `MB Hotspot 03117` and `MB WLAN 37248` (Mercedes-Benz), `MY ROGUE0409`,
+   `SYNC_XP9WT5H3` (Ford), `uconnectadpt`, `CarPlay_6cf8`,
+   `Smartphone_connect_1a523b` and `Vehicle Hotspot`.
+4. **Phone / hotspot** — phones, tablets and mobile-broadband pucks:
+   anything containing `hotspot`, plus `iPhone`/`iPad`, `Galaxy S24 66BC`,
+   `AndroidAP_…`, `Pixel 7`, `…MiFi…`, `CellSpot…`, `Franklin T10 0390`,
+   `Moxee Tether…`, `Redmi …` and `NOKIA-C031`. Checked after Vehicle, so a
+   car's hotspot stays a Vehicle.
+5. **Default-looking** — the same `DEFAULT_SSID_PATTERNS` as the security axis.
+6. **Named** — everything else.
+
+Two judgement calls worth knowing, both visible in the current data:
+
+- **An owner-renamed car is `Named`, not `Vehicle`.** `Christinas VW`,
+  `DAVID CHEVY` and `CodyGMC` are almost certainly cars, but a made-up name is
+  not evidence of a device class — and the same shape covers a home router named
+  after a hobby. Only factory schemes count. This is why the maker patterns are
+  anchored at the start: loose in the middle they also match `Audiology`,
+  `DodgerFam`, `Oxford908`, `RUConnected` and `Leaky Sync`.
+- **Tesla is absent.** `TeslaPW_…` is a Powerwall, `TeslaPV_…` a solar inverter
+  and `TeslaWallConnector_…` a home charger — fixed equipment, not cars — and
+  nothing in the data names a Tesla vehicle.
+
+The patterns live only in `VEHICLE_SSID_PATTERNS`, `PHONE_SSID_PATTERNS` and
+`WIFI_DIRECT_SSID_PATTERNS` in `assets/stats.js`, each with a comment naming a
+real SSID it is there for; update this section when you change them.
+`tests/e2e/kinds.spec.js` holds the hits and the look-alikes they must skip.
+
+Under the map, one checkbox per kind hides or shows that kind's markers. All
+start on. The breakdown keeps describing the whole database while markers are
+hidden — the toggles filter the map, not the numbers.
 
 ## `removed.json` — networks removed on request
 

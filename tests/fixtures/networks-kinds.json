@@ -1,0 +1,18 @@
+{
+  "updated_at": "2026-09-22T10:00:00Z",
+  "count": 12,
+  "networks": [
+    {"bssid": "aa:bb:cc:00:02:01", "ssid": "myChevrolet 3B64", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-22 10:00:00", "lat": 33.97, "lon": -117.22},
+    {"bssid": "aa:bb:cc:00:02:02", "ssid": "TOYOTA Camry-2.4g_26e19f", "auth": "[WPA2_PSK]", "channel": 1, "first_seen": "2026-09-22 10:00:00", "lat": 33.97, "lon": -117.17},
+    {"bssid": "aa:bb:cc:00:02:03", "ssid": "MB Hotspot 03117", "auth": "[WPA2_PSK]", "channel": 11, "first_seen": "2026-09-22 10:00:00", "lat": 33.97, "lon": -117.12},
+    {"bssid": "aa:bb:cc:00:02:04", "ssid": "Hotspot85FA", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-22 10:00:00", "lat": 33.97, "lon": -117.07},
+    {"bssid": "aa:bb:cc:00:02:05", "ssid": "Ethans Iphone", "auth": "[WPA3_PSK]", "channel": 36, "first_seen": "2026-09-22 10:00:00", "lat": 34.02, "lon": -117.22},
+    {"bssid": "aa:bb:cc:00:02:06", "ssid": "DIRECT-7F-HP OfficeJet Pro", "auth": "[WPA2_PSK]", "channel": 1, "first_seen": "2026-09-22 10:00:00", "lat": 34.02, "lon": -117.17},
+    {"bssid": "aa:bb:cc:00:02:07", "ssid": "DIRECT-BMW 16740", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-22 10:00:00", "lat": 34.02, "lon": -117.12},
+    {"bssid": "aa:bb:cc:00:02:08", "ssid": "SpectrumSetup-A1", "auth": "[WPA2_PSK]", "channel": 11, "first_seen": "2026-09-22 10:00:00", "lat": 34.02, "lon": -117.07},
+    {"bssid": "aa:bb:cc:00:02:09", "ssid": "NETGEAR42-5G", "auth": "[OPEN]", "channel": 36, "first_seen": "2026-09-22 10:00:00", "lat": 34.07, "lon": -117.22},
+    {"bssid": "aa:bb:cc:00:02:0a", "ssid": "", "auth": "[WPA2_PSK]", "channel": 1, "first_seen": "2026-09-22 10:00:00", "lat": 34.07, "lon": -117.17},
+    {"bssid": "aa:bb:cc:00:02:0b", "ssid": "Christinas VW", "auth": "[WPA2_PSK]", "channel": 6, "first_seen": "2026-09-22 10:00:00", "lat": 34.07, "lon": -117.12},
+    {"bssid": "aa:bb:cc:00:02:0c", "ssid": "CitrusCafe", "auth": "[OPEN]", "channel": 1, "first_seen": "2026-09-22 10:00:00", "lat": 34.07, "lon": -117.07}
+  ]
+}
