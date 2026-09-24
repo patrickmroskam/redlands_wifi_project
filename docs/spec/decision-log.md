@@ -864,3 +864,16 @@ Cycle 7 sent **one** message, confirmed from the hub. Asks on file, both answere
 - decision: `refreshed the dev-team routine's SKILL.md` — its body still named #65 as the workable set (the known silent-staleness trap). Rewritten to "EMPTY — re-derive on re-enable". The R10 invariants (separate classify/kindOf axes, nothing above `#map`, full Playwright suite) and the full-MAC Flock rule are carried forward. Description left as the dev-team wrote it (accurate).
 - confidence: high
 - alternatives: none.
+
+## 2026-09-24T05:20:00Z — session product-owner cycle 22
+
+- decision: `committed the ratified R9.4 text; did NOT re-enable the dev team` — cycle 21 (session `eff0d381…`) filed #73 on the owner's `mac` answer and edited the PRD, but it never committed. Its `update_scheduled_task(enabled=true)` aborted on a permission timeout at 20:42Z. The owner then drove that session interactively about a new `.gpx` upload and rejected its question at 04:16Z. At this run the PO routine and both No Mylar routines read `enabled:false`, which looks like an owner pause.
+- confidence: medium (the pause is inferred: no actor disables the PO routine)
+- alternatives: re-enabling per the cycle-20 task — rejected, it would override an apparent owner pause; re-asking the `.gpx` question — rejected, the owner declined it in-session hours ago.
+- watch-next: if the PO routine is running again next cycle, the pause is over, so re-enable the dev team for #73.
+
+## 2026-09-24T05:20:00Z — session product-owner cycle 22
+
+- decision: `proposed-close #17 (resolved-by-owner)` + `po-closure-proposed` — the tripwire reads NS at Cloudflare, no apex `A`, no `www`, and curl gets `000`. That is the title's "drop the DNS records" exit. The standing tripwire is re-aimed at a reappearance of Pages-pointed records without a challenge TXT.
+- confidence: high (two public resolvers agree)
+- watch-next: the aging window shuts 2026-09-26T05:20Z; the dev team (when running) concurs or objects.

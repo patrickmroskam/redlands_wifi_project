@@ -118,14 +118,13 @@ struck through below. Mapping only — no stats, breakdown, or per-device pages.
 - R9.1 — THE SYSTEM SHALL serve a Bluetooth map at `bluetooth.html` and a Flock camera map at `flock.html`, in the same retro theme, fenced to the same ZIP polygons as the main map.
 - R9.2 — WHERE a BLE observation's address may be a rotating private address (resolvable or non-resolvable) THE SYSTEM SHALL NOT publish it, so the map records devices rather than the people who passed by.
 - R9.3 — THE SYSTEM SHALL publish a BLE device with only: address, advertised name, approximate location, and first seen — never RSSI, altitude, accuracy, auth mode, or channel.
-- R9.4 — THE SYSTEM SHALL mark an observation as a Flock camera only when it matches a rule in `data/flock-rules.json`, and SHALL record on each published camera which rule matched it.
-  *Amendment **proposed** 2026-09-23 (cycle 19), **awaiting owner ratification**: add "…and every
-  rule SHALL be a full six-octet address matching one device, never a shorter vendor prefix."
-  This is how the shipped rule is already written (#70) and why; a vendor prefix would publish a
-  resident's Ring doorbell as a camera, because the firmware's own Flock OUI list contains USI
-  `08:3a:88`, which matches one in this project's real data. The invariant currently lives only in
-  `data/flock-rules.json`'s comment and `flock.html`'s visitor copy, neither of which an actor
-  must read.*
+- R9.4 — THE SYSTEM SHALL mark an observation as a Flock camera only when it matches a rule in `data/flock-rules.json`, and SHALL record on each published camera which rule matched it. Every rule SHALL be a full six-octet address matching one device, never a shorter vendor prefix.
+  *Amended 2026-09-23, **ratified by the owner** (OH HAI ask `msg_18000c3c-4780-4cd7-9a11-002884b1db46`,
+  answer `mac`). Proposed at cycle 19. This is how the shipped rule is already written (#70) and why:
+  a vendor prefix would publish a resident's Ring doorbell as a camera, because the firmware's own
+  Flock OUI list contains USI `08:3a:88`, which matches one in this project's real data. An SSID
+  pattern is not an address and does not meet this line either (`0022648889` looked like a Penguin
+  serial and was a TP-Link router). Enforcement in code and the constitution is tracked by #73.*
 - R9.5 — WHERE a row matches a Flock rule THE SYSTEM SHALL publish it to `data/flock.json` in addition to the database its Type selects, never instead of it.
 - R9.6 — THE SYSTEM SHALL apply the same fence, `_nomap` / `_optout` opt-out, removal denylist, and BSSID dedupe to every database.
 - R9.7 — THE SYSTEM SHALL link the two device maps, the privacy policy, and the source repository from the footer of every page.
